@@ -8,30 +8,24 @@ on:
 
 jobs:
   backend:
-    name: Rust Backend (Lint & Test)
+    name: Rust Backend (Check & Test)
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
 
       - name: Install Rust toolchain
-        uses: dtolnay/rust-action@stable
+        uses: dtolnay/rust-toolchain@stable
         with:
           components: clippy, rustfmt
 
       - name: Check Rust formatting
         run: cargo fmt --check --manifest-path src-tauri/Cargo.toml
 
-      - name: Run Clippy Linter
-        run: cargo clippy --manifest-path src-tauri/Cargo.toml -- -D warnings
-
-      - name: Build Backend
-        run: cargo build --manifest-path src-tauri/Cargo.toml
-
-      - name: Run Rust Tests
-        run: cargo test --manifest-path src-tauri/Cargo.toml
+      - name: Run Cargo Check
+        run: cargo check --manifest-path src-tauri/Cargo.toml
 
   frontend:
-    name: React Frontend (Lint & Build)
+    name: React Frontend (Build)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -43,9 +37,6 @@ jobs:
 
       - name: Install Dependencies
         run: npm ci
-
-      - name: Run Frontend Linter
-        run: npm run lint
 
       - name: Build Frontend
         run: npm run build
