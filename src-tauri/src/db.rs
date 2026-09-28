@@ -8,7 +8,8 @@ const ACCOUNT_NAME: &str = "db_encryption_key";
 
 /// Obtiene la clave de DPAPI o genera una nueva si es la primera ejecución
 fn get_or_create_encryption_key() -> String {
-    let entry = Entry::new(SERVICE_NAME, ACCOUNT_NAME).expect("Fallo al conectar con Windows Credential Manager");
+    let entry = Entry::new(SERVICE_NAME, ACCOUNT_NAME)
+        .expect("Fallo al conectar con Windows Credential Manager");
 
     match entry.get_password() {
         Ok(password) => password,
@@ -16,11 +17,13 @@ fn get_or_create_encryption_key() -> String {
             // Generar clave aleatoria segura usando bytes aleatorios
             let mut key_bytes = [0u8; 32];
             getrandom::fill(&mut key_bytes).expect("Fallo al generar bytes aleatorios");
-            
+
             // Convertir a cadena hexadecimal para SQLCipher
             let new_key: String = key_bytes.iter().map(|b| format!("{:02x}", b)).collect();
 
-            entry.set_password(&new_key).expect("Fallo al guardar la clave en DPAPI");
+            entry
+                .set_password(&new_key)
+                .expect("Fallo al guardar la clave en DPAPI");
             new_key
         }
     }
@@ -29,7 +32,8 @@ fn get_or_create_encryption_key() -> String {
 /// Inicializa la base de datos, aplica cifrado y corre migraciones
 pub fn init_db(app_data_dir: PathBuf) -> Result<Connection> {
     if !app_data_dir.exists() {
-        fs::create_dir_all(&app_data_dir).expect("No se pudo crear el directorio de la base de datos");
+        fs::create_dir_all(&app_data_dir)
+            .expect("No se pudo crear el directorio de la base de datos");
     }
 
     let db_path = app_data_dir.join("lubricentro_secure.db");
@@ -49,7 +53,7 @@ pub fn init_db(app_data_dir: PathBuf) -> Result<Connection> {
     if version == 0 {
         let initial_schema = include_str!("../migrations/0001_initial_schema.sql");
         conn.execute_batch(initial_schema)?;
-        
+
         // Marcar la base de datos como versión 1 para no repetir el script
         conn.execute("PRAGMA user_version = 1", [])?;
     }
