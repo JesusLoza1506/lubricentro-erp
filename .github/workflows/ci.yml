@@ -24,6 +24,9 @@ jobs:
       - name: Run Clippy Linter
         run: cargo clippy --manifest-path src-tauri/Cargo.toml -- -D warnings
 
+      - name: Build Backend
+        run: cargo build --manifest-path src-tauri/Cargo.toml
+
       - name: Run Rust Tests
         run: cargo test --manifest-path src-tauri/Cargo.toml
 
@@ -40,6 +43,9 @@ jobs:
 
       - name: Install Dependencies
         run: npm ci
+
+      - name: Run Frontend Linter
+        run: npm run lint
 
       - name: Build Frontend
         run: npm run build
