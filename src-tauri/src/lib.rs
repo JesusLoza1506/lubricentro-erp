@@ -1,8 +1,8 @@
-pub mod db;
 pub mod auditoria;
 pub mod auth;
 pub mod caja;
 pub mod comprobantes;
+pub mod db;
 pub mod fidelizacion;
 pub mod inventario;
 pub mod ordenes;
