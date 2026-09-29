@@ -2,6 +2,7 @@ pub mod auditoria;
 pub mod auth;
 pub mod caja;
 pub mod comprobantes;
+pub mod db;
 pub mod fidelizacion;
 pub mod inventario;
 pub mod ordenes;
@@ -20,3 +21,6 @@ pub fn run() {
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
+
+#[cfg(test)]
+mod db_tests;
