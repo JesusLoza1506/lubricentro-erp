@@ -24,6 +24,18 @@ jobs:
       - name: Run Cargo Check
         run: cargo check --manifest-path src-tauri/Cargo.toml
 
+      - name: Run Clippy
+        run: cargo clippy --manifest-path src-tauri/Cargo.toml -- -D warnings
+
+      - name: Run Tests
+        run: cargo test --manifest-path src-tauri/Cargo.toml
+
+      - name: Install Tarpaulin (Coverage)
+        run: cargo install cargo-tarpaulin --locked
+
+      - name: Run Coverage (Fail under 80%)
+        run: cargo tarpaulin --manifest-path src-tauri/Cargo.toml --fail-under 80
+
   frontend:
     name: React Frontend (Build)
     runs-on: ubuntu-latest
