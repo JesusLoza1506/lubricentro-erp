@@ -2,7 +2,11 @@ pub fn calcular_montos(monto_total: f64) -> (f64, f64, f64) {
     let subtotal = monto_total / 1.18;
     let igv = monto_total - subtotal;
     // Redondeo contable a 2 decimales
-    ((subtotal * 100.0).round() / 100.0, (igv * 100.0).round() / 100.0, monto_total)
+    (
+        (subtotal * 100.0).round() / 100.0,
+        (igv * 100.0).round() / 100.0,
+        monto_total,
+    )
 }
 
 #[cfg(test)]

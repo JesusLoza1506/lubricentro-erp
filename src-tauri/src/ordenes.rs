@@ -13,7 +13,10 @@ pub struct OrdenTrabajo {
 
 impl OrdenTrabajo {
     pub fn nueva(id: u32) -> Self {
-        Self { id, estado: EstadoOT::EnEspera }
+        Self {
+            id,
+            estado: EstadoOT::EnEspera,
+        }
     }
 
     pub fn avanzar_a_proceso(&mut self) -> Result<(), String> {
@@ -52,16 +55,25 @@ mod tests {
         ot.finalizar().unwrap();
 
         // Validar que se rechace un salto inválido (FINALIZADO a EN_PROCESO)
-        assert!(ot.avanzar_a_proceso().is_err(), "Debe rechazar pasar a EN_PROCESO desde FINALIZADO");
+        assert!(
+            ot.avanzar_a_proceso().is_err(),
+            "Debe rechazar pasar a EN_PROCESO desde FINALIZADO"
+        );
 
         // Validar que se rechace finalizar una orden recién creada (EN_ESPERA)
         let mut ot2 = OrdenTrabajo::nueva(2);
-        assert!(ot2.finalizar().is_err(), "Debe rechazar finalizar desde EN_ESPERA");
+        assert!(
+            ot2.finalizar().is_err(),
+            "Debe rechazar finalizar desde EN_ESPERA"
+        );
 
         // Validar que se rechace cancelar una orden ya finalizada
         let mut ot3 = OrdenTrabajo::nueva(3);
         ot3.avanzar_a_proceso().unwrap();
         ot3.finalizar().unwrap();
-        assert!(ot3.cancelar().is_err(), "Debe rechazar cancelar desde FINALIZADO");
+        assert!(
+            ot3.cancelar().is_err(),
+            "Debe rechazar cancelar desde FINALIZADO"
+        );
     }
 }

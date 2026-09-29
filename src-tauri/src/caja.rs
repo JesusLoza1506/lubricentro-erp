@@ -36,7 +36,10 @@ mod tests {
     #[test]
     fn test_apertura_y_cierre_caja() {
         // Valores límite y transición de estados
-        assert!(CajaChica::abrir(-10.0).is_err(), "Debe rechazar montos negativos");
+        assert!(
+            CajaChica::abrir(-10.0).is_err(),
+            "Debe rechazar montos negativos"
+        );
 
         let mut caja = CajaChica::abrir(150.50).unwrap();
         assert_eq!(caja.estado, EstadoCaja::Abierta);
@@ -45,6 +48,9 @@ mod tests {
         assert_eq!(caja.estado, EstadoCaja::Cerrada);
 
         let error = caja.cerrar().unwrap_err();
-        assert_eq!(error, "La caja ya está cerrada", "No se puede cerrar dos veces");
+        assert_eq!(
+            error, "La caja ya está cerrada",
+            "No se puede cerrar dos veces"
+        );
     }
 }

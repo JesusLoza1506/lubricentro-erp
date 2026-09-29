@@ -18,14 +18,20 @@ mod tests {
     fn test_hash_y_verificar_password() {
         // Caso de prueba: Partición de equivalencia (credenciales válidas vs inválidas)
         let password = "mi_clave_secreta_123";
-        
+
         // Generamos el hash
         let hashed = hash_password(password).expect("Fallo al hashear la contraseña");
-        
+
         // Verificamos que la contraseña correcta pase
-        assert!(verify_password(password, &hashed).unwrap(), "La contraseña correcta debería ser aceptada");
-        
+        assert!(
+            verify_password(password, &hashed).unwrap(),
+            "La contraseña correcta debería ser aceptada"
+        );
+
         // Verificamos que una contraseña incorrecta sea rechazada
-        assert!(!verify_password("clave_equivocada", &hashed).unwrap(), "Una contraseña incorrecta debería ser rechazada");
+        assert!(
+            !verify_password("clave_equivocada", &hashed).unwrap(),
+            "Una contraseña incorrecta debería ser rechazada"
+        );
     }
 }

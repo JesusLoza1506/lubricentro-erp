@@ -17,7 +17,13 @@ mod tests {
     #[test]
     fn test_proyeccion_kilometraje() {
         // Caso de prueba: Tabla de decisión[cite: 9]
-        assert_eq!(calcular_proximo_mantenimiento(50_000, TipoAceite::Mineral), 55_000);
-        assert_eq!(calcular_proximo_mantenimiento(50_000, TipoAceite::Sintetico), 60_000);
+        assert_eq!(
+            calcular_proximo_mantenimiento(50_000, TipoAceite::Mineral),
+            55_000
+        );
+        assert_eq!(
+            calcular_proximo_mantenimiento(50_000, TipoAceite::Sintetico),
+            60_000
+        );
     }
 }
