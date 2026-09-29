@@ -37,7 +37,7 @@ pub fn init_db(app_data_dir: PathBuf) -> Result<Connection> {
     let conn = Connection::open(&db_path)?;
 
     let key = get_or_create_encryption_key();
-    
+
     // Usamos execute_batch para evitar el error ExecuteReturnedResults de los PRAGMA
     conn.execute_batch(&format!(
         "PRAGMA key = '{}';
@@ -67,7 +67,9 @@ mod tests {
         let dir = tempdir().unwrap();
         match init_db(dir.path().to_path_buf()) {
             Ok(connection) => {
-                let version: i32 = connection.query_row("PRAGMA user_version", [], |row| row.get(0)).unwrap();
+                let version: i32 = connection
+                    .query_row("PRAGMA user_version", [], |row| row.get(0))
+                    .unwrap();
                 assert_eq!(version, 1);
             }
             Err(e) => {
