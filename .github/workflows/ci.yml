@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, develop]
   pull_request:
-    branches: [main]
+    branches: [main, develop]
 
 jobs:
   backend:
@@ -27,7 +27,7 @@ jobs:
       - name: Run Clippy
         run: cargo clippy --manifest-path src-tauri/Cargo.toml -- -D warnings
 
-      - name: Run Tests
+      - name: Run Unit Tests
         run: cargo test --manifest-path src-tauri/Cargo.toml
 
       - name: Install Tarpaulin (Coverage)
@@ -35,6 +35,20 @@ jobs:
 
       - name: Run Coverage (Fail under 80%)
         run: cargo tarpaulin --manifest-path src-tauri/Cargo.toml --fail-under 80
+
+  integration-nubefact:
+    name: NubeFact Sandbox Integration
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Run Integration Tests against Sandbox
+        run: cargo test --test integration_nubefact --manifest-path src-tauri/Cargo.toml
+        env:
+          NUBEFACT_SANDBOX_TOKEN: ${{ secrets.NUBEFACT_SANDBOX_TOKEN }}
 
   frontend:
     name: React Frontend (Build)
