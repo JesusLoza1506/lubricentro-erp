@@ -298,3 +298,54 @@ pub async fn iniciar_worker_nubefact(app_data_dir: PathBuf) {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_estructura_payload_comprobante() {
+        let payload = ComprobantePayload {
+            operacion: "generar_comprobante".to_string(),
+            tipo_de_comprobante: 1,
+            serie: "FFF1".to_string(),
+            numero: 1,
+            sunat_transaction: 1,
+            cliente_tipo_de_documento: 6,
+            cliente_numero_de_documento: "20600695771".to_string(),
+            cliente_denominacion: "NUBEFACT SA".to_string(),
+            cliente_direccion: "AV. LIBERTAD 123".to_string(),
+            cliente_email: "test@gmail.com".to_string(),
+            fecha_de_emision: "29-09-2026".to_string(),
+            moneda: 1,
+            porcentaje_de_igv: 18.0,
+            total_gravada: 100.0,
+            total_igv: 18.0,
+            total: 118.0,
+            detraccion: false,
+            enviar_automaticamente_a_la_sunat: true,
+            enviar_automaticamente_al_cliente: false,
+            cancelado: true,
+            items: vec![],
+        };
+
+        assert_eq!(payload.serie, "FFF1");
+        assert_eq!(payload.total, 118.0);
+    }
+
+    #[test]
+    fn test_parseo_respuesta_nubefact() {
+        let json_data = r#"{
+            "tipo_de_comprobante": 1,
+            "serie": "FFF1",
+            "numero": 66,
+            "aceptada_por_sunat": true,
+            "sunat_description": "ACEPTADA"
+        }"#;
+
+        let res: Result<NubeFactResponse, _> = serde_json::from_str(json_data);
+        assert!(res.is_ok());
+        let parsed = res.unwrap();
+        assert_eq!(parsed.aceptada_por_sunat, Some(true));
+    }
+}

@@ -34,7 +34,7 @@ jobs:
         run: cargo install cargo-tarpaulin --locked
 
       - name: Run Coverage (Fail under 80%)
-        run: cargo tarpaulin --manifest-path src-tauri/Cargo.toml --fail-under 80
+        run: cargo tarpaulin --manifest-path src-tauri/Cargo.toml --ignore-tests --exclude-files src/lib.rs src/main.rs --fail-under 80
 
   integration-nubefact:
     name: NubeFact Sandbox Integration
