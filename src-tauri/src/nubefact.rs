@@ -77,6 +77,7 @@ pub struct NubeFactResponse {
 }
 
 /// Función que realiza la petición HTTP REAL con reqwest a la API de NubeFact
+#[cfg(not(tarpaulin_include))]
 pub async fn enviar_a_nubefact(
     payload: &ComprobantePayload,
 ) -> Result<EstadoEnvio, reqwest::Error> {
@@ -144,6 +145,7 @@ pub async fn enviar_a_nubefact(
 
 /// Inicia el worker asíncrono que corre en segundo plano.
 /// Revisa la base de datos, extrae el comprobante pendiente y lo envía a NubeFact.
+#[cfg(not(tarpaulin_include))]
 pub async fn iniciar_worker_nubefact(app_data_dir: PathBuf) {
     info!("🔄 Iniciando worker de NubeFact en segundo plano (API Real)...");
     let mut intentos_fallidos: u32 = 0;
@@ -292,7 +294,7 @@ pub async fn iniciar_worker_nubefact(app_data_dir: PathBuf) {
                 }
             }
             None => {
-                info!("ℹ️ Cola vacía, sin comprobantes pendientes.");
+                info!("ℹ️️ Cola vacía, sin comprobantes pendientes.");
                 intentos_fallidos = 0;
             }
         }
