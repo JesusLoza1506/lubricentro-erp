@@ -1,3 +1,11 @@
+pub mod auth;
+pub mod caja;
+pub mod auditoria;
+pub mod ordenes;
+pub mod inventario;
+pub mod comprobantes;
+pub mod fidelizacion;
+
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 #[tauri::command]
 fn greet(name: &str) -> String {
