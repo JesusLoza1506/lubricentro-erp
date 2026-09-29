@@ -1,4 +1,14 @@
+<<<<<<< HEAD
 pub mod db;
+=======
+pub mod auditoria;
+pub mod auth;
+pub mod caja;
+pub mod comprobantes;
+pub mod fidelizacion;
+pub mod inventario;
+pub mod ordenes;
+>>>>>>> fddafcbe3e8b401f6fb5ca0348aaaca5c43fcf05
 
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 #[tauri::command]
