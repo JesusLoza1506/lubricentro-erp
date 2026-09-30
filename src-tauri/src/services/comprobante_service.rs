@@ -19,3 +19,31 @@ impl ComprobanteService {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_mapear_comprobante_a_dto() {
+        let entity = ComprobanteEntity {
+            id_comprobante: 1,
+            id_ot: None,
+            id_cliente: 1,
+            id_cajero: 1,
+            tipo_comprobante: "01".to_string(),
+            id_serie: Some(1),
+            correlativo: 10,
+            monto_subtotal: 100.0,
+            monto_igv: 18.0,
+            monto_total: 118.0,
+            medio_pago: "Efectivo".to_string(),
+            estado_sunat: "PENDIENTE".to_string(),
+            fecha_emision: None,
+        };
+
+        let dto = ComprobanteService::mapear_a_dto(entity, Some("FFF1".to_string()));
+        assert_eq!(dto.correlativo, 10);
+        assert_eq!(dto.serie.unwrap(), "FFF1");
+    }
+}
