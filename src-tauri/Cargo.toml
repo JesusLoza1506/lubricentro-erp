@@ -26,6 +26,7 @@ bcrypt = "0.15"
 rusqlite = { version = "0.31", features = ["bundled"] }
 keyring = "2"
 getrandom = "0.2"
+dotenvy = "0.15"
 
 # --- Nuevas dependencias para Fase 3 (NubeFact, Asincronía y Logs) ---
 reqwest = { version = "0.12", features = ["json"] }

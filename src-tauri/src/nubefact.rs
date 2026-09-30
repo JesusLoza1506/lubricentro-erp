@@ -81,17 +81,20 @@ pub struct NubeFactResponse {
 pub async fn enviar_a_nubefact(
     payload: &ComprobantePayload,
 ) -> Result<EstadoEnvio, reqwest::Error> {
-    let url = "https://api.nubefact.com/api/v1/b1f7ac80-5d5e-4fd9-8c8d-7b00c2638da0";
-    let token = "3e15b81cab1b46dc9881d4979e343a273d7abde7bb3e406686eb92f84f6bebd1";
+    let url = std::env::var("NUBEFACT_URL")
+        .unwrap_or_else(|_| "https://api.nubefact.com/api/v1/sandbox".to_string());
+
+    let token =
+        std::env::var("NUBEFACT_TOKEN").unwrap_or_else(|_| "token_sandbox_default".to_string());
 
     info!(
-        "🚀 Enviando comprobante {} - {} a NubeFact (API Real)...",
+        "🚀 Enviando comprobante {} - {} a NubeFact...",
         payload.serie, payload.numero
     );
 
     let client = reqwest::Client::new();
     let res = client
-        .post(url)
+        .post(&url)
         .header("Authorization", format!("Bearer {}", token))
         .header("Content-Type", "application/json")
         .json(&payload)
@@ -147,7 +150,7 @@ pub async fn enviar_a_nubefact(
 /// Revisa la base de datos, extrae el comprobante pendiente y lo envía a NubeFact.
 #[cfg(not(tarpaulin_include))]
 pub async fn iniciar_worker_nubefact(app_data_dir: PathBuf) {
-    info!("🔄 Iniciando worker de NubeFact en segundo plano (API Real)...");
+    info!("🔄 Iniciando worker de NubeFact en segundo plano...");
     let mut intentos_fallidos: u32 = 0;
 
     loop {
@@ -294,7 +297,7 @@ pub async fn iniciar_worker_nubefact(app_data_dir: PathBuf) {
                 }
             }
             None => {
-                info!("ℹ️️ Cola vacía, sin comprobantes pendientes.");
+                info!("ℹ Cola vacía, sin comprobantes pendientes.");
                 intentos_fallidos = 0;
             }
         }
