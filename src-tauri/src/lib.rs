@@ -18,6 +18,7 @@ use commands::{
     auth_commands::*, caja_commands::*, cliente_commands::*, comprobante_commands::*,
     inventario_commands::*, ordenes_commands::*,
 };
+use std::sync::Mutex;
 use tauri::Manager;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -36,7 +37,9 @@ pub fn run() {
 
             tracing::info!("📂 Directorio de Datos de la App (Ruta SQLite): {:?}", app_data_dir);
 
-            if let Ok(mut conn) = crate::db::init_db(app_data_dir.clone()) {
+            let mut conn = crate::db::init_db(app_data_dir.clone()).expect("Error al inicializar la base de datos");
+
+            {
                 let tx = conn.transaction().expect("Error al iniciar transacción");
 
                 let count: i32 = tx
@@ -87,6 +90,9 @@ pub fn run() {
                 }
             }
 
+            // Administramos la conexión a la base de datos globalmente para los comandos de Tauri
+            app.manage(Mutex::new(conn));
+
             tauri::async_runtime::spawn(async move {
                 crate::nubefact::iniciar_worker_nubefact(app_data_dir).await;
             });
@@ -96,6 +102,7 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![
             obtener_usuario_sesion_cmd,
+            crear_usuario_cmd,
             buscar_cliente_por_doc_cmd,
             listar_productos_publicos_cmd,
             obtener_ot_por_codigo_cmd,
