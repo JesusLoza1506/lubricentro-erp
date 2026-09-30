@@ -8,6 +8,12 @@ pub mod inventario;
 pub mod nubefact;
 pub mod ordenes;
 
+// --- Nuevas Capas (Fase 3.5) ---
+pub mod commands;
+pub mod dto;
+pub mod entities;
+pub mod services;
+
 use tauri::Manager;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]

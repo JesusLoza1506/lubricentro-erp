@@ -1,0 +1,13 @@
+pub mod auditoria;
+pub mod caja_chica;
+pub mod categoria;
+pub mod cliente;
+pub mod cola_sincronizacion;
+pub mod comprobante;
+pub mod detalle_comprobante;
+pub mod orden_trabajo;
+pub mod permiso_rol;
+pub mod producto;
+pub mod serie;
+pub mod usuario;
+pub mod vehiculo;

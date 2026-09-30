@@ -1,0 +1,9 @@
+pub mod caja_dto;
+pub mod cliente_dto;
+pub mod cola_dto;
+pub mod comprobante_dto;
+pub mod orden_trabajo_dto;
+pub mod permiso_dto;
+pub mod producto_dto;
+pub mod usuario_dto;
+pub mod vehiculo_dto;
