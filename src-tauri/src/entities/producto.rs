@@ -2,6 +2,7 @@
 pub struct ProductoEntity {
     pub id_producto: i32,
     pub id_categoria: i32,
+    pub nombre: String,
     pub codigo_barras: Option<String>,
     pub unidad_medida: Option<String>,
     pub stock_actual: f64,

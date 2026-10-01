@@ -85,9 +85,28 @@ pub fn run() {
                     )
                     .unwrap();
 
-                    tx.commit().expect("Error al hacer commit de los datos iniciales");
-                    tracing::info!("🌱 [SEEDING] Datos iniciales reales inyectados correctamente en la BD.");
+                    tracing::info!("🌱 [SEEDING] Datos iniciales de ventas/usuarios inyectados correctamente.");
                 }
+
+                // --- Seed de Categorías de Inventario ---
+                let cat_count: i32 = tx
+                    .query_row("SELECT COUNT(*) FROM categorias", [], |row| row.get(0))
+                    .unwrap_or(0);
+
+                if cat_count == 0 {
+                    tx.execute_batch("
+                        INSERT OR IGNORE INTO categorias (id_categoria, nombre_categoria) VALUES
+                        (1, 'Aceites de Motor'),
+                        (2, 'Filtros de Aceite'),
+                        (3, 'Filtros de Aire'),
+                        (4, 'Filtros de Combustible'),
+                        (5, 'Fluidos y Refrigerantes'),
+                        (6, 'Aditivos y Limpiadores');
+                    ").unwrap();
+                    tracing::info!("🌱 [SEEDING] Categorías base creadas.");
+                }
+
+                tx.commit().expect("Error al hacer commit de los datos iniciales");
             }
 
             // Administramos la conexión a la base de datos globalmente para los comandos de Tauri
@@ -104,7 +123,12 @@ pub fn run() {
             obtener_usuario_sesion_cmd,
             crear_usuario_cmd,
             buscar_cliente_por_doc_cmd,
-            listar_productos_publicos_cmd,
+            listar_productos_cmd,
+            listar_productos_criticos_cmd,
+            registrar_producto_cmd,
+            actualizar_producto_cmd,        // <-- REGISTRADO
+            eliminar_producto_cmd,          // <-- REGISTRADO
+            listar_categorias_cmd,
             obtener_ot_por_codigo_cmd,
             emitir_comprobante_cmd,
             cerrar_caja_cmd,
