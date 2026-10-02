@@ -1,4 +1,3 @@
-
 use bcrypt::{hash, DEFAULT_COST};
 
 fn main() {
