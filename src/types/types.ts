@@ -1,14 +1,25 @@
-// Define la estructura exacta de UsuarioSesionDTO que viene de Rust
+export interface PermisoRolDTO {
+  id_permiso: number;
+  rol: 'ADMINISTRADOR' | 'CAJERO' | 'MECANICO';
+  modulo: string;
+  puede_ver: boolean;
+  puede_crear: boolean;
+  puede_editar: boolean;
+  puede_eliminar: boolean;
+}
+
+// Ojehechauka hekopete UsuarioSesionDTO oúva Rust-gui
 export interface UsuarioSesionDTO {
   id_usuario: number;
   nombre_completo: string;
   usuario: string;
   rol: 'ADMINISTRADOR' | 'CAJERO' | 'MECANICO';
   activo: boolean;
+  permisos: PermisoRolDTO[];
 }
 
-// Define la credencial de entrada para la autenticación
+// Ojehechauka umi mba'e ojeikotevẽva oñepyrũ hag̃ua sesión
 export interface Credenciales {
   usuario: string;
-  password_hash: string;
+  password: string;
 }

@@ -13,6 +13,7 @@ pub struct LoginResponseDto {
     pub nombre_completo: String,
     pub username: String,
     pub rol: String,
+    pub activo: bool, // <--- Sincronizado con TypeScript
     pub permisos: Vec<PermisoDto>,
 }
 

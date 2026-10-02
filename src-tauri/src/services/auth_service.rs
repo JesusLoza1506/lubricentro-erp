@@ -29,6 +29,7 @@ impl AuthService {
             let username: String = row.get(2)?;
             let password_hash: String = row.get(3)?;
             let rol: String = row.get(4)?;
+            let activo: bool = row.get::<_, i32>(5)? == 1;
 
             // Validación de la contraseña con bcrypt
             let es_valido = verify(&req.password, &password_hash)
@@ -48,6 +49,7 @@ impl AuthService {
                 nombre_completo,
                 username,
                 rol,
+                activo,
                 permisos,
             })
         } else {
@@ -63,7 +65,7 @@ impl AuthService {
         id_usuario: i64,
     ) -> Result<LoginResponseDto, AppError> {
         let mut stmt = conn.prepare(
-            "SELECT id_usuario, nombre_completo, username, rol 
+            "SELECT id_usuario, nombre_completo, username, rol, activo 
              FROM usuarios 
              WHERE id_usuario = ?1 AND activo = 1",
         )?;
@@ -75,6 +77,7 @@ impl AuthService {
             let nombre_completo: String = row.get(1)?;
             let username: String = row.get(2)?;
             let rol: String = row.get(3)?;
+            let activo: bool = row.get::<_, i32>(4)? == 1;
 
             let permisos = Self::obtener_permisos_rol(conn, &rol)?;
 
@@ -83,6 +86,7 @@ impl AuthService {
                 nombre_completo,
                 username,
                 rol,
+                activo,
                 permisos,
             })
         } else {
@@ -144,26 +148,76 @@ mod tests {
     use tempfile::tempdir;
 
     #[test]
-    fn test_login_exitoso_y_permisos() {
+    fn test_login_exitoso_y_permisos_por_los_tres_roles() {
         let dir = tempdir().unwrap();
         let conn = init_db(dir.path().to_path_buf()).unwrap();
 
         let pass_hash = hash("secret123", DEFAULT_COST).unwrap();
+
+        // 1. Probar usuario Administrador
         conn.execute(
             "INSERT INTO usuarios (nombre_completo, username, password_hash, rol, activo) 
-             VALUES ('Mecanico Test', 'mecanico1', ?1, 'MECANICO', 1)",
+             VALUES ('Admin Test', 'admin_test', ?1, 'ADMINISTRADOR', 1)",
             [&pass_hash],
         )
         .unwrap();
 
-        let req = LoginRequestDto {
-            username: "mecanico1".to_string(),
-            password: "secret123".to_string(),
-        };
+        let res_admin = AuthService::login(
+            &conn,
+            LoginRequestDto {
+                username: "admin_test".to_string(),
+                password: "secret123".to_string(),
+            },
+        )
+        .unwrap();
 
-        let res = AuthService::login(&conn, req).unwrap();
-        assert_eq!(res.username, "mecanico1");
-        assert_eq!(res.rol, "MECANICO");
-        assert!(!res.permisos.is_empty());
+        assert_eq!(res_admin.username, "admin_test");
+        assert_eq!(res_admin.rol, "ADMINISTRADOR");
+        assert!(res_admin.activo);
+        assert!(!res_admin.permisos.is_empty());
+
+        // 2. Probar usuario Mecánico
+        conn.execute(
+            "INSERT INTO usuarios (nombre_completo, username, password_hash, rol, activo) 
+             VALUES ('Mecanico Test', 'mecanico_test', ?1, 'MECANICO', 1)",
+            [&pass_hash],
+        )
+        .unwrap();
+
+        let res_mecanico = AuthService::login(
+            &conn,
+            LoginRequestDto {
+                username: "mecanico_test".to_string(),
+                password: "secret123".to_string(),
+            },
+        )
+        .unwrap();
+
+        assert_eq!(res_mecanico.username, "mecanico_test");
+        assert_eq!(res_mecanico.rol, "MECANICO");
+        assert!(res_mecanico.activo);
+        assert!(!res_mecanico.permisos.is_empty());
+
+        // 3. Probar usuario Cajero
+        conn.execute(
+            "INSERT INTO usuarios (nombre_completo, username, password_hash, rol, activo) 
+             VALUES ('Cajero Test', 'cajero_test', ?1, 'CAJERO', 1)",
+            [&pass_hash],
+        )
+        .unwrap();
+
+        let res_cajero = AuthService::login(
+            &conn,
+            LoginRequestDto {
+                username: "cajero_test".to_string(),
+                password: "secret123".to_string(),
+            },
+        )
+        .unwrap();
+
+        assert_eq!(res_cajero.username, "cajero_test");
+        assert_eq!(res_cajero.rol, "CAJERO");
+        assert!(res_cajero.activo);
+        assert!(!res_cajero.permisos.is_empty());
     }
 }

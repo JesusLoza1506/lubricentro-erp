@@ -29,8 +29,9 @@ export const LoginPage: React.FC = () => {
 
     try {
       await iniciarSesion(usuarioInput, passwordInput);
-    } catch (err) {
-      setErrorMsg('Credenciales incorrectas o usuario no encontrado.');
+    } catch (err: any) {
+      // Ojeiporu upe mensaje genérico oúva backend-gui seguridáre
+      setErrorMsg(err.message || 'Credenciales incorrectas o usuario no encontrado.');
     }
   };
 
@@ -148,7 +149,7 @@ export const LoginPage: React.FC = () => {
         </div>
       </div>
 
-      {/* PANEL DERECHO: Formulario tipo Glassmorphism */}
+      {/* PANEL DERECHO: Formulario */}
       <div style={s.rightPanel}>
         <div style={s.card}>
           <div style={{ marginBottom: '28px' }}>
@@ -212,14 +213,6 @@ export const LoginPage: React.FC = () => {
                   onChange={(e) => setUsuarioInput(e.target.value)}
                   placeholder="Ej. LOZA"
                   style={s.inputBox}
-                  onFocus={(e) => {
-                    e.target.style.borderColor = '#2563EB';
-                    e.target.style.boxShadow = '0 0 15px rgba(37, 99, 235, 0.2)';
-                  }}
-                  onBlur={(e) => {
-                    e.target.style.borderColor = '#334155';
-                    e.target.style.boxShadow = 'none';
-                  }}
                 />
               </div>
             </div>
@@ -246,14 +239,6 @@ export const LoginPage: React.FC = () => {
                   onChange={(e) => setPasswordInput(e.target.value)}
                   placeholder="••••••••"
                   style={s.inputBox}
-                  onFocus={(e) => {
-                    e.target.style.borderColor = '#2563EB';
-                    e.target.style.boxShadow = '0 0 15px rgba(37, 99, 235, 0.2)';
-                  }}
-                  onBlur={(e) => {
-                    e.target.style.borderColor = '#334155';
-                    e.target.style.boxShadow = 'none';
-                  }}
                 />
               </div>
             </div>
@@ -278,8 +263,6 @@ export const LoginPage: React.FC = () => {
                 boxShadow: '0 8px 25px rgba(37, 99, 235, 0.45)',
                 transition: 'all 0.3s ease',
               }}
-              onMouseEnter={(e) => !cargando && (e.currentTarget.style.backgroundColor = '#1D4ED8')}
-              onMouseLeave={(e) => !cargando && (e.currentTarget.style.backgroundColor = '#2563EB')}
             >
               <span>{cargando ? 'Verificando sistema...' : 'Ingresar al ERP'}</span>
               <ArrowRight size={18} />

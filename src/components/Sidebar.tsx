@@ -1,13 +1,14 @@
 import React from 'react';
 import {
-  Package,
+  Shield,
+  FileText,
   Wrench,
+  Package,
   ShoppingCart,
   Receipt,
   Users,
   Activity,
   Database,
-  Shield,
   LogOut,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
@@ -18,37 +19,78 @@ interface SidebarProps {
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({ moduloActual, setModuloActual }) => {
-  const { usuario, cerrarSesion } = useAuth();
+  const { usuario, tienePermiso, cerrarSesion } = useAuth();
 
+  // Catálogo oficial de los 9 módulos según la especificación
   const menuItems = [
     {
       id: 'dashboard',
+      moduloKey: 'DASHBOARD',
       label: 'Inicio',
       icon: Shield,
-      roles: ['ADMINISTRADOR', 'CAJERO', 'MECANICO'],
+      siempreVisible: true, // Accesible para todos tras login
     },
-    { id: 'inventario', label: 'Inventario & Stock', icon: Package, roles: ['ADMINISTRADOR'] },
+    {
+      id: 'ficha_vehicular',
+      moduloKey: 'FICHA_VEHICULAR',
+      label: 'Ficha Vehicular',
+      icon: FileText,
+      siempreVisible: false,
+    },
     {
       id: 'taller',
+      moduloKey: 'OT',
       label: 'Órdenes de Trabajo',
       icon: Wrench,
-      roles: ['ADMINISTRADOR', 'MECANICO'],
+      siempreVisible: false,
+    },
+    {
+      id: 'inventario',
+      moduloKey: 'INVENTARIO',
+      label: 'Inventario & Stock',
+      icon: Package,
+      siempreVisible: false,
     },
     {
       id: 'pos',
+      moduloKey: 'POS',
       label: 'Punto de Venta / POS',
       icon: ShoppingCart,
-      roles: ['ADMINISTRADOR', 'CAJERO'],
+      siempreVisible: false,
     },
-    { id: 'caja', label: 'Caja Chica', icon: Receipt, roles: ['ADMINISTRADOR', 'CAJERO'] },
-    { id: 'fidelizacion', label: 'Fidelización', icon: Users, roles: ['ADMINISTRADOR'] },
-    { id: 'monitoreo', label: 'Cola SUNAT', icon: Activity, roles: ['ADMINISTRADOR'] },
-    { id: 'backup', label: 'Backup & Copias', icon: Database, roles: ['ADMINISTRADOR'] },
+    {
+      id: 'caja',
+      moduloKey: 'CAJA',
+      label: 'Caja Chica',
+      icon: Receipt,
+      siempreVisible: false,
+    },
+    {
+      id: 'fidelizacion',
+      moduloKey: 'FIDELIZACION',
+      label: 'Fidelización',
+      icon: Users,
+      siempreVisible: false,
+    },
+    {
+      id: 'monitoreo',
+      moduloKey: 'COLA_SUNAT',
+      label: 'Cola SUNAT',
+      icon: Activity,
+      siempreVisible: false,
+    },
+    {
+      id: 'backup',
+      moduloKey: 'BACKUP',
+      label: 'Backup & Copias',
+      icon: Database,
+      siempreVisible: false,
+    },
   ];
 
-  // Filtrar según el rol activo del usuario
+  // Ocultamiento estricto: solo se muestran los módulos con puede_ver = 1 en permisos_rol
   const opcionesPermitidas = menuItems.filter(
-    (item) => usuario?.rol && item.roles.includes(usuario.rol)
+    (item) => item.siempreVisible || tienePermiso(item.moduloKey, 'ver')
   );
 
   return (

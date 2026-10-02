@@ -2,17 +2,19 @@ import { invoke } from '@tauri-apps/api/core';
 import { UsuarioSesionDTO } from '../types/types';
 
 /**
- * Llama al comando Tauri `obtener_usuario_sesion_cmd`
- * enviando usuario y contraseña para autenticar al usuario.
+ * Llama al comando Tauri `login_cmd`
+ * enviando el objeto `req` con las claves exactas que espera Serde en Rust: `username` y `password`.
  */
 export const obtenerUsuarioSesion = async (
   usuario: string,
-  password_hash: string
+  password: string
 ): Promise<UsuarioSesionDTO> => {
   try {
-    const res = await invoke<UsuarioSesionDTO>('obtener_usuario_sesion_cmd', {
-      usuario: usuario,
-      passwordHash: password_hash,
+    const res = await invoke<UsuarioSesionDTO>('login_cmd', {
+      req: {
+        username: usuario,
+        password: password,
+      },
     });
     return res;
   } catch (error) {

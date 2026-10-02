@@ -24,30 +24,13 @@ pub fn run() {
                 .app_data_dir()
                 .expect("Fallo al obtener el directorio de la aplicación");
 
-            tracing::info!("📂 Directorio de Datos de la App (SQLite V3): {:?}", app_data_dir);
+            tracing::info!(
+                "📂 Directorio de Datos de la App (SQLite V3): {:?}",
+                app_data_dir
+            );
 
             let conn = crate::db::init_db(app_data_dir.clone())
                 .expect("Error al inicializar la base de datos");
-
-            // --- Seed de Usuario Administrador Inicial ---
-            {
-                let count: i32 = conn
-                    .query_row("SELECT COUNT(*) FROM usuarios", [], |row| row.get(0))
-                    .unwrap_or(0);
-
-                if count == 0 {
-                    let hash_admin = bcrypt::hash("admin123", 4).expect("Error al generar hash");
-
-                    conn.execute(
-                        "INSERT INTO usuarios (id_usuario, nombre_completo, username, password_hash, rol, activo) 
-                         VALUES (1, 'Administrador General', 'admin', ?1, 'ADMINISTRADOR', 1)",
-                        [&hash_admin],
-                    )
-                    .expect("Error al insertar usuario admin inicial");
-
-                    tracing::info!("🌱 [SEEDING] Usuario 'admin' creado exitosamente.");
-                }
-            }
 
             app.manage(Mutex::new(conn));
 

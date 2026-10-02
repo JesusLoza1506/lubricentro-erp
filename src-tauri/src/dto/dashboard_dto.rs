@@ -3,10 +3,11 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct DashboardDto {
     pub rol: String,
-    pub total_ventas_hoy: Option<i64>, // En céntimos (Solo Admin/Cajero)
-    pub ot_en_proceso: i64,
-    pub productos_stock_bajo: i64,
-    pub alertas_fidelizacion: i64, // Vehículos que superan el próximo kilometraje
+    pub ventas_del_dia: f64,
+    pub comprobantes_emitidos: i64,
+    pub ots_activas: i64,
+    pub productos_stock_critico: i64,
+    pub estado_caja: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
