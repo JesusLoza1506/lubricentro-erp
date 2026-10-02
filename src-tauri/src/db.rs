@@ -26,7 +26,7 @@ fn get_or_create_encryption_key() -> String {
     }
 }
 
-/// Inicializa la base de datos, aplica cifrado y corre migraciones
+/// Inicializa la base de datos, aplica pragmas obligatorios y corre la migración V3
 pub fn init_db(app_data_dir: PathBuf) -> Result<Connection> {
     if !app_data_dir.exists() {
         fs::create_dir_all(&app_data_dir)
@@ -38,13 +38,13 @@ pub fn init_db(app_data_dir: PathBuf) -> Result<Connection> {
 
     let key = get_or_create_encryption_key();
 
-    // Usamos execute_batch para evitar el error ExecuteReturnedResults de los PRAGMA
-    conn.execute_batch(&format!(
-        "PRAGMA key = '{}';
-         PRAGMA foreign_keys = ON;
+    // Intentamos aplicar PRAGMA key (si SQLCipher está activo) e imponer FK y WAL
+    let _ = conn.execute(&format!("PRAGMA key = '{}';", key), []);
+
+    conn.execute_batch(
+        "PRAGMA foreign_keys = ON;
          PRAGMA journal_mode = WAL;",
-        key
-    ))?;
+    )?;
 
     let version: i32 = conn.query_row("PRAGMA user_version", [], |row| row.get(0))?;
 
@@ -71,6 +71,12 @@ mod tests {
                     .query_row("PRAGMA user_version", [], |row| row.get(0))
                     .unwrap();
                 assert_eq!(version, 1);
+
+                // Verificar que las claves foráneas estén activas
+                let fk_enabled: i32 = connection
+                    .query_row("PRAGMA foreign_keys", [], |row| row.get(0))
+                    .unwrap();
+                assert_eq!(fk_enabled, 1);
             }
             Err(e) => {
                 panic!("Error al inicializar la base de datos: {:?}", e);

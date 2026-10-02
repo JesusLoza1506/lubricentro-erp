@@ -1,16 +1,54 @@
-use crate::dto::orden_trabajo_dto::OrdenTrabajoDTO;
+use crate::dto::orden_trabajo_dto::{CambiarEstadoOtDto, CrearOrdenTrabajoDto, OrdenTrabajoDto};
+use crate::errors::AppError;
+use crate::services::ordenes_service::OrdenesService;
+use rusqlite::Connection;
+use std::sync::Mutex;
+use tauri::State;
 
 #[tauri::command]
-pub async fn obtener_ot_por_codigo_cmd(codigo: String) -> Result<OrdenTrabajoDTO, String> {
-    Ok(OrdenTrabajoDTO {
-        id_ot: 1,
-        codigo_ot: codigo,
-        placa: "ABC-123".to_string(),
-        id_mecanico: 2,
-        zanja: Some(1),
-        estado: "EN_PROCESO".to_string(),
-        kilometraje_ingreso: 45000,
-        proximo_kilometraje: 50000,
-        fecha_ingreso: Some("2026-09-29 10:00:00".to_string()),
-    })
+pub fn crear_orden_trabajo_cmd(
+    state: State<'_, Mutex<Connection>>,
+    payload: CrearOrdenTrabajoDto,
+) -> Result<OrdenTrabajoDto, AppError> {
+    let conn = state.lock().map_err(|_| {
+        AppError::Validation("Fallo al obtener estado de la base de datos".to_string())
+    })?;
+
+    OrdenesService::crear_orden_trabajo(&conn, payload)
+}
+
+#[tauri::command]
+pub fn obtener_ot_por_codigo_cmd(
+    state: State<'_, Mutex<Connection>>,
+    codigo: String,
+) -> Result<OrdenTrabajoDto, AppError> {
+    let conn = state.lock().map_err(|_| {
+        AppError::Validation("Fallo al obtener estado de la base de datos".to_string())
+    })?;
+
+    OrdenesService::obtener_ot_por_codigo(&conn, &codigo)
+}
+
+#[tauri::command]
+pub fn cambiar_estado_ot_cmd(
+    state: State<'_, Mutex<Connection>>,
+    payload: CambiarEstadoOtDto,
+) -> Result<OrdenTrabajoDto, AppError> {
+    let conn = state.lock().map_err(|_| {
+        AppError::Validation("Fallo al obtener estado de la base de datos".to_string())
+    })?;
+
+    OrdenesService::cambiar_estado_ot(&conn, payload)
+}
+
+#[tauri::command]
+pub fn listar_ordenes_trabajo_cmd(
+    state: State<'_, Mutex<Connection>>,
+    filtro_estado: Option<String>,
+) -> Result<Vec<OrdenTrabajoDto>, AppError> {
+    let conn = state.lock().map_err(|_| {
+        AppError::Validation("Fallo al obtener estado de la base de datos".to_string())
+    })?;
+
+    OrdenesService::listar_ordenes_trabajo(&conn, filtro_estado)
 }

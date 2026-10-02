@@ -2,6 +2,7 @@ pub mod caja_dto;
 pub mod cliente_dto;
 pub mod cola_dto;
 pub mod comprobante_dto;
+pub mod dashboard_dto;
 pub mod orden_trabajo_dto;
 pub mod permiso_dto;
 pub mod producto_dto;

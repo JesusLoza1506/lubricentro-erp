@@ -1,22 +1,18 @@
-use crate::dto::comprobante_dto::{ComprobanteDTO, EmitirComprobanteDTO};
+use crate::dto::comprobante_dto::{ComprobanteDto, EmitirComprobanteDto};
+use crate::errors::AppError;
+use crate::services::comprobante_service::ComprobanteService;
+use rusqlite::Connection;
+use std::sync::Mutex;
+use tauri::State;
 
 #[tauri::command]
-pub async fn emitir_comprobante_cmd(
-    payload: EmitirComprobanteDTO,
-) -> Result<ComprobanteDTO, String> {
-    let subtotal = payload.monto_total / 1.18;
-    let igv = payload.monto_total - subtotal;
+pub fn emitir_comprobante_cmd(
+    state: State<'_, Mutex<Connection>>,
+    payload: EmitirComprobanteDto,
+) -> Result<ComprobanteDto, AppError> {
+    let conn = state.lock().map_err(|_| {
+        AppError::Validation("Fallo al obtener estado de la base de datos".to_string())
+    })?;
 
-    Ok(ComprobanteDTO {
-        id_comprobante: 100,
-        tipo_comprobante: payload.tipo_comprobante,
-        serie: Some("FFF1".to_string()),
-        correlativo: 69,
-        monto_subtotal: subtotal,
-        monto_igv: igv,
-        monto_total: payload.monto_total,
-        medio_pago: payload.medio_pago,
-        estado_sunat: "PENDIENTE".to_string(),
-        fecha_emision: Some("2026-09-29 22:30:00".to_string()),
-    })
+    ComprobanteService::emitir_comprobante(&conn, payload)
 }

@@ -1,9 +1,11 @@
-#[derive(Debug, Clone, PartialEq)]
+use serde::{Deserialize, Serialize};
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct UsuarioEntity {
-    pub id_usuario: i32,
+    pub id_usuario: i64,
     pub nombre_completo: String,
-    pub usuario: String,
+    pub username: String,
     pub password_hash: String,
     pub rol: String,
-    pub activo: bool,
+    pub activo: i32,
 }
