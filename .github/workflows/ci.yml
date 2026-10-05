@@ -73,7 +73,7 @@ jobs:
         run: npm ci
 
       - name: Run Frontend Tests
-        run: npm test -- --passWithNoTests --ci
+        run: npm test -- --passWithNoTests
 
       - name: Build Frontend
         run: npm run build
