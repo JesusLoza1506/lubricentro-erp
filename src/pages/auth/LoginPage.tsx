@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from '../../context/AuthContext';
 import {
   Droplets,
   ShieldAlert,
@@ -10,7 +10,7 @@ import {
   User,
   Sparkles,
 } from 'lucide-react';
-import { loginStyles as s } from '../styles/loginStyles';
+import { loginStyles as s } from '../../styles/loginStyles';
 
 export const LoginPage: React.FC = () => {
   const { iniciarSesion, cargando } = useAuth();

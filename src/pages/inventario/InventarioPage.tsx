@@ -16,11 +16,11 @@ import {
   CrearProductoDTO,
   EditarProductoDTO,
   ProductoForm,
-} from '../types/inventario';
-import { inventarioService } from '../services/inventarioService';
-import { InventarioModal, ModoModal } from './inventario/InventarioModal';
-import { getBadgeStyles } from './inventario/inventarioStyles';
-import { ConfirmModal } from '../components/ConfirmModal';
+} from '../../types/inventario';
+import { inventarioService } from '../../services/inventarioService';
+import { InventarioModal, ModoModal } from '../inventario/components/InventarioModal';
+import { getBadgeStyles } from '../inventario/inventarioStyles';
+import { ConfirmModal } from '../../components/ConfirmModal';
 
 const prodInicial: ProductoForm = {
   id_categoria: 1,
@@ -451,10 +451,10 @@ export const InventarioPage: React.FC = () => {
                       {p.unidad_medida || 'UNIDAD'}
                     </td>
                     <td style={{ padding: '16px', color: '#CBD5E1' }}>
-                      S/ {p.precio_compra.toFixed(2)}
+                      S/ {(p.precio_compra / 100).toFixed(2)}
                     </td>
                     <td style={{ padding: '16px', fontWeight: '700', color: '#34D399' }}>
-                      S/ {p.precio_venta.toFixed(2)}
+                      S/ {(p.precio_venta / 100).toFixed(2)}
                     </td>
                     <td
                       style={{

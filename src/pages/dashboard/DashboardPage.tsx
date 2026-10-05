@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { useAuth } from '../context/AuthContext';
-import { obtenerDatosDashboard, DashboardDTO } from '../services/dashboardService';
+import { useAuth } from '../../context/AuthContext';
+import { obtenerDatosDashboard, DashboardDTO } from '../../services/dashboardService';
 import {
   Wrench,
   ShoppingCart,

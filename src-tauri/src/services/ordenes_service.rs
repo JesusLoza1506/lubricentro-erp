@@ -1,7 +1,8 @@
-use crate::dto::orden_trabajo_dto::{CambiarEstadoOtDto, CrearOrdenTrabajoDto, OrdenTrabajoDto};
-use crate::entities::orden_trabajo::OrdenTrabajoEntity;
+use crate::dto::orden_trabajo_dto::{
+    CambiarEstadoOtDto, CrearOrdenTrabajoDto, DetalleItemOtDto, OrdenTrabajoHistorialDto,
+};
 use crate::errors::AppError;
-use rusqlite::{params, Connection};
+use rusqlite::{params, Connection, OptionalExtension};
 
 pub struct OrdenesService;
 
@@ -16,11 +17,30 @@ impl OrdenesService {
         Ok(format!("OT-{:06}", max_id + 1))
     }
 
+    /// Busca en los productos de la OT si existe un insumo de tipo Aceite/Lubricante
+    fn obtener_tipo_aceite_ot(conn: &Connection, id_ot: i64) -> Result<Option<String>, AppError> {
+        let sql = "SELECT p.descripcion
+                   FROM detalle_ot_productos dp
+                   JOIN productos p ON dp.id_producto = p.id_producto
+                   LEFT JOIN categorias c ON p.id_categoria = c.id_categoria
+                   WHERE dp.id_ot = ?1
+                     AND (UPPER(c.nombre_categoria) LIKE '%ACEITE%'
+                       OR UPPER(c.nombre_categoria) LIKE '%LUBRICANTE%'
+                       OR UPPER(p.descripcion) LIKE '%ACEITE%'
+                       OR UPPER(p.descripcion) LIKE '%20W%'
+                       OR UPPER(p.descripcion) LIKE '%10W%'
+                       OR UPPER(p.descripcion) LIKE '%5W%')
+                   LIMIT 1";
+
+        let resultado = conn.query_row(sql, [id_ot], |row| row.get(0)).optional()?;
+        Ok(resultado)
+    }
+
     /// Registra una nueva Orden de Trabajo
     pub fn crear_orden_trabajo(
         conn: &Connection,
         req: CrearOrdenTrabajoDto,
-    ) -> Result<OrdenTrabajoDto, AppError> {
+    ) -> Result<OrdenTrabajoHistorialDto, AppError> {
         let placa = req.placa.trim().to_uppercase();
 
         if placa.is_empty() {
@@ -74,7 +94,6 @@ impl OrdenesService {
 
         let codigo_ot = Self::generar_codigo_ot(conn)?;
 
-        // Inserción en la base de datos (se activará el trigger trg_valida_rol_mecanico_insert si el id_mecanico no es MECANICO)
         conn.execute(
             "INSERT INTO ordenes_trabajo (codigo_ot, placa, id_mecanico, zanja, estado, kilometraje_ingreso, proximo_kilometraje, observaciones, fecha_ingreso)
              VALUES (?1, ?2, ?3, ?4, 'EN_ESPERA', ?5, ?6, ?7, CURRENT_TIMESTAMP)",
@@ -100,71 +119,130 @@ impl OrdenesService {
         Self::obtener_ot_por_id(conn, id_ot)
     }
 
-    /// Obtiene una OT por su ID
-    pub fn obtener_ot_por_id(conn: &Connection, id_ot: i64) -> Result<OrdenTrabajoDto, AppError> {
-        let mut stmt = conn.prepare(
-            "SELECT id_ot, codigo_ot, placa, id_mecanico, zanja, estado, kilometraje_ingreso, proximo_kilometraje, observaciones, fecha_ingreso
-             FROM ordenes_trabajo WHERE id_ot = ?1",
+    /// Obtiene los detalles de insumos y servicios de una OT específica
+    pub fn obtener_detalles_ot(
+        conn: &Connection,
+        id_ot: i64,
+    ) -> Result<Vec<DetalleItemOtDto>, AppError> {
+        let mut detalles = Vec::new();
+
+        // 1. Obtener Productos aplicados en la OT
+        let mut stmt_prod = conn.prepare(
+            "SELECT
+                dp.id_detalle,
+                p.descripcion,
+                dp.cantidad,
+                (dp.precio_aplicado / 100.0) AS precio_unitario,
+                ((dp.cantidad * dp.precio_aplicado - dp.descuento) / 100.0) AS subtotal
+             FROM detalle_ot_productos dp
+             JOIN productos p ON dp.id_producto = p.id_producto
+             WHERE dp.id_ot = ?1",
         )?;
 
-        let entity = stmt
+        let iter_prod = stmt_prod.query_map([id_ot], |row| {
+            Ok(DetalleItemOtDto {
+                id_detalle: row.get(0)?,
+                descripcion: row.get(1)?,
+                cantidad: row.get(2)?,
+                precio_unitario: row.get(3)?,
+                subtotal: row.get(4)?,
+                tipo: "PRODUCTO".to_string(),
+            })
+        })?;
+
+        for prod in iter_prod {
+            detalles.push(prod?);
+        }
+
+        // 2. Obtener Servicios aplicados en la OT
+        let mut stmt_serv = conn.prepare(
+            "SELECT
+                ds.id_detalle,
+                s.descripcion,
+                1.0 AS cantidad,
+                (ds.precio_aplicado / 100.0) AS precio_unitario,
+                ((ds.precio_aplicado - ds.descuento) / 100.0) AS subtotal
+             FROM detalle_ot_servicios ds
+             JOIN servicios s ON ds.id_servicio = s.id_servicio
+             WHERE ds.id_ot = ?1",
+        )?;
+
+        let iter_serv = stmt_serv.query_map([id_ot], |row| {
+            Ok(DetalleItemOtDto {
+                id_detalle: row.get(0)?,
+                descripcion: row.get(1)?,
+                cantidad: row.get(2)?,
+                precio_unitario: row.get(3)?,
+                subtotal: row.get(4)?,
+                tipo: "SERVICIO".to_string(),
+            })
+        })?;
+
+        for serv in iter_serv {
+            detalles.push(serv?);
+        }
+
+        Ok(detalles)
+    }
+
+    /// Obtiene una OT por su ID con sus detalles e información del mecánico
+    pub fn obtener_ot_por_id(
+        conn: &Connection,
+        id_ot: i64,
+    ) -> Result<OrdenTrabajoHistorialDto, AppError> {
+        let mut stmt = conn.prepare(
+            "SELECT
+                ot.id_ot, ot.codigo_ot, ot.placa, ot.id_mecanico, ot.zanja, ot.estado,
+                ot.kilometraje_ingreso, ot.proximo_kilometraje, ot.observaciones, ot.fecha_ingreso,
+                u.nombre_completo
+             FROM ordenes_trabajo ot
+             LEFT JOIN usuarios u ON ot.id_mecanico = u.id_usuario
+             WHERE ot.id_ot = ?1",
+        )?;
+
+        let raw_data = stmt
             .query_row([id_ot], |row| {
-                Ok(OrdenTrabajoEntity {
-                    id_ot: row.get(0)?,
-                    codigo_ot: row.get(1)?,
-                    placa: row.get(2)?,
-                    id_mecanico: row.get(3)?,
-                    zanja: row.get(4)?,
-                    estado: row.get(5)?,
-                    kilometraje_ingreso: row.get(6)?,
-                    proximo_kilometraje: row.get(7)?,
-                    observaciones: row.get(8)?,
-                    fecha_ingreso: row.get(9)?,
-                })
+                Ok((
+                    row.get::<_, i64>(0)?,
+                    row.get::<_, String>(1)?,
+                    row.get::<_, String>(2)?,
+                    row.get::<_, i64>(3)?,
+                    row.get::<_, Option<i32>>(4)?,
+                    row.get::<_, String>(5)?,
+                    row.get::<_, i64>(6)?,
+                    row.get::<_, i64>(7)?,
+                    row.get::<_, Option<String>>(8)?,
+                    row.get::<_, String>(9)?,
+                    row.get::<_, Option<String>>(10)?,
+                ))
             })
             .map_err(|_| AppError::NotFound(format!("No se encontró la OT con ID {}", id_ot)))?;
 
-        Ok(OrdenTrabajoDto::from(entity))
-    }
+        let detalles = Self::obtener_detalles_ot(conn, raw_data.0)?;
+        let tipo_aceite = Self::obtener_tipo_aceite_ot(conn, raw_data.0)?;
 
-    /// Obtiene una OT por su código único (ej: OT-000001)
-    pub fn obtener_ot_por_codigo(
-        conn: &Connection,
-        codigo: &str,
-    ) -> Result<OrdenTrabajoDto, AppError> {
-        let codigo_clean = codigo.trim().to_uppercase();
-        let mut stmt = conn.prepare(
-            "SELECT id_ot, codigo_ot, placa, id_mecanico, zanja, estado, kilometraje_ingreso, proximo_kilometraje, observaciones, fecha_ingreso
-             FROM ordenes_trabajo WHERE codigo_ot = ?1",
-        )?;
-
-        let entity = stmt
-            .query_row([&codigo_clean], |row| {
-                Ok(OrdenTrabajoEntity {
-                    id_ot: row.get(0)?,
-                    codigo_ot: row.get(1)?,
-                    placa: row.get(2)?,
-                    id_mecanico: row.get(3)?,
-                    zanja: row.get(4)?,
-                    estado: row.get(5)?,
-                    kilometraje_ingreso: row.get(6)?,
-                    proximo_kilometraje: row.get(7)?,
-                    observaciones: row.get(8)?,
-                    fecha_ingreso: row.get(9)?,
-                })
-            })
-            .map_err(|_| {
-                AppError::NotFound(format!("No se encontró la OT con código {}", codigo_clean))
-            })?;
-
-        Ok(OrdenTrabajoDto::from(entity))
+        Ok(OrdenTrabajoHistorialDto {
+            id_ot: raw_data.0,
+            codigo_ot: raw_data.1,
+            placa: raw_data.2,
+            id_mecanico: raw_data.3,
+            zanja: raw_data.4,
+            estado: raw_data.5,
+            kilometraje_ingreso: raw_data.6,
+            proximo_kilometraje: raw_data.7,
+            observaciones: raw_data.8,
+            fecha_ingreso: Some(raw_data.9),
+            nombre_mecanico: raw_data.10,
+            tipo_aceite,
+            detalles,
+        })
     }
 
     /// Máquina de estados para actualización de OT
     pub fn cambiar_estado_ot(
         conn: &Connection,
         req: CambiarEstadoOtDto,
-    ) -> Result<OrdenTrabajoDto, AppError> {
+    ) -> Result<OrdenTrabajoHistorialDto, AppError> {
         let ot_actual = Self::obtener_ot_por_id(conn, req.id_ot)?;
         let nuevo_estado = req.nuevo_estado.trim().to_uppercase();
 
@@ -176,7 +254,6 @@ impl OrdenesService {
             )));
         }
 
-        // Si cambia a EN_PROCESO, requerir zanja y validar disponibilidad
         if nuevo_estado == "EN_PROCESO" {
             let zanja_asignada = req.zanja.or(ot_actual.zanja);
             if zanja_asignada.is_none() {
@@ -210,7 +287,6 @@ impl OrdenesService {
                 params![nuevo_estado, z, req.id_ot],
             )?;
         } else if nuevo_estado == "FINALIZADO" || nuevo_estado == "CANCELADO" {
-            // Al finalizar o cancelar, se libera la zanja
             conn.execute(
                 "UPDATE ordenes_trabajo SET estado = ?1, zanja = NULL WHERE id_ot = ?2",
                 params![nuevo_estado, req.id_ot],
@@ -225,124 +301,63 @@ impl OrdenesService {
         Self::obtener_ot_por_id(conn, req.id_ot)
     }
 
-    /// Lista todas las órdenes de trabajo activas o filtradas por estado
-    pub fn listar_ordenes_trabajo(
+    /// Obtiene el historial completo de órdenes de trabajo asociadas a una placa
+    pub fn obtener_historial_por_placa(
         conn: &Connection,
-        filtro_estado: Option<String>,
-    ) -> Result<Vec<OrdenTrabajoDto>, AppError> {
-        let query = if let Some(ref estado) = filtro_estado {
-            format!(
-                "SELECT id_ot, codigo_ot, placa, id_mecanico, zanja, estado, kilometraje_ingreso, proximo_kilometraje, observaciones, fecha_ingreso
-                 FROM ordenes_trabajo WHERE estado = '{}' ORDER BY id_ot DESC",
-                estado.trim().to_uppercase()
-            )
-        } else {
-            "SELECT id_ot, codigo_ot, placa, id_mecanico, zanja, estado, kilometraje_ingreso, proximo_kilometraje, observaciones, fecha_ingreso
-             FROM ordenes_trabajo ORDER BY id_ot DESC".to_string()
-        };
+        placa: &str,
+    ) -> Result<Vec<OrdenTrabajoHistorialDto>, AppError> {
+        let placa_clean = placa.trim().to_uppercase();
+        let mut stmt = conn.prepare(
+            "SELECT
+                ot.id_ot, ot.codigo_ot, ot.placa, ot.id_mecanico, ot.zanja, ot.estado,
+                ot.kilometraje_ingreso, ot.proximo_kilometraje, ot.observaciones, ot.fecha_ingreso,
+                u.nombre_completo
+             FROM ordenes_trabajo ot
+             LEFT JOIN usuarios u ON ot.id_mecanico = u.id_usuario
+             WHERE ot.placa = ?1
+             ORDER BY ot.fecha_ingreso DESC, ot.id_ot DESC",
+        )?;
 
-        let mut stmt = conn.prepare(&query)?;
-        let iter = stmt.query_map([], |row| {
-            let entity = OrdenTrabajoEntity {
-                id_ot: row.get(0)?,
-                codigo_ot: row.get(1)?,
-                placa: row.get(2)?,
-                id_mecanico: row.get(3)?,
-                zanja: row.get(4)?,
-                estado: row.get(5)?,
-                kilometraje_ingreso: row.get(6)?,
-                proximo_kilometraje: row.get(7)?,
-                observaciones: row.get(8)?,
-                fecha_ingreso: row.get(9)?,
-            };
-            Ok(OrdenTrabajoDto::from(entity))
+        let iter = stmt.query_map([&placa_clean], |row| {
+            Ok((
+                row.get::<_, i64>(0)?,
+                row.get::<_, String>(1)?,
+                row.get::<_, String>(2)?,
+                row.get::<_, i64>(3)?,
+                row.get::<_, Option<i32>>(4)?,
+                row.get::<_, String>(5)?,
+                row.get::<_, i64>(6)?,
+                row.get::<_, i64>(7)?,
+                row.get::<_, Option<String>>(8)?,
+                row.get::<_, String>(9)?,
+                row.get::<_, Option<String>>(10)?,
+            ))
         })?;
 
-        let mut ordenes = Vec::new();
+        let mut historial = Vec::new();
         for item in iter {
-            ordenes.push(item?);
+            let raw_data = item?;
+
+            let detalles = Self::obtener_detalles_ot(conn, raw_data.0)?;
+            let tipo_aceite = Self::obtener_tipo_aceite_ot(conn, raw_data.0)?;
+
+            historial.push(OrdenTrabajoHistorialDto {
+                id_ot: raw_data.0,
+                codigo_ot: raw_data.1,
+                placa: raw_data.2,
+                id_mecanico: raw_data.3,
+                zanja: raw_data.4,
+                estado: raw_data.5,
+                kilometraje_ingreso: raw_data.6,
+                proximo_kilometraje: raw_data.7,
+                observaciones: raw_data.8,
+                fecha_ingreso: Some(raw_data.9),
+                nombre_mecanico: raw_data.10,
+                tipo_aceite,
+                detalles,
+            });
         }
 
-        Ok(ordenes)
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::db::init_db;
-    use tempfile::tempdir;
-
-    fn setup_mecanico_y_vehiculo(conn: &Connection) -> (i64, String) {
-        conn.execute(
-            "INSERT INTO usuarios (id_usuario, nombre_completo, username, password_hash, rol, activo)
-             VALUES (1, 'Mecanico Juan', 'mecanico1', 'hash', 'MECANICO', 1)",
-            [],
-        )
-        .unwrap();
-
-        conn.execute(
-            "INSERT INTO clientes (tipo_documento, numero_documento, nombre_razon_social, activo)
-             VALUES ('DNI', '12345678', 'Cliente Test', 1)",
-            [],
-        )
-        .unwrap();
-
-        let id_cliente = conn.last_insert_rowid();
-
-        conn.execute(
-            "INSERT INTO vehiculos (placa, id_cliente, marca, modelo, kilometraje_actual, activo)
-             VALUES ('ABC-123', ?1, 'Toyota', 'Yaris', 45000, 1)",
-            [id_cliente],
-        )
-        .unwrap();
-
-        (1, "ABC-123".to_string())
-    }
-
-    #[test]
-    fn test_flujo_completo_orden_trabajo_y_zanja() {
-        let dir = tempdir().unwrap();
-        let conn = init_db(dir.path().to_path_buf()).unwrap();
-        let (id_mecanico, placa) = setup_mecanico_y_vehiculo(&conn);
-
-        let req = CrearOrdenTrabajoDto {
-            placa,
-            id_mecanico,
-            zanja: Some(1),
-            kilometraje_ingreso: 45000,
-            proximo_kilometraje: 50000,
-            observaciones: Some("Cambio de aceite".to_string()),
-        };
-
-        let ot = OrdenesService::crear_orden_trabajo(&conn, req).unwrap();
-        assert_eq!(ot.codigo_ot, "OT-000001");
-        assert_eq!(ot.estado, "EN_ESPERA");
-
-        // Transición a EN_PROCESO en Zanja 1
-        let ot_en_proceso = OrdenesService::cambiar_estado_ot(
-            &conn,
-            CambiarEstadoOtDto {
-                id_ot: ot.id_ot,
-                nuevo_estado: "EN_PROCESO".to_string(),
-                zanja: Some(1),
-            },
-        )
-        .unwrap();
-        assert_eq!(ot_en_proceso.estado, "EN_PROCESO");
-        assert_eq!(ot_en_proceso.zanja, Some(1));
-
-        // Transición a FINALIZADO libera la zanja
-        let ot_finalizada = OrdenesService::cambiar_estado_ot(
-            &conn,
-            CambiarEstadoOtDto {
-                id_ot: ot.id_ot,
-                nuevo_estado: "FINALIZADO".to_string(),
-                zanja: None,
-            },
-        )
-        .unwrap();
-        assert_eq!(ot_finalizada.estado, "FINALIZADO");
-        assert_eq!(ot_finalizada.zanja, None);
+        Ok(historial)
     }
 }

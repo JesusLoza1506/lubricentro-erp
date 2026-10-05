@@ -27,7 +27,7 @@ CREATE TABLE permisos_rol (
 
 CREATE TABLE clientes (
     id_cliente INTEGER PRIMARY KEY AUTOINCREMENT,
-    tipo_documento TEXT NOT NULL CHECK (tipo_documento IN ('DNI', 'RUC')),
+    tipo_documento TEXT NOT NULL CHECK (tipo_documento IN ('DNI', 'RUC', 'CE', 'PASAPORTE')),
     numero_documento TEXT NOT NULL UNIQUE,
     nombre_razon_social TEXT NOT NULL,
     telefono TEXT,

@@ -6,7 +6,6 @@ use std::path::PathBuf;
 const SERVICE_NAME: &str = "lubricentro_erp_service";
 const ACCOUNT_NAME: &str = "db_encryption_key";
 
-/// Obtiene la clave de DPAPI o genera una nueva si es la primera ejecución
 fn get_or_create_encryption_key() -> String {
     let entry = Entry::new(SERVICE_NAME, ACCOUNT_NAME);
 
@@ -26,7 +25,6 @@ fn get_or_create_encryption_key() -> String {
     }
 }
 
-/// Inicializa la base de datos, aplica pragmas obligatorios y corre la migración V3
 pub fn init_db(app_data_dir: PathBuf) -> Result<Connection> {
     if !app_data_dir.exists() {
         fs::create_dir_all(&app_data_dir)
@@ -38,7 +36,6 @@ pub fn init_db(app_data_dir: PathBuf) -> Result<Connection> {
 
     let key = get_or_create_encryption_key();
 
-    // Intentamos aplicar PRAGMA key (si SQLCipher está activo) e imponer FK y WAL
     let _ = conn.execute(&format!("PRAGMA key = '{}';", key), []);
 
     conn.execute_batch(
@@ -48,7 +45,8 @@ pub fn init_db(app_data_dir: PathBuf) -> Result<Connection> {
 
     let version: i32 = conn.query_row("PRAGMA user_version", [], |row| row.get(0))?;
 
-    if version == 0 {
+    // Migración Versión 1: Esquema Inicial limpio y real
+    if version < 1 {
         let initial_schema = include_str!("../migrations/0001_initial_schema.sql");
         conn.execute_batch(initial_schema)?;
         conn.execute("PRAGMA user_version = 1", [])?;
@@ -72,7 +70,6 @@ mod tests {
                     .unwrap();
                 assert_eq!(version, 1);
 
-                // Verificar que las claves foráneas estén activas
                 let fk_enabled: i32 = connection
                     .query_row("PRAGMA foreign_keys", [], |row| row.get(0))
                     .unwrap();

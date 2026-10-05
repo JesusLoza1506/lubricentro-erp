@@ -46,7 +46,10 @@ pub fn run() {
             registrar_cliente_cmd,
             buscar_cliente_por_doc_cmd,
             registrar_vehiculo_cmd,
-            listar_vehiculos_por_cliente_cmd,
+            actualizar_vehiculo_cmd,
+            obtener_vehiculo_por_placa_cmd,
+            obtener_ficha_vehicular_completa_cmd, // <--- ¡AQUÍ ESTÁ EL COMANDO CRÍTICO REGISTRADO!
+            eliminar_vehiculo_cmd,
             // Inventario (Fase 2)
             listar_productos_cmd,
             listar_productos_publicos_cmd,
@@ -56,9 +59,8 @@ pub fn run() {
             listar_categorias_cmd,
             // Órdenes de Trabajo (Fase 3)
             crear_orden_trabajo_cmd,
-            obtener_ot_por_codigo_cmd,
             cambiar_estado_ot_cmd,
-            listar_ordenes_trabajo_cmd,
+            obtener_historial_por_placa_cmd,
             // Caja Chica & POS (Fase 4)
             abrir_caja_cmd,
             cerrar_caja_cmd,

@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
-import { LoginPage } from './pages/LoginPage';
+import { LoginPage } from './pages/auth/LoginPage';
 import { Sidebar } from './components/Sidebar';
-import { DashboardPage } from './pages/DashboardPage';
-import { InventarioPage } from './pages/InventarioPage';
+import { DashboardPage } from './pages/dashboard/DashboardPage';
+import { InventarioPage } from './pages/inventario/InventarioPage';
+import { FichaVehicularPage } from './pages/vehiculo/FichaVehicularPage';
 
 const MainApp: React.FC = () => {
   const { usuario, tienePermiso } = useAuth();
@@ -21,6 +22,19 @@ const MainApp: React.FC = () => {
         ) : (
           <DashboardPage setModuloActual={setModuloActual} />
         );
+
+      case 'ficha_vehicular':
+      case 'ficha-vehicular':
+      case 'vehiculos':
+      case 'clientes':
+        return tienePermiso('FICHA_VEHICULAR', 'ver') ||
+          tienePermiso('VEHICULOS', 'ver') ||
+          tienePermiso('CLIENTES', 'ver') ? (
+          <FichaVehicularPage />
+        ) : (
+          <DashboardPage setModuloActual={setModuloActual} />
+        );
+
       default:
         return <DashboardPage setModuloActual={setModuloActual} />;
     }

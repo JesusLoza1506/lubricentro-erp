@@ -1,6 +1,6 @@
 import React from 'react';
-import { Categoria, ProductoForm } from '../../types/inventario';
-import { modalInputStyle } from './inventarioStyles';
+import { Categoria, ProductoForm } from '../../../types/inventario';
+import { modalInputStyle } from '../inventarioStyles';
 
 export type ModoModal = 'CREAR' | 'EDITAR' | 'VER';
 
@@ -131,9 +131,21 @@ export const InventarioModal: React.FC<InventarioModalProps> = ({
               >
                 {categorias.map((cat) => {
                   const id = cat.id_categoria ?? cat.idCategoria;
-                  const nombre = cat.nombre_categoria ?? cat.nombreCategoria;
+                  const nombre =
+                    cat.nombre_categoria ??
+                    cat.nombreCategoria ??
+                    (cat as any).nombre ??
+                    `Categoría ${id}`;
                   return (
-                    <option key={id} value={id}>
+                    <option
+                      key={id}
+                      value={id}
+                      style={{
+                        backgroundColor: '#0F172A',
+                        color: '#F8FAFC',
+                        padding: '8px',
+                      }}
+                    >
                       {nombre}
                     </option>
                   );
