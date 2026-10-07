@@ -209,10 +209,8 @@ pub fn obtener_todos_vehiculos_cmd(
         .map_err(|e| AppError::Validation(e.to_string()))?;
 
     let mut lista = Vec::new();
-    for r in rows {
-        if let Ok(v) = r {
-            lista.push(v);
-        }
+    for v in rows.flatten() {
+        lista.push(v);
     }
 
     Ok(lista)

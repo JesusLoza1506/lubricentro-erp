@@ -89,13 +89,13 @@ impl OrdenesService {
             return Ok(());
         }
 
-        let es_valida = match (actual.as_str(), nuevo.as_str()) {
-            ("EN_ESPERA", "EN_PROCESO") => true,
-            ("EN_ESPERA", "CANCELADO") => true,
-            ("EN_PROCESO", "FINALIZADO") => true,
-            ("EN_PROCESO", "CANCELADO") => true,
-            _ => false,
-        };
+        let es_valida = matches!(
+            (actual.as_str(), nuevo.as_str()),
+            ("EN_ESPERA", "EN_PROCESO")
+                | ("EN_ESPERA", "CANCELADO")
+                | ("EN_PROCESO", "FINALIZADO")
+                | ("EN_PROCESO", "CANCELADO")
+        );
 
         if !es_valida {
             return Err(AppError::Validation(format!(
