@@ -1,14 +1,19 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { vehiculoService } from '../../services/vehiculoService';
+import { ordenesService } from '../../services/ordenesService';
 import {
   VehiculoCompletoDTO,
-  OrdenTrabajoHistorialDTO,
+  OrdenTrabajoHistorialDTO as VehiculoOTDTO,
   CrearVehiculoDTO,
   EditarVehiculoDTO,
 } from '../../types/vehiculo';
+import { CrearOrdenTrabajoPayload, OrdenTrabajoHistorialDTO } from '../../types/ordenTrabajo';
 import { ModalVehiculo, ModoModalVehiculo } from './components/ModalVehiculo';
+
+// Modal de consulta informativa exclusivo de Ficha Vehicular
 import { ModalDetalleOT } from './components/ModalDetalleOT';
+import { ModalCrearOT } from '../ordenes/components/ModalCrearOT';
 import { ConfirmModal } from '../../components/ConfirmModal';
 import { ToastNotification } from '../../components/ToastNotification';
 
@@ -19,6 +24,12 @@ import { FichaVehicularHistorial } from './components/FichaVehicularHistorial';
 import { FichaVehicularEmptyState } from './components/FichaVehicularEmptyState';
 import { pageContainerStyle } from './vehiculoStyles';
 
+interface FichaVehicularPageProps {
+  placaInicial?: string;
+  onVolver?: () => void;
+  onNavegarAOrdenes?: () => void;
+}
+
 // Helper para extraer el mensaje de error sin usar 'any'
 const extraerMensaje = (err: unknown): string => {
   if (typeof err === 'string') return err;
@@ -28,16 +39,21 @@ const extraerMensaje = (err: unknown): string => {
   return 'Ocurrió un error inesperado al procesar la solicitud.';
 };
 
-export const FichaVehicularPage: React.FC = () => {
+export const FichaVehicularPage: React.FC<FichaVehicularPageProps> = ({
+  placaInicial,
+  onNavegarAOrdenes,
+}) => {
   const { tienePermiso, usuario } = useAuth();
 
   const puedeCrear = tienePermiso('FICHA_VEHICULAR', 'crear');
   const puedeEditar = tienePermiso('FICHA_VEHICULAR', 'editar');
   const puedeEliminar = tienePermiso('FICHA_VEHICULAR', 'eliminar');
+  const puedeCrearOT = tienePermiso('OT', 'crear');
 
-  const [placaBusqueda, setPlacaBusqueda] = useState<string>('');
+  const [placaBusqueda, setPlacaBusqueda] = useState<string>(placaInicial || '');
   const [vehiculo, setVehiculo] = useState<VehiculoCompletoDTO | null>(null);
-  const [historial, setHistorial] = useState<OrdenTrabajoHistorialDTO[]>([]);
+  const [historial, setHistorial] = useState<VehiculoOTDTO[]>([]);
+  const [ordenesTodas, setOrdenesTodas] = useState<OrdenTrabajoHistorialDTO[]>([]);
   const [cargando, setCargando] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [buscado, setBuscado] = useState<boolean>(false);
@@ -47,14 +63,19 @@ export const FichaVehicularPage: React.FC = () => {
     tipo: 'EXITO' | 'ERROR';
   } | null>(null);
 
-  // Referencia numérica para limpiar el timeout del toast en el navegador
   const timeoutRef = useRef<number | null>(null);
 
   const [modalVehiculoAbierto, setModalVehiculoAbierto] = useState<boolean>(false);
   const [modoModalVehiculo, setModoModalVehiculo] = useState<ModoModalVehiculo>('CREAR');
-  const [modalOTAbierto, setModalOTAbierto] = useState<boolean>(false);
-  const [otSeleccionada, setOtSeleccionada] = useState<OrdenTrabajoHistorialDTO | null>(null);
+  const [modalCrearOTAbierto, setModalCrearOTAbierto] = useState<boolean>(false);
+  const [otSeleccionada, setOtSeleccionada] = useState<VehiculoOTDTO | null>(null);
   const [confirmModalEliminar, setConfirmModalEliminar] = useState<boolean>(false);
+
+  const obtenerIdUsuario = (): number => {
+    if (!usuario) return 0;
+    const uAny = usuario as any;
+    return uAny.id_usuario || uAny.id || uAny.idUsuario || 0;
+  };
 
   const mostrarNotificacion = (mensaje: string, tipo: 'EXITO' | 'ERROR') => {
     if (timeoutRef.current !== null) {
@@ -66,7 +87,6 @@ export const FichaVehicularPage: React.FC = () => {
     }, 4500);
   };
 
-  // Cleanup effect al desmontar el componente
   useEffect(() => {
     return () => {
       if (timeoutRef.current !== null) {
@@ -85,12 +105,14 @@ export const FichaVehicularPage: React.FC = () => {
 
     const placaClean = placa.trim().toUpperCase();
     try {
-      const fichaCompleta = await vehiculoService.obtenerFichaVehicularCompleta(
-        placaClean,
-        usuario?.id_usuario
-      );
+      const uId = obtenerIdUsuario();
+      const [fichaCompleta, listaOTs] = await Promise.all([
+        vehiculoService.obtenerFichaVehicularCompleta(placaClean, uId),
+        ordenesService.listarOrdenesTrabajo(uId).catch(() => []),
+      ]);
       setVehiculo(fichaCompleta.vehiculo);
       setHistorial(fichaCompleta.historial);
+      setOrdenesTodas(listaOTs);
     } catch (err: unknown) {
       setError(extraerMensaje(err));
     } finally {
@@ -99,14 +121,18 @@ export const FichaVehicularPage: React.FC = () => {
   };
 
   useEffect(() => {
-    const searchParams = new URLSearchParams(window.location.search);
-    const queryPlaca = searchParams.get('placa');
-
-    if (queryPlaca) {
-      setPlacaBusqueda(queryPlaca.toUpperCase());
-      ejecutarBusqueda(queryPlaca);
+    if (placaInicial) {
+      setPlacaBusqueda(placaInicial.toUpperCase());
+      ejecutarBusqueda(placaInicial);
+    } else {
+      const searchParams = new URLSearchParams(window.location.search);
+      const queryPlaca = searchParams.get('placa');
+      if (queryPlaca) {
+        setPlacaBusqueda(queryPlaca.toUpperCase());
+        ejecutarBusqueda(queryPlaca);
+      }
     }
-  }, []);
+  }, [placaInicial]);
 
   const handleGuardarVehiculo = async (data: CrearVehiculoDTO | EditarVehiculoDTO) => {
     try {
@@ -119,6 +145,25 @@ export const FichaVehicularPage: React.FC = () => {
       }
       setPlacaBusqueda(data.placa);
       await ejecutarBusqueda(data.placa);
+    } catch (err: unknown) {
+      const msgError = extraerMensaje(err);
+      mostrarNotificacion(msgError, 'ERROR');
+      throw err;
+    }
+  };
+
+  const handleCrearOT = async (payload: CrearOrdenTrabajoPayload) => {
+    try {
+      const uId = obtenerIdUsuario();
+      await ordenesService.crearOrdenTrabajo(payload, uId);
+      mostrarNotificacion('¡Orden de Trabajo creada correctamente!', 'EXITO');
+      setModalCrearOTAbierto(false);
+
+      if (onNavegarAOrdenes) {
+        onNavegarAOrdenes();
+      } else if (vehiculo) {
+        await ejecutarBusqueda(vehiculo.placa);
+      }
     } catch (err: unknown) {
       const msgError = extraerMensaje(err);
       mostrarNotificacion(msgError, 'ERROR');
@@ -144,6 +189,10 @@ export const FichaVehicularPage: React.FC = () => {
       setConfirmModalEliminar(false);
     }
   };
+
+  const zanjasOcupadas = ordenesTodas
+    .filter((ot) => (ot.estado === 'EN_ESPERA' || ot.estado === 'EN_PROCESO') && ot.zanja)
+    .map((ot) => Number(ot.zanja));
 
   return (
     <div style={pageContainerStyle}>
@@ -203,22 +252,52 @@ export const FichaVehicularPage: React.FC = () => {
 
       {vehiculo && (
         <>
-          <FichaVehicularInfo
-            vehiculo={vehiculo}
-            puedeEditar={puedeEditar}
-            puedeEliminar={puedeEliminar}
-            onAbrirEditar={() => {
-              setModoModalVehiculo('EDITAR');
-              setModalVehiculoAbierto(true);
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginBottom: '12px',
             }}
-            onAbrirEliminar={() => setConfirmModalEliminar(true)}
-          />
+          >
+            <FichaVehicularInfo
+              vehiculo={vehiculo}
+              puedeEditar={puedeEditar}
+              puedeEliminar={puedeEliminar}
+              onAbrirEditar={() => {
+                setModoModalVehiculo('EDITAR');
+                setModalVehiculoAbierto(true);
+              }}
+              onAbrirEliminar={() => setConfirmModalEliminar(true)}
+            />
+          </div>
+
+          {/* Botón flotante/superior para Crear OT directamente para este vehículo */}
+          {puedeCrearOT && (
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '16px' }}>
+              <button
+                onClick={() => setModalCrearOTAbierto(true)}
+                style={{
+                  padding: '10px 18px',
+                  backgroundColor: '#2563EB',
+                  color: '#FFFFFF',
+                  border: 'none',
+                  borderRadius: '8px',
+                  fontWeight: '700',
+                  fontSize: '13px',
+                  cursor: 'pointer',
+                  boxShadow: '0 4px 12px rgba(37, 99, 235, 0.3)',
+                }}
+              >
+                + Crear OT para {vehiculo.placa}
+              </button>
+            </div>
+          )}
 
           <FichaVehicularHistorial
             historial={historial}
             onVerDetalleOT={(ot) => {
               setOtSeleccionada(ot);
-              setModalOTAbierto(true);
             }}
           />
         </>
@@ -232,11 +311,26 @@ export const FichaVehicularPage: React.FC = () => {
         handleGuardar={handleGuardarVehiculo}
       />
 
+      {/* Modal de consulta de detalle exclusivo de Ficha */}
       <ModalDetalleOT
-        modalAbierto={modalOTAbierto}
-        setModalAbierto={setModalOTAbierto}
+        modalAbierto={!!otSeleccionada}
+        setModalAbierto={(abierto) => {
+          if (!abierto) setOtSeleccionada(null);
+        }}
         ordenTrabajo={otSeleccionada}
       />
+
+      {/* Modal de creación de OT con placa precargada */}
+      {modalCrearOTAbierto && vehiculo && (
+        <ModalCrearOT
+          ordenesExistentes={ordenesTodas}
+          zanjasOcupadas={zanjasOcupadas}
+          idMecanicoDefault={obtenerIdUsuario()}
+          placaInicial={vehiculo.placa}
+          onClose={() => setModalCrearOTAbierto(false)}
+          onSubmit={handleCrearOT}
+        />
+      )}
 
       <ConfirmModal
         abierto={confirmModalEliminar}

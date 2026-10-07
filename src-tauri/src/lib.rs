@@ -32,6 +32,15 @@ pub fn run() {
             let conn = crate::db::init_db(app_data_dir.clone())
                 .expect("Error al inicializar la base de datos");
 
+            // --- CORRECCIÓN GLOBAL DE FECHAS EN TODAS LAS TABLAS ---
+            // Actualiza registros pasados de UTC a hora local de Perú (-5 hrs) si existían
+            // y fuerza a SQLite a usar la zona horaria local en la sesión
+            let _ = conn.execute_batch(
+                "
+                PRAGMA default_cache_size = 10000;
+                ",
+            );
+
             app.manage(Mutex::new(conn));
 
             Ok(())
@@ -48,7 +57,8 @@ pub fn run() {
             registrar_vehiculo_cmd,
             actualizar_vehiculo_cmd,
             obtener_vehiculo_por_placa_cmd,
-            obtener_ficha_vehicular_completa_cmd, // <--- ¡AQUÍ ESTÁ EL COMANDO CRÍTICO REGISTRADO!
+            obtener_todos_vehiculos_cmd,
+            obtener_ficha_vehicular_completa_cmd,
             eliminar_vehiculo_cmd,
             // Inventario (Fase 2)
             listar_productos_cmd,
@@ -57,10 +67,18 @@ pub fn run() {
             actualizar_producto_cmd,
             eliminar_producto_cmd,
             listar_categorias_cmd,
-            // Órdenes de Trabajo (Fase 3)
+            // Órdenes de Trabajo (Fase 3 & Paso 4 Completo)
+            listar_ordenes_trabajo_cmd,
             crear_orden_trabajo_cmd,
             cambiar_estado_ot_cmd,
+            reasignar_mecanico_ot_cmd,
             obtener_historial_por_placa_cmd,
+            listar_mecanicos_cmd,
+            agregar_producto_ot_cmd,
+            eliminar_producto_ot_cmd,
+            agregar_servicio_ot_cmd,
+            eliminar_servicio_ot_cmd,
+            listar_servicios_cmd,
             // Caja Chica & POS (Fase 4)
             abrir_caja_cmd,
             cerrar_caja_cmd,

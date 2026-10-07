@@ -1,6 +1,6 @@
 import React from 'react';
 import { OrdenTrabajoHistorialDTO } from '../../../types/vehiculo';
-import { Wrench, Calendar, Gauge, FileText, X, Droplet } from 'lucide-react';
+import { Wrench, Calendar, Gauge, FileText, X, Droplet, UserCheck } from 'lucide-react';
 
 interface ModalDetalleOTProps {
   modalAbierto: boolean;
@@ -66,8 +66,15 @@ export const ModalDetalleOT: React.FC<ModalDetalleOTProps> = ({
                 backgroundColor:
                   ordenTrabajo.estado === 'FINALIZADO'
                     ? 'rgba(52, 211, 153, 0.2)'
-                    : 'rgba(251, 191, 36, 0.2)',
-                color: ordenTrabajo.estado === 'FINALIZADO' ? '#34D399' : '#FBBF24',
+                    : ordenTrabajo.estado === 'CANCELADO'
+                      ? 'rgba(239, 68, 68, 0.2)'
+                      : 'rgba(251, 191, 36, 0.2)',
+                color:
+                  ordenTrabajo.estado === 'FINALIZADO'
+                    ? '#34D399'
+                    : ordenTrabajo.estado === 'CANCELADO'
+                      ? '#EF4444'
+                      : '#FBBF24',
               }}
             >
               {ordenTrabajo.estado}
@@ -115,6 +122,24 @@ export const ModalDetalleOT: React.FC<ModalDetalleOTProps> = ({
             <FileText size={16} color="#A855F7" />
             <span>Placa: {ordenTrabajo.placa}</span>
           </div>
+          {ordenTrabajo.nombre_mecanico && (
+            <div
+              style={{
+                gridColumn: 'span 2',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                color: '#CBD5E1',
+                borderTop: '1px solid rgba(51, 65, 85, 0.5)',
+                paddingTop: '8px',
+              }}
+            >
+              <UserCheck size={16} color="#38BDF8" />
+              <span>
+                Mecánico: <strong>{ordenTrabajo.nombre_mecanico}</strong>
+              </span>
+            </div>
+          )}
         </div>
 
         {/* TIPO DE ACEITE / LUBRICANTE APLICADO */}

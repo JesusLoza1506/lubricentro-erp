@@ -49,6 +49,14 @@ pub fn init_db(app_data_dir: PathBuf) -> Result<Connection> {
     if version < 1 {
         let initial_schema = include_str!("../migrations/0001_initial_schema.sql");
         conn.execute_batch(initial_schema)?;
+
+        // Crear índice único parcial para zanjas activas en SQLite
+        conn.execute_batch(
+            "CREATE UNIQUE INDEX IF NOT EXISTS idx_zanja_activa 
+             ON ordenes_trabajo(zanja) 
+             WHERE zanja IS NOT NULL AND estado IN ('EN_ESPERA', 'EN_PROCESO');",
+        )?;
+
         conn.execute("PRAGMA user_version = 1", [])?;
     }
 

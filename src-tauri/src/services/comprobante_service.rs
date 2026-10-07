@@ -1,7 +1,7 @@
 use crate::dto::comprobante_dto::{ComprobanteDto, EmitirComprobanteDto};
 use crate::entities::comprobante::ComprobanteEntity;
 use crate::errors::AppError;
-use rusqlite::{params, Connection};
+use rusqlite::{params, Connection, OptionalExtension};
 
 pub struct ComprobanteService;
 
@@ -49,10 +49,10 @@ impl ComprobanteService {
             }
         }
 
-        // Insertar comprobante (se validarán los triggers trg_valida_rol_cajero_insert, etc.)
+        // Insertar comprobante
         conn.execute(
             "INSERT INTO comprobantes (id_ot, id_cliente, id_cajero, id_caja, tipo_comprobante, id_serie, correlativo, monto_subtotal, monto_igv, monto_total, estado_sunat, fecha_emision)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, 'PENDIENTE', CURRENT_TIMESTAMP)",
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, 'PENDIENTE', datetime('now', 'localtime'))",
             params![
                 req.id_ot,
                 req.id_cliente,
@@ -69,7 +69,7 @@ impl ComprobanteService {
 
         let id_comprobante = conn.last_insert_rowid();
 
-        // Registrar pago asociado (activará el trigger trg_valida_pago_insert)
+        // Registrar pago asociado
         conn.execute(
             "INSERT INTO pagos_comprobante (id_comprobante, medio_pago, monto)
              VALUES (?1, ?2, ?3)",
@@ -83,8 +83,8 @@ impl ComprobanteService {
         // Registrar movimiento en caja si corresponde a venta efectiva
         if tipo != "PROFORMA" {
             conn.execute(
-                "INSERT INTO movimientos_caja (id_caja, id_comprobante, tipo_movimiento, monto, descripcion)
-                 VALUES (?1, ?2, 'INGRESO_VENTA', ?3, ?4)",
+                "INSERT INTO movimientos_caja (id_caja, id_comprobante, tipo_movimiento, monto, descripcion, fecha_movimiento)
+                 VALUES (?1, ?2, 'INGRESO_VENTA', ?3, ?4, datetime('now', 'localtime'))",
                 params![
                     req.id_caja,
                     id_comprobante,
@@ -92,6 +92,86 @@ impl ComprobanteService {
                     format!("Venta de comprobante ID {}", id_comprobante)
                 ],
             )?;
+
+            // GESTIÓN INTELIGENTE DE STOCK / KÁRDEX SEGÚN LA ORIGEN DE LA OT
+            if let Some(id_ot_val) = req.id_ot {
+                let mut stmt_prods = conn.prepare(
+                    "SELECT id_detalle, id_producto, cantidad, precio_aplicado FROM detalle_ot_productos WHERE id_ot = ?1",
+                )?;
+
+                let prods_iter = stmt_prods.query_map([id_ot_val], |row| {
+                    Ok((
+                        row.get::<_, i64>(0)?,
+                        row.get::<_, i64>(1)?,
+                        row.get::<_, f64>(2)?,
+                        row.get::<_, i64>(3)?,
+                    ))
+                })?;
+
+                for prod_res in prods_iter {
+                    let (id_det_ot, id_prod, cant, p_unit) = prod_res?;
+
+                    // Insertar en detalle_comprobante
+                    conn.execute(
+                        "INSERT INTO detalle_comprobante (id_comprobante, id_producto, cantidad, precio_unitario, subtotal)
+                         VALUES (?1, ?2, ?3, ?4, ?5)",
+                        params![
+                            id_comprobante,
+                            id_prod,
+                            cant,
+                            p_unit,
+                            (cant * p_unit as f64) as i64
+                        ],
+                    )?;
+
+                    let id_det_comp = conn.last_insert_rowid();
+
+                    // Verificar si el producto ya descontó stock cuando estuvo en el Taller
+                    let mov_ot: Option<i64> = conn
+                        .query_row(
+                            "SELECT id_movimiento FROM movimientos_inventario WHERE id_detalle_ot = ?1",
+                            [id_det_ot],
+                            |row| row.get(0),
+                        )
+                        .optional()?;
+
+                    if let Some(id_mov) = mov_ot {
+                        // OT NUEVA: Ya descontó stock en el taller -> Vincular el movimiento existente al comprobante
+                        conn.execute(
+                            "UPDATE movimientos_inventario SET id_detalle_comprobante = ?1 WHERE id_movimiento = ?2",
+                            params![id_det_comp, id_mov],
+                        )?;
+                    } else {
+                        // OT ANTIGUA: No había descontado en taller -> Descontar stock ahora en POS
+                        let stock_actual: f64 = conn.query_row(
+                            "SELECT stock_actual FROM productos WHERE id_producto = ?1",
+                            [id_prod],
+                            |row| row.get(0),
+                        )?;
+
+                        let stock_resultante = stock_actual - cant;
+
+                        conn.execute(
+                            "UPDATE productos SET stock_actual = ?1 WHERE id_producto = ?2",
+                            params![stock_resultante, id_prod],
+                        )?;
+
+                        conn.execute(
+                            "INSERT INTO movimientos_inventario (id_producto, id_usuario, id_detalle_comprobante, tipo_movimiento, stock_anterior, diferencia, stock_resultante, referencia, fecha_movimiento)
+                             VALUES (?1, ?2, ?3, 'EGRESO_VENTA', ?4, ?5, ?6, ?7, datetime('now', 'localtime'))",
+                            params![
+                                id_prod,
+                                req.id_cajero,
+                                id_det_comp,
+                                stock_actual,
+                                -cant,
+                                stock_resultante,
+                                format!("Venta desde OT Antigua {}", id_ot_val)
+                            ],
+                        )?;
+                    }
+                }
+            }
         }
 
         Self::obtener_comprobante_por_id(conn, id_comprobante)

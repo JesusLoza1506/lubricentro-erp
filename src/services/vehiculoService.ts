@@ -41,7 +41,14 @@ export const vehiculoService = {
     });
   },
 
-  // 4. Registrar Nuevo Vehículo / Cliente
+  // 4. Listar TODOS los vehículos activos directamente de la tabla 'vehiculos'
+  listarVehiculos: async (idUsuario?: number): Promise<VehiculoCompletoDTO[]> => {
+    return await invoke<VehiculoCompletoDTO[]>('obtener_todos_vehiculos_cmd', {
+      idUsuario: idUsuario ?? null,
+    });
+  },
+
+  // 5. Registrar Nuevo Vehículo / Cliente
   registrarVehiculo: async (payload: CrearVehiculoDTO, idUsuario?: number): Promise<void> => {
     return await invoke('registrar_vehiculo_cmd', {
       payload,
@@ -49,7 +56,7 @@ export const vehiculoService = {
     });
   },
 
-  // 5. Actualizar Vehículo Existente
+  // 6. Actualizar Vehículo Existente
   actualizarVehiculo: async (payload: EditarVehiculoDTO, idUsuario?: number): Promise<void> => {
     return await invoke('actualizar_vehiculo_cmd', {
       payload,
@@ -57,7 +64,7 @@ export const vehiculoService = {
     });
   },
 
-  // 6. Eliminar Vehículo (Exclusivo Administrador)
+  // 7. Eliminar Vehículo (Exclusivo Administrador)
   eliminarVehiculo: async (placa: string, idUsuario?: number): Promise<void> => {
     return await invoke('eliminar_vehiculo_cmd', {
       placa,

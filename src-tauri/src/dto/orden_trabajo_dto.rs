@@ -33,7 +33,7 @@ pub struct CrearOrdenTrabajoDto {
     pub id_mecanico: i64,
     pub zanja: Option<i32>,
     pub kilometraje_ingreso: i64,
-    pub proximo_kilometraje: i64,
+    pub tipo_aceite: String, // "MINERAL" | "SINTETICO" (Usado para auto-calcular próximo KM)
     pub observaciones: Option<String>,
 }
 
@@ -42,4 +42,32 @@ pub struct CambiarEstadoOtDto {
     pub id_ot: i64,
     pub nuevo_estado: String,
     pub zanja: Option<i32>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct ReasignarMecanicoOtDto {
+    pub id_ot: i64,
+    pub nuevo_id_mecanico: i64,
+}
+
+// --- NUEVOS DTOS PARA PASO 4 (GESTIÓN DE DETALLES) ---
+
+#[derive(Debug, Deserialize)]
+pub struct AgregarProductoOtDto {
+    pub id_ot: i64,
+    pub id_producto: i64,
+    pub cantidad: f64,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct AgregarServicioOtDto {
+    pub id_ot: i64,
+    pub id_servicio: i64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ServicioResumenDto {
+    pub id_servicio: i64,
+    pub descripcion: String,
+    pub precio_base: f64, // En soles
 }

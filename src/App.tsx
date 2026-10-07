@@ -5,17 +5,35 @@ import { Sidebar } from './components/Sidebar';
 import { DashboardPage } from './pages/dashboard/DashboardPage';
 import { InventarioPage } from './pages/inventario/InventarioPage';
 import { FichaVehicularPage } from './pages/vehiculo/FichaVehicularPage';
+import { OrdenesPage } from './pages/ordenes/OrdenesPage';
 
 const MainApp: React.FC = () => {
   const { usuario, tienePermiso } = useAuth();
   const [moduloActual, setModuloActual] = useState<string>('dashboard');
+  const [placaSeleccionada, setPlacaSeleccionada] = useState<string>('');
 
   if (!usuario) {
     return <LoginPage />;
   }
 
+  const navegarAFichaVehicular = (placa?: string) => {
+    if (placa) {
+      setPlacaSeleccionada(placa.toUpperCase().trim());
+    }
+    setModuloActual('ficha_vehicular');
+  };
+
   const renderModulo = () => {
     switch (moduloActual) {
+      case 'ordenes':
+      case 'taller':
+      case 'ot':
+        return tienePermiso('OT', 'ver') || tienePermiso('ORDENES', 'ver') ? (
+          <OrdenesPage onNavegarAFichaVehicular={navegarAFichaVehicular} />
+        ) : (
+          <DashboardPage setModuloActual={setModuloActual} />
+        );
+
       case 'inventario':
         return tienePermiso('INVENTARIO', 'ver') ? (
           <InventarioPage />
@@ -30,7 +48,7 @@ const MainApp: React.FC = () => {
         return tienePermiso('FICHA_VEHICULAR', 'ver') ||
           tienePermiso('VEHICULOS', 'ver') ||
           tienePermiso('CLIENTES', 'ver') ? (
-          <FichaVehicularPage />
+          <FichaVehicularPage placaInicial={placaSeleccionada} />
         ) : (
           <DashboardPage setModuloActual={setModuloActual} />
         );

@@ -6,6 +6,10 @@ export const inventarioService = {
     return await invoke<Producto[]>('listar_productos_cmd');
   },
 
+  listarProductosPublicos: async (): Promise<Producto[]> => {
+    return await invoke<Producto[]>('listar_productos_publicos_cmd');
+  },
+
   listarProductosCriticos: async (): Promise<Producto[]> => {
     return await invoke<Producto[]>('listar_productos_criticos_cmd');
   },

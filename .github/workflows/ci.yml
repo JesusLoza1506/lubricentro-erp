@@ -38,6 +38,9 @@ jobs:
       - name: Run Vehiculo Integration Tests
         run: cargo test --test vehiculo_tests --manifest-path src-tauri/Cargo.toml
 
+      - name: Run Ordenes Integration Tests
+        run: cargo test --test ordenes_tests --manifest-path src-tauri/Cargo.toml
+
   integration-nubefact:
     name: NubeFact Sandbox Integration
     runs-on: windows-latest

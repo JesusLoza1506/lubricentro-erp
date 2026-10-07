@@ -4,7 +4,6 @@ import { FichaVehicularPage } from '../FichaVehicularPage';
 import { vehiculoService } from '../../../services/vehiculoService';
 import { FichaVehicularCompletaDTO } from '../../../types/vehiculo';
 
-// Mock de los servicios de Tauri / Backend
 vi.mock('../../../services/vehiculoService', () => ({
   vehiculoService: {
     obtenerFichaVehicularCompleta: vi.fn(),
@@ -14,7 +13,6 @@ vi.mock('../../../services/vehiculoService', () => ({
   },
 }));
 
-// Mock del contexto de Autenticación con permisos completos
 vi.mock('../../../context/AuthContext', () => ({
   useAuth: () => ({
     tienePermiso: () => true,
@@ -22,18 +20,18 @@ vi.mock('../../../context/AuthContext', () => ({
   }),
 }));
 
-describe('FichaVehicularPage - Pruebas de Integración Frontend', () => {
+describe('FichaVehicularPage - Pruebas de Integración Frontend (FASE 4)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  it('renderiza correctamente el estado inicial vacío de búsqueda', () => {
+  it('1. Renderiza correctamente el estado inicial vacío de búsqueda', () => {
     render(<FichaVehicularPage />);
     expect(screen.getByPlaceholderText(/Ej\. ABC-123/i)).toBeDefined();
     expect(screen.getByText(/Consulta la Hoja de Vida Vehicular/i)).toBeDefined();
   });
 
-  it('muestra estado de carga y renderiza la ficha vehicular cuando la búsqueda es exitosa', async () => {
+  it('2. Muestra estado de carga y renderiza la ficha vehicular cuando la búsqueda es exitosa', async () => {
     const mockFicha: FichaVehicularCompletaDTO = {
       vehiculo: {
         id_cliente: 1,
@@ -72,7 +70,6 @@ describe('FichaVehicularPage - Pruebas de Integración Frontend', () => {
     const botonBuscar = screen.getByRole('button', { name: /buscar/i });
     fireEvent.click(botonBuscar);
 
-    // Validamos usando matchers flexibles para textos compuestos
     await waitFor(() => {
       expect(screen.getByText('Juan Pérez')).toBeDefined();
       expect(screen.getByText((content) => content.includes('Toyota'))).toBeDefined();
@@ -81,7 +78,7 @@ describe('FichaVehicularPage - Pruebas de Integración Frontend', () => {
     });
   });
 
-  it('captura y muestra el mensaje de error cuando el backend falla', async () => {
+  it('3. Captura y muestra el mensaje de error cuando el vehículo no existe', async () => {
     vi.mocked(vehiculoService.obtenerFichaVehicularCompleta).mockRejectedValue(
       new Error('Vehículo no encontrado en la base de datos.')
     );
@@ -96,6 +93,36 @@ describe('FichaVehicularPage - Pruebas de Integración Frontend', () => {
 
     await waitFor(() => {
       expect(screen.getByText(/Vehículo no encontrado en la base de datos/i)).toBeDefined();
+    });
+  });
+
+  it('4. Permite buscar y cargar los datos de una placa correctamente', async () => {
+    const mockFicha: FichaVehicularCompletaDTO = {
+      vehiculo: {
+        id_cliente: 1,
+        placa: 'ABC-123',
+        marca: 'Toyota',
+        modelo: 'Yaris',
+        anio: 2020,
+        tipo_motor: '1.5L',
+        kilometraje_actual: 45000,
+        nombre_cliente: 'Juan Pérez',
+      },
+      historial: [],
+    };
+
+    vi.mocked(vehiculoService.obtenerFichaVehicularCompleta).mockResolvedValue(mockFicha);
+
+    render(<FichaVehicularPage />);
+
+    const input = screen.getByPlaceholderText(/Ej\. ABC-123/i);
+    fireEvent.change(input, { target: { value: 'ABC-123' } });
+
+    const botonBuscar = screen.getByRole('button', { name: /buscar/i });
+    fireEvent.click(botonBuscar);
+
+    await waitFor(() => {
+      expect(screen.getByText('Juan Pérez')).toBeDefined();
     });
   });
 });

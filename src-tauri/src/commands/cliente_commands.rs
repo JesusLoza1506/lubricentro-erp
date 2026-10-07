@@ -54,7 +54,6 @@ pub fn registrar_cliente_cmd(
         AppError::Validation("Fallo al obtener estado de la base de datos".to_string())
     })?;
 
-    // Restringido estrictamente a Administrador y Cajero (El mecánico es solo lectura)
     verificar_permiso_rol(&conn, id_usuario, &["ADMINISTRADOR", "CAJERO"])?;
 
     ClienteService::registrar_cliente(&conn, payload)
@@ -132,6 +131,91 @@ pub fn obtener_vehiculo_por_placa_cmd(
     verificar_permiso_rol(&conn, id_usuario, &["ADMINISTRADOR", "CAJERO", "MECANICO"])?;
 
     ClienteService::obtener_vehiculo_por_placa(&conn, &placa)
+}
+
+#[tauri::command]
+pub fn obtener_todos_vehiculos_cmd(
+    state: State<'_, Mutex<Connection>>,
+    id_usuario: Option<i64>,
+) -> Result<Vec<VehiculoCompletoDto>, AppError> {
+    let conn = state.lock().map_err(|_| {
+        AppError::Validation("Fallo al obtener estado de la base de datos".to_string())
+    })?;
+
+    verificar_permiso_rol(&conn, id_usuario, &["ADMINISTRADOR", "CAJERO", "MECANICO"])?;
+
+    let mut stmt = conn
+        .prepare(
+            "SELECT 
+                v.placa, 
+                v.marca, 
+                v.modelo, 
+                v.anio, 
+                v.tipo_motor, 
+                v.kilometraje_actual, 
+                v.id_cliente, 
+                v.activo,
+                c.nombre_razon_social,
+                c.tipo_documento,
+                c.numero_documento,
+                c.direccion,
+                c.telefono
+             FROM vehiculos v
+             LEFT JOIN clientes c ON v.id_cliente = c.id_cliente
+             WHERE v.activo = 1
+             ORDER BY v.placa ASC",
+        )
+        .map_err(|e| AppError::Validation(e.to_string()))?;
+
+    let rows = stmt
+        .query_map([], |row| {
+            let id_cliente: Option<i64> = row.get(6)?;
+            let nombre_cliente: Option<String> = row.get(8)?;
+            let tipo_doc: Option<String> = row.get(9)?;
+            let num_doc: Option<String> = row.get(10)?;
+            let direccion: Option<String> = row.get(11)?;
+            let telefono: Option<String> = row.get(12)?;
+
+            let cliente_struct = if id_cliente.is_some() {
+                Some(crate::dto::vehiculo_dto::ClienteResumenDto {
+                    id_cliente: id_cliente.unwrap_or(0),
+                    tipo_documento: tipo_doc.clone().unwrap_or_default(),
+                    numero_documento: num_doc.clone().unwrap_or_default(),
+                    nombre_razon_social: nombre_cliente.clone().unwrap_or_default(),
+                    telefono: telefono.clone(),
+                    direccion: direccion.clone(),
+                })
+            } else {
+                None
+            };
+
+            Ok(VehiculoCompletoDto {
+                placa: row.get(0)?,
+                marca: row.get(1)?,
+                modelo: row.get(2)?,
+                anio: row.get(3)?,
+                tipo_motor: row.get(4)?,
+                kilometraje_actual: row.get(5)?,
+                id_cliente: id_cliente.unwrap_or(0),
+                activo: row.get::<_, i32>(7)?,
+                cliente: cliente_struct,
+                nombre_cliente: nombre_cliente.clone(),
+                telefono_cliente: telefono,
+                tipo_documento_cliente: tipo_doc,
+                documento_cliente: num_doc,
+                direccion_cliente: direccion,
+            })
+        })
+        .map_err(|e| AppError::Validation(e.to_string()))?;
+
+    let mut lista = Vec::new();
+    for r in rows {
+        if let Ok(v) = r {
+            lista.push(v);
+        }
+    }
+
+    Ok(lista)
 }
 
 #[tauri::command]
