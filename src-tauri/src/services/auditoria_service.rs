@@ -31,6 +31,7 @@ impl AuditoriaService {
     /// - modulo: 'LOGIN', 'DASHBOARD', 'FICHA_VEHICULAR', 'OT', 'INVENTARIO', 'POS', 'CAJA', 'BACKUP', 'ADMIN', 'REPORTES'
     /// - resultado: 'OK', 'DENEGADO', 'ERROR'
     /// - CHECK((actor='USUARIO' AND id_usuario IS NOT NULL AND username_snapshot IS NOT NULL AND rol_snapshot IS NOT NULL) OR (actor<>'USUARIO' AND id_usuario IS NULL))
+    #[allow(clippy::too_many_arguments)]
     pub fn registrar_v5(
         conn: &Connection,
         id_usuario: Option<i64>,

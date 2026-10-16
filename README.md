@@ -43,7 +43,7 @@
 7. [Instalación y ejecución](#instalacion)
 8. [Pruebas y calidad](#pruebas)
 9. [Documentación](#documentacion)
-10. [Autor y contexto académico](#autor)
+10. [Autores y contexto académico](#autor)
 
 ---
 
@@ -467,9 +467,13 @@ La documentación funcional y el código deben mantenerse alineados. Una modific
 
 <a id="autor"></a>
 
-## 10. Autor y contexto académico
+## 10. Autores y contexto académico
 
 **Jesús Ángel Loza Yataco**  
+**Esteban Ricardo Puma Palomino**  
+**Reyes Esterripa Carlos Edén**  
+**Magallanes Llanos Juan Jesús**
+
 Estudiante de Ingeniería de Sistemas — Perú.
 
 Proyecto académico para aplicar desarrollo de software, diseño de datos, integración de servicios y aseguramiento de la calidad a la gestión de un lubricentro.

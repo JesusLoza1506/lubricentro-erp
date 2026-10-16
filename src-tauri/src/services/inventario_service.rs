@@ -12,6 +12,7 @@ pub struct InventarioService;
 const UNIDADES_VALIDAS: [&str; 2] = ["UND", "ML"];
 
 impl InventarioService {
+    #[allow(clippy::too_many_arguments)]
     pub fn validar_datos_producto(
         conn: &Connection,
         _id_categoria: i64,

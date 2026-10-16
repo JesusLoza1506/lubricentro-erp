@@ -65,17 +65,13 @@ impl AuthService {
 
     /// 3.1.1: Normalizar código de recuperación eliminando guiones y todos los espacios en blanco intermedios
     pub fn normalizar_codigo(codigo: &str) -> String {
-        codigo
-            .replace('-', "")
-            .replace(' ', "")
-            .trim()
-            .to_uppercase()
+        codigo.replace(['-', ' '], "").trim().to_uppercase()
     }
 
     /// 3.1.3: Medición de caracteres Unicode (password.chars().count())
     pub fn validar_politica_password(password: &str, username: &str) -> Result<(), AppError> {
         let len = password.chars().count();
-        if len < 8 || len > 128 {
+        if !(8..=128).contains(&len) {
             return Err(AppError::Validation(
                 "La contraseña debe tener entre 8 y 128 caracteres.".to_string(),
             ));
@@ -257,8 +253,8 @@ impl AuthService {
                 if intentos_fallidos >= 5 {
                     conn.execute(
                         "UPDATE usuarios SET intentos_fallidos = 5, 
-                                bloqueado_hasta = datetime('now', '-5 hours', '+15 minutes') 
-                         WHERE id_usuario = ?1",
+                                    bloqueado_hasta = datetime('now', '-5 hours', '+15 minutes') 
+                             WHERE id_usuario = ?1",
                         [id_usuario],
                     )?;
                     AuditoriaService::registrar_evento_login(
@@ -361,7 +357,7 @@ impl AuthService {
         };
 
         let rol_memoria = session.rol.as_deref().unwrap_or("");
-        if activo == 0 || (rol_memoria != "" && rol_memoria != rol) {
+        if activo == 0 || (!rol_memoria.is_empty() && rol_memoria != rol) {
             session.invalidar_sesion_usuario(id_usuario);
             return Err(AppError::NoAutenticado);
         }
@@ -438,7 +434,7 @@ impl AuthService {
             if nuevos_fallos >= 5 {
                 conn.execute(
                     "UPDATE configuracion SET recuperacion_fallos = 5, 
-                                recuperacion_bloqueada_hasta = datetime('now', '-5 hours', '+15 minutes') 
+                                    recuperacion_bloqueada_hasta = datetime('now', '-5 hours', '+15 minutes') 
                      WHERE id_config = 1",
                     [],
                 )?;
