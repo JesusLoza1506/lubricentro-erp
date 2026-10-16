@@ -182,6 +182,8 @@ mod tests {
     use crate::db::init_db;
     use tempfile::tempdir;
 
+    const DUMMY_ARGON2_HASH: &str = "$argon2id$v=19$m=19456,t=2,p=1$Z3VpZGVsaW5lc3NhbHQ$5Vw5O7hK5W9u8P0s5vX+A1B2C3D4E5F6G7H8I9J0K1L";
+
     #[test]
     fn test_dashboard_filtrado_por_rol() {
         let dir = tempdir().unwrap();
@@ -190,16 +192,16 @@ mod tests {
         // 1. Insertar usuario Mecánico
         conn.execute(
             "INSERT INTO usuarios (id_usuario, nombre_completo, username, password_hash, rol, activo)
-             VALUES (10, 'Mecanico Uno', 'meca1', 'hash', 'MECANICO', 1)",
-            [],
+             VALUES (10, 'Mecanico Uno', 'meca1', ?1, 'MECANICO', 1)",
+            [DUMMY_ARGON2_HASH],
         )
         .unwrap();
 
         // 2. Insertar usuario Cajero
         conn.execute(
             "INSERT INTO usuarios (id_usuario, nombre_completo, username, password_hash, rol, activo)
-             VALUES (20, 'Cajero Uno', 'caja1', 'hash', 'CAJERO', 1)",
-            [],
+             VALUES (20, 'Cajero Uno', 'caja1', ?1, 'CAJERO', 1)",
+            [DUMMY_ARGON2_HASH],
         )
         .unwrap();
 

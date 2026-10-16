@@ -5,91 +5,91 @@ use crate::dto::vehiculo_dto::{
 };
 use crate::errors::AppError;
 use crate::services::cliente_service::ClienteService;
+use crate::services::session_manager::SessionState;
 use rusqlite::Connection;
 use std::sync::Mutex;
 use tauri::State;
 
-fn verificar_permiso_rol(
+fn verificar_permiso_sesion(
+    session: &mut SessionState,
     conn: &Connection,
-    id_usuario: Option<i64>,
     roles_permitidos: &[&str],
-) -> Result<(), AppError> {
-    let id_u = match id_usuario {
-        Some(id) if id > 0 => id,
-        _ => {
-            return Err(AppError::Validation(
-                "Acceso denegado: Se requiere un usuario autenticado para esta operación."
-                    .to_string(),
-            ))
-        }
-    };
+) -> Result<i64, AppError> {
+    let id_usuario = session.validar_sesion_operativa(conn)?;
+    let rol = session.rol.as_deref().unwrap_or("").to_uppercase();
 
-    let nombre_rol: String = conn
-        .query_row(
-            "SELECT UPPER(rol) FROM usuarios WHERE id_usuario = ?1 AND activo = 1",
-            [id_u],
-            |row| row.get(0),
-        )
-        .map_err(|_| {
-            AppError::Validation("Acceso denegado: Usuario no encontrado o inactivo.".to_string())
-        })?;
-
-    if !roles_permitidos.contains(&nombre_rol.as_str()) {
+    if !roles_permitidos.contains(&rol.as_str()) {
         return Err(AppError::Validation(format!(
             "Acceso denegado: El rol '{}' no tiene permisos para realizar esta operación.",
-            nombre_rol
+            rol
         )));
     }
 
-    Ok(())
+    Ok(id_usuario)
 }
 
 #[tauri::command]
 pub fn registrar_cliente_cmd(
-    state: State<'_, Mutex<Connection>>,
+    db_state: State<'_, Mutex<Connection>>,
+    session_state: State<'_, Mutex<SessionState>>,
     payload: CrearClienteDto,
-    id_usuario: Option<i64>,
 ) -> Result<i64, AppError> {
-    let conn = state.lock().map_err(|_| {
+    let mut session = session_state
+        .lock()
+        .map_err(|_| AppError::Validation("Fallo al obtener estado de sesión".to_string()))?;
+
+    let conn = db_state.lock().map_err(|_| {
         AppError::Validation("Fallo al obtener estado de la base de datos".to_string())
     })?;
 
-    verificar_permiso_rol(&conn, id_usuario, &["ADMINISTRADOR", "CAJERO"])?;
+    verificar_permiso_sesion(&mut session, &conn, &["ADMINISTRADOR", "CAJERO"])?;
 
     ClienteService::registrar_cliente(&conn, payload)
 }
 
 #[tauri::command]
 pub fn buscar_cliente_por_doc_cmd(
-    state: State<'_, Mutex<Connection>>,
+    db_state: State<'_, Mutex<Connection>>,
+    session_state: State<'_, Mutex<SessionState>>,
     doc: String,
-    id_usuario: Option<i64>,
 ) -> Result<ClienteDto, AppError> {
-    let conn = state.lock().map_err(|_| {
+    let mut session = session_state
+        .lock()
+        .map_err(|_| AppError::Validation("Fallo al obtener estado de sesión".to_string()))?;
+
+    let conn = db_state.lock().map_err(|_| {
         AppError::Validation("Fallo al obtener estado de la base de datos".to_string())
     })?;
 
-    verificar_permiso_rol(&conn, id_usuario, &["ADMINISTRADOR", "CAJERO", "MECANICO"])?;
+    verificar_permiso_sesion(
+        &mut session,
+        &conn,
+        &["ADMINISTRADOR", "CAJERO", "MECANICO"],
+    )?;
 
     ClienteService::buscar_cliente_por_documento(&conn, &doc)
 }
 
 #[tauri::command]
 pub fn registrar_vehiculo_cmd(
-    state: State<'_, Mutex<Connection>>,
+    db_state: State<'_, Mutex<Connection>>,
+    session_state: State<'_, Mutex<SessionState>>,
     payload: CrearVehiculoPayloadDto,
-    id_usuario: Option<i64>,
 ) -> Result<String, AppError> {
-    let mut conn = state.lock().map_err(|_| {
+    let mut session = session_state
+        .lock()
+        .map_err(|_| AppError::Validation("Fallo al obtener estado de sesión".to_string()))?;
+
+    let mut conn = db_state.lock().map_err(|_| {
         AppError::Validation("Fallo al obtener estado de la base de datos".to_string())
     })?;
 
-    verificar_permiso_rol(&conn, id_usuario, &["ADMINISTRADOR", "CAJERO"])?;
+    let id_u = verificar_permiso_sesion(&mut session, &conn, &["ADMINISTRADOR", "CAJERO"])?;
 
     let tx = conn
         .transaction()
         .map_err(|e| AppError::Validation(e.to_string()))?;
-    let placa = ClienteService::registrar_vehiculo(&tx, payload, id_usuario)?;
+    let placa = ClienteService::registrar_vehiculo(&tx, payload, Some(id_u))?;
     tx.commit()
         .map_err(|e| AppError::Validation(e.to_string()))?;
 
@@ -98,20 +98,24 @@ pub fn registrar_vehiculo_cmd(
 
 #[tauri::command]
 pub fn actualizar_vehiculo_cmd(
-    state: State<'_, Mutex<Connection>>,
+    db_state: State<'_, Mutex<Connection>>,
+    session_state: State<'_, Mutex<SessionState>>,
     payload: EditarVehiculoPayloadDto,
-    id_usuario: Option<i64>,
 ) -> Result<(), AppError> {
-    let mut conn = state.lock().map_err(|_| {
+    let mut session = session_state
+        .lock()
+        .map_err(|_| AppError::Validation("Fallo al obtener estado de sesión".to_string()))?;
+
+    let mut conn = db_state.lock().map_err(|_| {
         AppError::Validation("Fallo al obtener estado de la base de datos".to_string())
     })?;
 
-    verificar_permiso_rol(&conn, id_usuario, &["ADMINISTRADOR", "CAJERO"])?;
+    let id_u = verificar_permiso_sesion(&mut session, &conn, &["ADMINISTRADOR", "CAJERO"])?;
 
     let tx = conn
         .transaction()
         .map_err(|e| AppError::Validation(e.to_string()))?;
-    ClienteService::actualizar_vehiculo(&tx, payload, id_usuario)?;
+    ClienteService::actualizar_vehiculo(&tx, payload, Some(id_u))?;
     tx.commit()
         .map_err(|e| AppError::Validation(e.to_string()))?;
 
@@ -120,29 +124,45 @@ pub fn actualizar_vehiculo_cmd(
 
 #[tauri::command]
 pub fn obtener_vehiculo_por_placa_cmd(
-    state: State<'_, Mutex<Connection>>,
+    db_state: State<'_, Mutex<Connection>>,
+    session_state: State<'_, Mutex<SessionState>>,
     placa: String,
-    id_usuario: Option<i64>,
 ) -> Result<VehiculoCompletoDto, AppError> {
-    let conn = state.lock().map_err(|_| {
+    let mut session = session_state
+        .lock()
+        .map_err(|_| AppError::Validation("Fallo al obtener estado de sesión".to_string()))?;
+
+    let conn = db_state.lock().map_err(|_| {
         AppError::Validation("Fallo al obtener estado de la base de datos".to_string())
     })?;
 
-    verificar_permiso_rol(&conn, id_usuario, &["ADMINISTRADOR", "CAJERO", "MECANICO"])?;
+    verificar_permiso_sesion(
+        &mut session,
+        &conn,
+        &["ADMINISTRADOR", "CAJERO", "MECANICO"],
+    )?;
 
     ClienteService::obtener_vehiculo_por_placa(&conn, &placa)
 }
 
 #[tauri::command]
 pub fn obtener_todos_vehiculos_cmd(
-    state: State<'_, Mutex<Connection>>,
-    id_usuario: Option<i64>,
+    db_state: State<'_, Mutex<Connection>>,
+    session_state: State<'_, Mutex<SessionState>>,
 ) -> Result<Vec<VehiculoCompletoDto>, AppError> {
-    let conn = state.lock().map_err(|_| {
+    let mut session = session_state
+        .lock()
+        .map_err(|_| AppError::Validation("Fallo al obtener estado de sesión".to_string()))?;
+
+    let conn = db_state.lock().map_err(|_| {
         AppError::Validation("Fallo al obtener estado de la base de datos".to_string())
     })?;
 
-    verificar_permiso_rol(&conn, id_usuario, &["ADMINISTRADOR", "CAJERO", "MECANICO"])?;
+    verificar_permiso_sesion(
+        &mut session,
+        &conn,
+        &["ADMINISTRADOR", "CAJERO", "MECANICO"],
+    )?;
 
     let mut stmt = conn
         .prepare(
@@ -218,30 +238,42 @@ pub fn obtener_todos_vehiculos_cmd(
 
 #[tauri::command]
 pub fn obtener_ficha_vehicular_completa_cmd(
-    state: State<'_, Mutex<Connection>>,
+    db_state: State<'_, Mutex<Connection>>,
+    session_state: State<'_, Mutex<SessionState>>,
     placa: String,
-    id_usuario: Option<i64>,
 ) -> Result<FichaVehicularCompletaDto, AppError> {
-    let conn = state.lock().map_err(|_| {
+    let mut session = session_state
+        .lock()
+        .map_err(|_| AppError::Validation("Fallo al obtener estado de sesión".to_string()))?;
+
+    let conn = db_state.lock().map_err(|_| {
         AppError::Validation("Fallo al obtener estado de la base de datos".to_string())
     })?;
 
-    verificar_permiso_rol(&conn, id_usuario, &["ADMINISTRADOR", "CAJERO", "MECANICO"])?;
+    verificar_permiso_sesion(
+        &mut session,
+        &conn,
+        &["ADMINISTRADOR", "CAJERO", "MECANICO"],
+    )?;
 
     ClienteService::obtener_ficha_vehicular_completa(&conn, &placa)
 }
 
 #[tauri::command]
 pub fn eliminar_vehiculo_cmd(
-    state: State<'_, Mutex<Connection>>,
+    db_state: State<'_, Mutex<Connection>>,
+    session_state: State<'_, Mutex<SessionState>>,
     placa: String,
-    id_usuario: Option<i64>,
 ) -> Result<(), AppError> {
-    let conn = state.lock().map_err(|_| {
+    let mut session = session_state
+        .lock()
+        .map_err(|_| AppError::Validation("Fallo al obtener estado de sesión".to_string()))?;
+
+    let conn = db_state.lock().map_err(|_| {
         AppError::Validation("Fallo al obtener estado de la base de datos".to_string())
     })?;
 
-    verificar_permiso_rol(&conn, id_usuario, &["ADMINISTRADOR"])?;
+    let id_u = verificar_permiso_sesion(&mut session, &conn, &["ADMINISTRADOR"])?;
 
-    ClienteService::eliminar_vehiculo(&conn, &placa, id_usuario)
+    ClienteService::eliminar_vehiculo(&conn, &placa, Some(id_u))
 }

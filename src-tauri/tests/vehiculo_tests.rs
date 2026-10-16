@@ -3,21 +3,28 @@ use lubricentro_erp_lib::dto::vehiculo_dto::{CrearVehiculoPayloadDto, EditarVehi
 use lubricentro_erp_lib::services::cliente_service::ClienteService;
 use rusqlite::Connection;
 
-/// Configura una base de datos SQLite en memoria utilizando exactamente el esquema real de producción
+const DUMMY_ARGON2_HASH: &str =
+    "$argon2id$v=19$m=19456,t=2,p=1$Z3VpZGVsaW5lc3NhbHQ$5Vw5O7hK5W9u8P0s5vX+A1B2C3D4E5F6G7H8I9J0K1L";
+
+/// Configura una base de datos SQLite en memoria utilizando el esquema real V5 de producción
 fn setup_test_db() -> Connection {
     let conn = Connection::open_in_memory().unwrap();
     conn.execute_batch("PRAGMA foreign_keys = ON;").unwrap();
 
-    let initial_schema = include_str!("../migrations/0001_initial_schema.sql");
+    let initial_schema = include_str!("../migrations/0001_initial_schema_v7.sql");
     conn.execute_batch(initial_schema).unwrap();
 
-    // Datos iniciales compatibles con el esquema de producción
+    // Datos iniciales compatibles con el esquema de producción V5
+    conn.execute(
+        "INSERT INTO usuarios (nombre_completo, username, password_hash, rol, activo)
+         VALUES ('Admin System', 'admin', ?1, 'ADMINISTRADOR', 1),
+                ('Mecanico Taller', 'meca', ?1, 'MECANICO', 1)",
+        [DUMMY_ARGON2_HASH],
+    )
+    .unwrap();
+
     conn.execute_batch(
         "
-        INSERT INTO usuarios (nombre_completo, username, password_hash, rol)
-        VALUES ('Admin', 'admin', 'hash', 'ADMINISTRADOR'),
-               ('Mecanico', 'meca', 'hash', 'MECANICO');
-
         INSERT INTO clientes (tipo_documento, numero_documento, nombre_razon_social, telefono)
         VALUES ('DNI', '12345678', 'Juan Perez', '987654321');
 
@@ -105,8 +112,14 @@ fn test_consulta_atomica_ficha_completa_con_aceite() {
     let conn = setup_test_db();
 
     conn.execute(
-        "INSERT INTO ordenes_trabajo (codigo_ot, placa, id_mecanico, zanja, estado, kilometraje_ingreso, proximo_kilometraje)
-         VALUES ('OT-001', 'ABC-123', 2, 1, 'FINALIZADO', 50000, 55000)",
+        "INSERT INTO ordenes_trabajo (
+            id_operacion, codigo_ot, id_vehiculo, id_cliente_atendido,
+            placa_snapshot, cliente_snapshot, id_creador, id_zanja_prevista,
+            estado, kilometraje_ingreso, proximo_kilometraje
+        ) VALUES (
+            'OP-TEST-01', 'OT-001', 1, 1, 'ABC-123', '{\"nombre\":\"Juan Perez\"}',
+            1, 1, 'FINALIZADO', 50000, 55000
+        )",
         [],
     )
     .unwrap();
@@ -146,8 +159,14 @@ fn test_bloqueo_eliminacion_service_con_ot() {
     let conn = setup_test_db();
 
     conn.execute(
-        "INSERT INTO ordenes_trabajo (codigo_ot, placa, id_mecanico, zanja, estado, kilometraje_ingreso, proximo_kilometraje)
-         VALUES ('OT-001', 'ABC-123', 2, 1, 'FINALIZADO', 50000, 55000)",
+        "INSERT INTO ordenes_trabajo (
+            id_operacion, codigo_ot, id_vehiculo, id_cliente_atendido,
+            placa_snapshot, cliente_snapshot, id_creador, id_zanja_prevista,
+            estado, kilometraje_ingreso
+        ) VALUES (
+            'OP-TEST-02', 'OT-001', 1, 1, 'ABC-123', '{\"nombre\":\"Juan Perez\"}',
+            1, 1, 'FINALIZADO', 50000
+        )",
         [],
     )
     .unwrap();
@@ -173,7 +192,7 @@ fn test_autorizacion_rol_mecanico_bloqueado() {
 
     let rol: String = conn
         .query_row(
-            "SELECT UPPER(rol) FROM usuarios WHERE id_usuario = 2",
+            "SELECT UPPER(rol) FROM usuarios WHERE username = 'meca'",
             [],
             |row| row.get(0),
         )

@@ -6,13 +6,40 @@ import { DashboardPage } from './pages/dashboard/DashboardPage';
 import { InventarioPage } from './pages/inventario/InventarioPage';
 import { FichaVehicularPage } from './pages/vehiculo/FichaVehicularPage';
 import { OrdenesPage } from './pages/ordenes/OrdenesPage';
+import { CambioClaveModal } from './components/CambioClaveModal';
 
 const MainApp: React.FC = () => {
-  const { usuario, tienePermiso } = useAuth();
+  const { usuario, estadoSesion, cargando, tienePermiso } = useAuth();
   const [moduloActual, setModuloActual] = useState<string>('dashboard');
   const [placaSeleccionada, setPlacaSeleccionada] = useState<string>('');
 
-  if (!usuario) {
+  // H05: Estado local para controlar la visibilidad del modal de cambio voluntario de clave
+  const [mostrarCambioClaveModal, setMostrarCambioClaveModal] = useState<boolean>(false);
+
+  // 1. Pantalla de carga mientras se sincroniza el estado de la sesión con Rust
+  if (cargando) {
+    return (
+      <div
+        style={{
+          width: '100vw',
+          height: '100vh',
+          backgroundColor: '#0B1120',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          color: '#38BDF8',
+          fontFamily: 'Inter, system-ui, sans-serif',
+          fontSize: '16px',
+          fontWeight: '600',
+        }}
+      >
+        Cargando sistema ERP V7.0...
+      </div>
+    );
+  }
+
+  // 2. Redirección automática si no hay sesión O si se exige cambio de contraseña
+  if (estadoSesion === 'SIN_SESION' || estadoSesion === 'CAMBIO_OBLIGATORIO' || !usuario) {
     return <LoginPage />;
   }
 
@@ -76,10 +103,19 @@ const MainApp: React.FC = () => {
         gap: '20px',
       }}
     >
-      <Sidebar moduloActual={moduloActual} setModuloActual={setModuloActual} />
+      <Sidebar
+        moduloActual={moduloActual}
+        setModuloActual={setModuloActual}
+        onAbrirCambioClave={() => setMostrarCambioClaveModal(true)}
+      />
       <main style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         {renderModulo()}
       </main>
+
+      {/* H05: Renderizado del modal de Cambio Voluntario */}
+      {mostrarCambioClaveModal && (
+        <CambioClaveModal onClose={() => setMostrarCambioClaveModal(false)} />
+      )}
     </div>
   );
 };

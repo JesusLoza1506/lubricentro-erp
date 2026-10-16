@@ -8,4 +8,10 @@ pub struct UsuarioEntity {
     pub password_hash: String,
     pub rol: String,
     pub activo: i32,
+    pub debe_cambiar_clave: i32,
+    pub intentos_fallidos: i32,
+    pub bloqueado_hasta: Option<String>,
+    pub fecha_creacion: String,
+    pub fecha_cambio_clave: Option<String>,
+    pub version: i64,
 }

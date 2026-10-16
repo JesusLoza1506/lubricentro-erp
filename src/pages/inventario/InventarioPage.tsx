@@ -1,26 +1,23 @@
 import React, { useEffect, useState } from 'react';
-import {
-  Search,
-  Plus,
-  AlertTriangle,
-  RefreshCw,
-  Eye,
-  Pencil,
-  Trash2,
-  CheckCircle2,
-  XCircle,
-} from 'lucide-react';
+import { CheckCircle2, XCircle } from 'lucide-react';
 import {
   Producto,
   Categoria,
   CrearProductoDTO,
   EditarProductoDTO,
   ProductoForm,
+  DespacharProductoDTO,
+  AjustarStockDTO,
 } from '../../types/inventario';
 import { inventarioService } from '../../services/inventarioService';
-import { InventarioModal, ModoModal } from '../inventario/components/InventarioModal';
-import { getBadgeStyles } from '../inventario/inventarioStyles';
+import { InventarioHeader } from './components/InventarioHeader';
+import { InventarioFiltros } from './components/InventarioFiltros';
+import { InventarioTabla } from './components/InventarioTabla';
+import { InventarioModal, ModoModal } from './components/InventarioModal';
+import { ModalDespacho } from './components/ModalDespacho';
+import { ModalAjusteStock } from './components/ModalAjusteStock';
 import { ConfirmModal } from '../../components/ConfirmModal';
+import { useAuth } from '../../context/AuthContext';
 
 const prodInicial: ProductoForm = {
   id_categoria: 1,
@@ -34,32 +31,44 @@ const prodInicial: ProductoForm = {
 };
 
 export const InventarioPage: React.FC = () => {
+  const { usuario } = useAuth();
+  const idUsuarioActual = usuario?.id_usuario ?? 1;
+  const esAdmin = usuario?.rol?.toUpperCase() === 'ADMINISTRADOR';
+
   const [productos, setProductos] = useState<Producto[]>([]);
   const [categorias, setCategorias] = useState<Categoria[]>([]);
   const [cargando, setCargando] = useState<boolean>(true);
   const [busqueda, setBusqueda] = useState<string>('');
   const [filtroCritico, setFiltroCritico] = useState<boolean>(false);
 
-  // Modal de Producto
+  // Modales
   const [modalAbierto, setModalAbierto] = useState<boolean>(false);
   const [modoModal, setModoModal] = useState<ModoModal>('CREAR');
   const [prodForm, setProdForm] = useState<ProductoForm>(prodInicial);
 
-  // Modal de Confirmación de Eliminación
+  const [modalDespacho, setModalDespacho] = useState<{
+    abierto: boolean;
+    producto: Producto | null;
+    cantidad: number;
+    motivo: string;
+  }>({ abierto: false, producto: null, cantidad: 1, motivo: '' });
+
+  const [modalAjuste, setModalAjuste] = useState<{
+    abierto: boolean;
+    producto: Producto | null;
+    tipo_movimiento: 'ENTRADA' | 'AJUSTE';
+    cantidad_nueva: number;
+    motivo: string;
+  }>({ abierto: false, producto: null, tipo_movimiento: 'AJUSTE', cantidad_nueva: 0, motivo: '' });
+
   const [confirmModal, setConfirmModal] = useState<{
     abierto: boolean;
     id: number | null;
     nombre: string;
-  }>({
-    abierto: false,
-    id: null,
-    nombre: '',
-  });
+  }>({ abierto: false, id: null, nombre: '' });
 
-  // Notificación Toast de Éxito
+  // Notificaciones & Errores
   const [notificacion, setNotificacion] = useState<string | null>(null);
-
-  // Modal de Error Integrado
   const [errorModalMsg, setErrorModalMsg] = useState<string | null>(null);
 
   const mostrarToast = (msg: string) => {
@@ -72,9 +81,9 @@ export const InventarioPage: React.FC = () => {
     try {
       const [prodsData, catsData] = await Promise.all([
         filtroCritico
-          ? inventarioService.listarProductosCriticos()
-          : inventarioService.listarProductos(),
-        inventarioService.listarCategorias(),
+          ? inventarioService.listarProductosCriticos(idUsuarioActual)
+          : inventarioService.listarProductos(idUsuarioActual),
+        inventarioService.listarCategorias(idUsuarioActual),
       ]);
       setProductos(prodsData || []);
       setCategorias(catsData || []);
@@ -91,8 +100,9 @@ export const InventarioPage: React.FC = () => {
 
   useEffect(() => {
     cargarDatos();
-  }, [filtroCritico]);
+  }, [filtroCritico, idUsuarioActual]);
 
+  // Handlers para Productos
   const abrirModalCrear = () => {
     setModoModal('CREAR');
     setProdForm({ ...prodInicial, id_categoria: categorias[0]?.id_categoria || 1 });
@@ -101,34 +111,132 @@ export const InventarioPage: React.FC = () => {
 
   const abrirModalVer = (p: Producto) => {
     setModoModal('VER');
+    const precioCompraSol = 'precio_compra' in p ? p.precio_compra / 100 : 0;
     setProdForm({
       ...p,
-      idProducto: p.id_producto,
-      idCategoria: p.id_categoria,
+      id_producto: p.id_producto,
+      id_categoria: p.id_categoria,
+      precio_compra: precioCompraSol,
+      precio_venta: p.precio_venta / 100,
     });
     setModalAbierto(true);
   };
 
   const abrirModalEditar = (p: Producto) => {
     setModoModal('EDITAR');
+    const precioCompraSol = 'precio_compra' in p ? p.precio_compra / 100 : 0;
     setProdForm({
       ...p,
-      idProducto: p.id_producto,
       id_producto: p.id_producto,
-      idCategoria: p.id_categoria,
       id_categoria: p.id_categoria,
+      precio_compra: precioCompraSol,
+      precio_venta: p.precio_venta / 100,
     });
     setModalAbierto(true);
   };
 
-  const solicitarEliminacion = (idProducto: number, nombre: string) => {
-    setConfirmModal({ abierto: true, id: idProducto, nombre });
+  const handleGuardarProducto = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      const precioCompraCentimos = Math.round(Number(prodForm.precio_compra || 0) * 100);
+      const precioVentaCentimos = Math.round(Number(prodForm.precio_venta || 0) * 100);
+
+      if (modoModal === 'CREAR') {
+        const payloadCrear: CrearProductoDTO = {
+          id_categoria: Number(prodForm.id_categoria || 1),
+          nombre: prodForm.nombre.trim(),
+          codigo_barras: prodForm.codigo_barras?.trim() || null,
+          unidad_medida: prodForm.unidad_medida?.trim() || 'UNIDAD',
+          stock_actual: Number(prodForm.stock_actual || 0),
+          stock_minimo: Number(prodForm.stock_minimo || 0),
+          precio_compra: precioCompraCentimos,
+          precio_venta: precioVentaCentimos,
+        };
+        await inventarioService.registrarProducto(payloadCrear, idUsuarioActual);
+        mostrarToast('Producto registrado con éxito');
+      } else if (modoModal === 'EDITAR') {
+        const payloadEditar: EditarProductoDTO = {
+          id_producto: Number(prodForm.id_producto),
+          id_categoria: Number(prodForm.id_categoria || 1),
+          nombre: prodForm.nombre.trim(),
+          codigo_barras: prodForm.codigo_barras?.trim() || null,
+          unidad_medida: prodForm.unidad_medida?.trim() || 'UNIDAD',
+          stock_actual: Number(prodForm.stock_actual || 0),
+          stock_minimo: Number(prodForm.stock_minimo || 0),
+          precio_compra: precioCompraCentimos,
+          precio_venta: precioVentaCentimos,
+        };
+        await inventarioService.actualizarProducto(payloadEditar, idUsuarioActual);
+        mostrarToast('Producto actualizado con éxito');
+      }
+      setModalAbierto(false);
+      cargarDatos();
+    } catch (err: unknown) {
+      const msg =
+        typeof err === 'string'
+          ? err
+          : (err as { message?: string })?.message || 'Error al guardar el producto';
+      setErrorModalMsg(msg);
+    }
   };
 
+  // Handlers para Despacho
+  const ejecutarDespacho = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!modalDespacho.producto) return;
+    try {
+      const payload: DespacharProductoDTO = {
+        id_producto: modalDespacho.producto.id_producto,
+        cantidad: Number(modalDespacho.cantidad),
+        motivo: modalDespacho.motivo.trim() || undefined,
+      };
+      await inventarioService.despacharProductoGranel(payload, idUsuarioActual);
+      mostrarToast(`Despacho registrado para "${modalDespacho.producto.nombre}"`);
+      setModalDespacho({ abierto: false, producto: null, cantidad: 1, motivo: '' });
+      cargarDatos();
+    } catch (err: unknown) {
+      const msg =
+        typeof err === 'string'
+          ? err
+          : (err as { message?: string })?.message || 'Error al procesar el despacho';
+      setErrorModalMsg(msg);
+    }
+  };
+
+  // Handlers para Ajuste de Stock
+  const ejecutarAjuste = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!modalAjuste.producto) return;
+    try {
+      const payload: AjustarStockDTO = {
+        id_producto: modalAjuste.producto.id_producto,
+        tipo_movimiento: modalAjuste.tipo_movimiento,
+        cantidad_nueva: Number(modalAjuste.cantidad_nueva),
+        motivo: modalAjuste.motivo.trim(),
+      };
+      await inventarioService.ajustarStock(payload, idUsuarioActual);
+      mostrarToast(`Ajuste de stock guardado para "${modalAjuste.producto.nombre}"`);
+      setModalAjuste({
+        abierto: false,
+        producto: null,
+        tipo_movimiento: 'AJUSTE',
+        cantidad_nueva: 0,
+        motivo: '',
+      });
+      cargarDatos();
+    } catch (err: unknown) {
+      const msg =
+        typeof err === 'string'
+          ? err
+          : (err as { message?: string })?.message || 'Error al guardar el ajuste de stock';
+      setErrorModalMsg(msg);
+    }
+  };
+
+  // Handlers para Eliminación
   const ejecutarEliminacion = async () => {
     if (!confirmModal.id) return;
     try {
-      const idUsuarioActual = 1;
       await inventarioService.eliminarProducto(confirmModal.id, idUsuarioActual);
       setConfirmModal({ abierto: false, id: null, nombre: '' });
       mostrarToast(`Producto "${confirmModal.nombre}" eliminado correctamente`);
@@ -139,48 +247,6 @@ export const InventarioPage: React.FC = () => {
         typeof err === 'string'
           ? err
           : (err as { message?: string })?.message || 'Error al eliminar el producto';
-      setErrorModalMsg(msg);
-    }
-  };
-
-  const handleGuardar = async (e: React.FormEvent) => {
-    e.preventDefault();
-    try {
-      if (modoModal === 'CREAR') {
-        const payloadCrear: CrearProductoDTO = {
-          id_categoria: Number(prodForm.id_categoria || prodForm.idCategoria || 1),
-          nombre: prodForm.nombre,
-          codigo_barras: prodForm.codigo_barras || prodForm.codigoBarras || null,
-          unidad_medida: prodForm.unidad_medida || prodForm.unidadMedida || null,
-          stock_actual: Number(prodForm.stock_actual ?? prodForm.stockActual ?? 0),
-          stock_minimo: Number(prodForm.stock_minimo ?? prodForm.stockMinimo ?? 0),
-          precio_compra: Number(prodForm.precio_compra ?? prodForm.precioCompra ?? 0),
-          precio_venta: Number(prodForm.precio_venta ?? prodForm.precioVenta ?? 0),
-        };
-        await inventarioService.registrarProducto(payloadCrear);
-        mostrarToast('Producto registrado con éxito');
-      } else if (modoModal === 'EDITAR') {
-        const payloadEditar: EditarProductoDTO = {
-          id_producto: Number(prodForm.id_producto || prodForm.idProducto),
-          id_categoria: Number(prodForm.id_categoria || prodForm.idCategoria || 1),
-          nombre: prodForm.nombre,
-          codigo_barras: prodForm.codigo_barras || prodForm.codigoBarras || null,
-          unidad_medida: prodForm.unidad_medida || prodForm.unidadMedida || null,
-          stock_actual: Number(prodForm.stock_actual ?? prodForm.stockActual ?? 0),
-          stock_minimo: Number(prodForm.stock_minimo ?? prodForm.stockMinimo ?? 0),
-          precio_compra: Number(prodForm.precio_compra ?? prodForm.precioCompra ?? 0),
-          precio_venta: Number(prodForm.precio_venta ?? prodForm.precioVenta ?? 0),
-        };
-        await inventarioService.actualizarProducto(payloadEditar);
-        mostrarToast('Producto actualizado con éxito');
-      }
-      setModalAbierto(false);
-      cargarDatos();
-    } catch (err: unknown) {
-      const msg =
-        typeof err === 'string'
-          ? err
-          : (err as { message?: string })?.message || 'Error al guardar el producto';
       setErrorModalMsg(msg);
     }
   };
@@ -205,7 +271,7 @@ export const InventarioPage: React.FC = () => {
         position: 'relative',
       }}
     >
-      {/* Toast de Notificación de Éxito */}
+      {/* Toast Notificación */}
       {notificacion && (
         <div
           style={{
@@ -229,7 +295,7 @@ export const InventarioPage: React.FC = () => {
         </div>
       )}
 
-      {/* Modal Personalizado de Error */}
+      {/* Modal Error */}
       {errorModalMsg && (
         <div
           style={{
@@ -291,223 +357,39 @@ export const InventarioPage: React.FC = () => {
         </div>
       )}
 
-      {/* Encabezado */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div>
-          <h2 style={{ fontSize: '24px', fontWeight: '800', color: '#F8FAFC', margin: 0 }}>
-            Inventario & Productos
-          </h2>
-          <p style={{ color: '#94A3B8', fontSize: '14px', margin: '4px 0 0 0' }}>
-            Gestión de catálogo, precios y control de stock mínimo.
-          </p>
-        </div>
-        <button
-          onClick={abrirModalCrear}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            padding: '12px 20px',
-            backgroundColor: '#2563EB',
-            color: '#FFFFFF',
-            border: 'none',
-            borderRadius: '10px',
-            fontWeight: '700',
-            cursor: 'pointer',
-          }}
-        >
-          <Plus size={18} /> Nuevo Producto
-        </button>
-      </div>
+      {/* Componentes Principales */}
+      <InventarioHeader esAdmin={esAdmin} onAbrirModalCrear={abrirModalCrear} />
 
-      {/* Controles de Búsqueda y Filtros */}
-      <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
-        <div style={{ position: 'relative', flex: 1 }}>
-          <Search
-            size={18}
-            color="#64748B"
-            style={{
-              position: 'absolute',
-              left: '14px',
-              top: '50%',
-              transform: 'translateY(-50%)',
-            }}
-          />
-          <input
-            type="text"
-            placeholder="Buscar por nombre o código de barras..."
-            value={busqueda}
-            onChange={(e) => setBusqueda(e.target.value)}
-            style={{
-              width: '100%',
-              padding: '12px 16px 12px 42px',
-              backgroundColor: 'rgba(15, 23, 42, 0.6)',
-              border: '1px solid #334155',
-              borderRadius: '10px',
-              color: '#F8FAFC',
-              fontSize: '14px',
-              outline: 'none',
-              boxSizing: 'border-box',
-            }}
-          />
-        </div>
+      <InventarioFiltros
+        busqueda={busqueda}
+        setBusqueda={setBusqueda}
+        filtroCritico={filtroCritico}
+        setFiltroCritico={setFiltroCritico}
+        onRefresh={cargarDatos}
+      />
 
-        <button
-          onClick={() => setFiltroCritico(!filtroCritico)}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            padding: '12px 16px',
-            backgroundColor: filtroCritico ? 'rgba(239, 68, 68, 0.2)' : 'rgba(30, 41, 59, 0.6)',
-            color: filtroCritico ? '#FCA5A5' : '#CBD5E1',
-            border: filtroCritico ? '1px solid #EF4444' : '1px solid #334155',
-            borderRadius: '10px',
-            fontWeight: '600',
-            cursor: 'pointer',
-          }}
-        >
-          <AlertTriangle size={18} color={filtroCritico ? '#EF4444' : '#94A3B8'} />
-          {filtroCritico ? 'Mostrando Stock Crítico' : 'Ver Stock Crítico'}
-        </button>
+      <InventarioTabla
+        cargando={cargando}
+        productos={productosFiltrados}
+        esAdmin={esAdmin}
+        onVer={abrirModalVer}
+        onDespachar={(p) =>
+          setModalDespacho({ abierto: true, producto: p, cantidad: 1, motivo: '' })
+        }
+        onAjustar={(p) =>
+          setModalAjuste({
+            abierto: true,
+            producto: p,
+            tipo_movimiento: 'AJUSTE',
+            cantidad_nueva: p.stock_actual,
+            motivo: '',
+          })
+        }
+        onEditar={abrirModalEditar}
+        onEliminar={(id, nombre) => setConfirmModal({ abierto: true, id, nombre })}
+      />
 
-        <button
-          onClick={cargarDatos}
-          style={{
-            padding: '12px',
-            backgroundColor: 'rgba(30, 41, 59, 0.6)',
-            border: '1px solid #334155',
-            borderRadius: '10px',
-            color: '#CBD5E1',
-            cursor: 'pointer',
-          }}
-        >
-          <RefreshCw size={18} />
-        </button>
-      </div>
-
-      {/* Tabla con Sticky Header */}
-      <div
-        style={{
-          flex: 1,
-          backgroundColor: 'rgba(15, 23, 42, 0.6)',
-          border: '1px solid #334155',
-          borderRadius: '16px',
-          overflowY: 'auto',
-          maxHeight: 'calc(100vh - 280px)',
-        }}
-      >
-        <table
-          style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '14px' }}
-        >
-          <thead
-            style={{
-              position: 'sticky',
-              top: 0,
-              zIndex: 10,
-              backgroundColor: '#1E293B',
-              boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
-            }}
-          >
-            <tr style={{ borderBottom: '1px solid #334155', color: '#94A3B8' }}>
-              <th style={{ padding: '16px' }}>CÓDIGO</th>
-              <th style={{ padding: '16px' }}>PRODUCTO</th>
-              <th style={{ padding: '16px' }}>UNIDAD</th>
-              <th style={{ padding: '16px' }}>P. COMPRA</th>
-              <th style={{ padding: '16px' }}>P. VENTA</th>
-              <th style={{ padding: '16px' }}>STOCK</th>
-              <th style={{ padding: '16px' }}>ESTADO</th>
-              <th style={{ padding: '16px', textAlign: 'center' }}>ACCIONES</th>
-            </tr>
-          </thead>
-          <tbody>
-            {cargando ? (
-              <tr>
-                <td colSpan={8} style={{ padding: '32px', textAlign: 'center', color: '#94A3B8' }}>
-                  Cargando productos...
-                </td>
-              </tr>
-            ) : productosFiltrados.length === 0 ? (
-              <tr>
-                <td colSpan={8} style={{ padding: '32px', textAlign: 'center', color: '#94A3B8' }}>
-                  No se encontraron productos en el inventario.
-                </td>
-              </tr>
-            ) : (
-              productosFiltrados.map((p) => {
-                const esCritico = p.stock_actual <= p.stock_minimo;
-                return (
-                  <tr
-                    key={p.id_producto}
-                    style={{ borderBottom: '1px solid rgba(51, 65, 85, 0.4)' }}
-                  >
-                    <td style={{ padding: '16px', color: '#38BDF8', fontFamily: 'monospace' }}>
-                      {p.codigo_barras || 'N/A'}
-                    </td>
-                    <td style={{ padding: '16px', fontWeight: '600', color: '#F8FAFC' }}>
-                      {p.nombre}
-                    </td>
-                    <td style={{ padding: '16px', color: '#94A3B8' }}>
-                      {p.unidad_medida || 'UNIDAD'}
-                    </td>
-                    <td style={{ padding: '16px', color: '#CBD5E1' }}>
-                      S/ {(p.precio_compra / 100).toFixed(2)}
-                    </td>
-                    <td style={{ padding: '16px', fontWeight: '700', color: '#34D399' }}>
-                      S/ {(p.precio_venta / 100).toFixed(2)}
-                    </td>
-                    <td
-                      style={{
-                        padding: '16px',
-                        fontWeight: '700',
-                        color: esCritico ? '#EF4444' : '#F8FAFC',
-                      }}
-                    >
-                      {p.stock_actual}
-                    </td>
-                    <td style={{ padding: '16px' }}>
-                      <span style={getBadgeStyles(esCritico)}>
-                        {esCritico ? 'STOCK CRÍTICO' : 'NORMAL'}
-                      </span>
-                    </td>
-                    <td style={{ padding: '16px', textAlign: 'center' }}>
-                      <div style={{ display: 'flex', justifyContent: 'center', gap: '8px' }}>
-                        <button
-                          onClick={() => abrirModalVer(p)}
-                          title="Ver Detalle"
-                          style={btnAccionStyle}
-                        >
-                          <Eye size={16} color="#38BDF8" />
-                        </button>
-                        <button
-                          onClick={() => abrirModalEditar(p)}
-                          title="Editar Producto"
-                          style={btnAccionStyle}
-                        >
-                          <Pencil size={16} color="#FBBF24" />
-                        </button>
-                        <button
-                          onClick={() => solicitarEliminacion(p.id_producto, p.nombre)}
-                          title="Eliminar Producto"
-                          style={{
-                            ...btnAccionStyle,
-                            backgroundColor: 'rgba(239, 68, 68, 0.15)',
-                            border: '1px solid rgba(239, 68, 68, 0.3)',
-                          }}
-                        >
-                          <Trash2 size={16} color="#EF4444" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })
-            )}
-          </tbody>
-        </table>
-      </div>
-
-      {/* Modales */}
+      {/* Modales Desacoplados */}
       <InventarioModal
         modalAbierto={modalAbierto}
         setModalAbierto={setModalAbierto}
@@ -515,7 +397,41 @@ export const InventarioPage: React.FC = () => {
         prodForm={prodForm}
         setProdForm={setProdForm}
         categorias={categorias}
-        handleGuardar={handleGuardar}
+        handleGuardar={handleGuardarProducto}
+      />
+
+      <ModalDespacho
+        abierto={modalDespacho.abierto}
+        producto={modalDespacho.producto}
+        cantidad={modalDespacho.cantidad}
+        setCantidad={(cant) => setModalDespacho({ ...modalDespacho, cantidad: cant })}
+        motivo={modalDespacho.motivo}
+        setMotivo={(mot) => setModalDespacho({ ...modalDespacho, motivo: mot })}
+        onClose={() =>
+          setModalDespacho({ abierto: false, producto: null, cantidad: 1, motivo: '' })
+        }
+        onSubmit={ejecutarDespacho}
+      />
+
+      <ModalAjusteStock
+        abierto={modalAjuste.abierto}
+        producto={modalAjuste.producto}
+        tipoMovimiento={modalAjuste.tipo_movimiento}
+        setTipoMovimiento={(tipo) => setModalAjuste({ ...modalAjuste, tipo_movimiento: tipo })}
+        cantidadNueva={modalAjuste.cantidad_nueva}
+        setCantidadNueva={(cant) => setModalAjuste({ ...modalAjuste, cantidad_nueva: cant })}
+        motivo={modalAjuste.motivo}
+        setMotivo={(mot) => setModalAjuste({ ...modalAjuste, motivo: mot })}
+        onClose={() =>
+          setModalAjuste({
+            abierto: false,
+            producto: null,
+            tipo_movimiento: 'AJUSTE',
+            cantidad_nueva: 0,
+            motivo: '',
+          })
+        }
+        onSubmit={ejecutarAjuste}
       />
 
       <ConfirmModal
@@ -527,15 +443,4 @@ export const InventarioPage: React.FC = () => {
       />
     </div>
   );
-};
-
-const btnAccionStyle: React.CSSProperties = {
-  padding: '6px 10px',
-  backgroundColor: 'rgba(30, 41, 59, 0.8)',
-  border: '1px solid #334155',
-  borderRadius: '8px',
-  cursor: 'pointer',
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
 };

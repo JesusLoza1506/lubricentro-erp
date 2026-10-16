@@ -1,4 +1,7 @@
-export interface Producto {
+export type UnidadMedida = 'LITRO' | 'GALON' | 'UNIDAD' | 'BARRIL';
+
+// DTO Público (CAJERO / MECANICO) - Fuga de datos de costos imposibilitada desde tipos
+export interface ProductoPublicoDTO {
   id_producto: number;
   id_categoria: number;
   nombre_categoria?: string;
@@ -7,9 +10,18 @@ export interface Producto {
   unidad_medida: string | null;
   stock_actual: number;
   stock_minimo: number;
-  precio_compra: number;
-  precio_venta: number;
+  precio_venta: number; // En céntimos
+  es_critico: boolean;
 }
+
+// DTO Interno (ADMINISTRADOR) - Incluye precio_compra y margen
+export interface ProductoAdminDTO extends ProductoPublicoDTO {
+  precio_compra: number; // En céntimos
+  margen: number; // En céntimos
+}
+
+// Tipo flexible para vistas/tablas de React
+export type Producto = ProductoPublicoDTO | ProductoAdminDTO;
 
 export interface CrearProductoDTO {
   id_categoria: number;
@@ -18,12 +30,25 @@ export interface CrearProductoDTO {
   unidad_medida?: string | null;
   stock_actual: number;
   stock_minimo: number;
-  precio_compra: number;
-  precio_venta: number;
+  precio_compra: number; // En céntimos
+  precio_venta: number; // En céntimos
 }
 
 export interface EditarProductoDTO extends CrearProductoDTO {
   id_producto: number;
+}
+
+export interface DespacharProductoDTO {
+  id_producto: number;
+  cantidad: number;
+  motivo?: string;
+}
+
+export interface AjustarStockDTO {
+  id_producto: number;
+  tipo_movimiento: 'ENTRADA' | 'AJUSTE';
+  cantidad_nueva: number;
+  motivo: string; // Obligatorio
 }
 
 export interface Categoria {
@@ -33,25 +58,16 @@ export interface Categoria {
   nombreCategoria?: string;
 }
 
-// Tipo unificado para el formulario en React (soporta tanto camelCase como snake_case)
+// Formulario reactivo para crear/editar productos
 export interface ProductoForm {
   id_producto?: number;
-  idProducto?: number;
   id_categoria: number;
-  idCategoria?: number;
   nombre: string;
   nombre_categoria?: string;
-  nombreCategoria?: string;
   codigo_barras?: string | null;
-  codigoBarras?: string | null;
   unidad_medida?: string | null;
-  unidadMedida?: string | null;
   stock_actual: number;
-  stockActual?: number;
   stock_minimo: number;
-  stockMinimo?: number;
-  precio_compra: number;
-  precioCompra?: number;
-  precio_venta: number;
-  precioVenta?: number;
+  precio_compra: number; // En Soles en el formulario (ej. 15.50)
+  precio_venta: number; // En Soles en el formulario (ej. 28.00)
 }

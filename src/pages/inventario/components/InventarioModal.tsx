@@ -1,5 +1,6 @@
 import React from 'react';
-import { Categoria, ProductoForm } from '../../../types/inventario';
+import { AlertTriangle } from 'lucide-react';
+import { Categoria, ProductoForm, UnidadMedida } from '../../../types/inventario';
 import { modalInputStyle } from '../inventarioStyles';
 
 export type ModoModal = 'CREAR' | 'EDITAR' | 'VER';
@@ -13,6 +14,8 @@ interface InventarioModalProps {
   categorias: Categoria[];
   handleGuardar: (e: React.FormEvent) => void;
 }
+
+const UNIDADES_OPCIONES: UnidadMedida[] = ['LITRO', 'GALON', 'UNIDAD', 'BARRIL'];
 
 export const InventarioModal: React.FC<InventarioModalProps> = ({
   modalAbierto,
@@ -34,16 +37,24 @@ export const InventarioModal: React.FC<InventarioModalProps> = ({
         ? 'Editar Producto'
         : 'Detalles del Producto';
 
-  const categoriaActualId = prodForm.id_categoria ?? prodForm.idCategoria ?? 1;
+  const categoriaActualId = prodForm.id_categoria ?? 1;
+
+  const categoriaEncontrada = categorias.find(
+    (c) => (c.id_categoria ?? c.idCategoria) === Number(categoriaActualId)
+  );
 
   const categoriaNombreActual =
     prodForm.nombre_categoria ||
-    prodForm.nombreCategoria ||
-    categorias.find((c) => (c.id_categoria ?? c.idCategoria) === Number(categoriaActualId))
-      ?.nombre_categoria ||
-    categorias.find((c) => (c.id_categoria ?? c.idCategoria) === Number(categoriaActualId))
-      ?.nombreCategoria ||
+    categoriaEncontrada?.nombre_categoria ||
+    categoriaEncontrada?.nombreCategoria ||
+    (categoriaEncontrada as any)?.nombre ||
     'Sin Categoría';
+
+  const advertenciaPrecioBajo =
+    !esSoloLectura &&
+    prodForm.precio_compra > 0 &&
+    prodForm.precio_venta > 0 &&
+    prodForm.precio_venta < prodForm.precio_compra;
 
   return (
     <div
@@ -63,7 +74,7 @@ export const InventarioModal: React.FC<InventarioModalProps> = ({
     >
       <div
         style={{
-          width: '500px',
+          width: '520px',
           backgroundColor: '#0F172A',
           border: '1px solid #334155',
           borderRadius: '16px',
@@ -129,22 +140,15 @@ export const InventarioModal: React.FC<InventarioModalProps> = ({
                   cursor: 'pointer',
                 }}
               >
-                {categorias.map((cat) => {
-                  const id = cat.id_categoria ?? cat.idCategoria;
+                {categorias.map((cat: any) => {
+                  const id = cat.id_categoria ?? cat.idCategoria ?? 1;
                   const nombre =
-                    cat.nombre_categoria ??
-                    cat.nombreCategoria ??
-                    (cat as any).nombre ??
-                    `Categoría ${id}`;
+                    cat.nombre_categoria ?? cat.nombreCategoria ?? cat.nombre ?? `Categoría ${id}`;
                   return (
                     <option
                       key={id}
                       value={id}
-                      style={{
-                        backgroundColor: '#0F172A',
-                        color: '#F8FAFC',
-                        padding: '8px',
-                      }}
+                      style={{ backgroundColor: '#0F172A', color: '#F8FAFC' }}
                     >
                       {nombre}
                     </option>
@@ -184,16 +188,40 @@ export const InventarioModal: React.FC<InventarioModalProps> = ({
                   marginBottom: '6px',
                 }}
               >
-                Unidad Medida
+                Unidad Medida *
               </label>
-              <input
-                disabled={esSoloLectura}
-                type="text"
-                value={prodForm.unidad_medida || ''}
-                onChange={(e) => setProdForm({ ...prodForm, unidad_medida: e.target.value })}
-                style={{ ...modalInputStyle, opacity: esSoloLectura ? 0.7 : 1 }}
-                placeholder="UNIDAD / GALON / LITRO"
-              />
+              {esSoloLectura ? (
+                <input
+                  disabled
+                  type="text"
+                  value={prodForm.unidad_medida || 'UNIDAD'}
+                  style={{ ...modalInputStyle, opacity: 0.7 }}
+                />
+              ) : (
+                <select
+                  required
+                  value={prodForm.unidad_medida || 'UNIDAD'}
+                  onChange={(e) =>
+                    setProdForm({ ...prodForm, unidad_medida: e.target.value as UnidadMedida })
+                  }
+                  style={{
+                    ...modalInputStyle,
+                    backgroundColor: '#1E293B',
+                    color: '#F8FAFC',
+                    cursor: 'pointer',
+                  }}
+                >
+                  {UNIDADES_OPCIONES.map((unid) => (
+                    <option
+                      key={unid}
+                      value={unid}
+                      style={{ backgroundColor: '#0F172A', color: '#F8FAFC' }}
+                    >
+                      {unid}
+                    </option>
+                  ))}
+                </select>
+              )}
             </div>
           </div>
 
@@ -248,6 +276,26 @@ export const InventarioModal: React.FC<InventarioModalProps> = ({
             </div>
           </div>
 
+          {advertenciaPrecioBajo && (
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                padding: '10px 14px',
+                backgroundColor: 'rgba(245, 158, 11, 0.15)',
+                border: '1px solid #F59E0B',
+                borderRadius: '8px',
+                color: '#FBBF24',
+                fontSize: '12px',
+                fontWeight: '600',
+              }}
+            >
+              <AlertTriangle size={16} color="#F59E0B" style={{ flexShrink: 0 }} />
+              <span>Este precio de venta está por debajo del costo registrado</span>
+            </div>
+          )}
+
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
             <div>
               <label
@@ -262,14 +310,18 @@ export const InventarioModal: React.FC<InventarioModalProps> = ({
               </label>
               <input
                 required
-                disabled={esSoloLectura}
+                disabled={esSoloLectura || modo === 'EDITAR'}
                 type="number"
+                step="0.01"
                 min="0"
                 value={prodForm.stock_actual ?? 0}
                 onChange={(e) =>
                   setProdForm({ ...prodForm, stock_actual: parseFloat(e.target.value) || 0 })
                 }
-                style={{ ...modalInputStyle, opacity: esSoloLectura ? 0.7 : 1 }}
+                style={{
+                  ...modalInputStyle,
+                  opacity: esSoloLectura || modo === 'EDITAR' ? 0.7 : 1,
+                }}
               />
             </div>
             <div>
@@ -287,6 +339,7 @@ export const InventarioModal: React.FC<InventarioModalProps> = ({
                 required
                 disabled={esSoloLectura}
                 type="number"
+                step="0.01"
                 min="0"
                 value={prodForm.stock_minimo ?? 0}
                 onChange={(e) =>

@@ -1,30 +1,46 @@
 use crate::dto::caja_dto::{AbrirCajaDto, CajaChicaDto, CierreCajaDto};
 use crate::errors::AppError;
 use crate::services::caja_service::CajaService;
+use crate::services::session_manager::SessionState;
 use rusqlite::Connection;
 use std::sync::Mutex;
 use tauri::State;
 
 #[tauri::command]
 pub fn abrir_caja_cmd(
-    state: State<'_, Mutex<Connection>>,
-    payload: AbrirCajaDto,
+    db_state: State<'_, Mutex<Connection>>,
+    session_state: State<'_, Mutex<SessionState>>,
+    mut payload: AbrirCajaDto,
 ) -> Result<i64, AppError> {
-    let conn = state.lock().map_err(|_| {
+    let mut session = session_state
+        .lock()
+        .map_err(|_| AppError::Validation("Fallo al obtener estado de sesión".to_string()))?;
+
+    let conn = db_state.lock().map_err(|_| {
         AppError::Validation("Fallo al obtener estado de la base de datos".to_string())
     })?;
+
+    let user_id = session.validar_sesion_operativa(&conn)?;
+    payload.id_usuario = user_id;
 
     CajaService::abrir_caja(&conn, payload)
 }
 
 #[tauri::command]
 pub fn cerrar_caja_cmd(
-    state: State<'_, Mutex<Connection>>,
+    db_state: State<'_, Mutex<Connection>>,
+    session_state: State<'_, Mutex<SessionState>>,
     payload: CierreCajaDto,
 ) -> Result<CajaChicaDto, AppError> {
-    let conn = state.lock().map_err(|_| {
+    let mut session = session_state
+        .lock()
+        .map_err(|_| AppError::Validation("Fallo al obtener estado de sesión".to_string()))?;
+
+    let conn = db_state.lock().map_err(|_| {
         AppError::Validation("Fallo al obtener estado de la base de datos".to_string())
     })?;
+
+    let _user_id = session.validar_sesion_operativa(&conn)?;
 
     CajaService::cerrar_caja(&conn, payload)
 }

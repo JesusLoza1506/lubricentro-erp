@@ -1,10 +1,13 @@
 import React from 'react';
-import { AlertTriangle, Trash2, X } from 'lucide-react';
+import { AlertTriangle, LogOut, Trash2, X } from 'lucide-react';
 
 interface ConfirmModalProps {
   abierto: boolean;
   titulo: string;
   mensaje: string;
+  subtitulo?: string;
+  textoConfirmar?: string;
+  textoCancelar?: string;
   onConfirmar: () => void;
   onCancelar: () => void;
   cargando?: boolean;
@@ -14,11 +17,16 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
   abierto,
   titulo,
   mensaje,
+  subtitulo = '⚠️ Acción Requiere Confirmación',
+  textoConfirmar = 'Sí, Eliminar',
+  textoCancelar = 'Cancelar',
   onConfirmar,
   onCancelar,
   cargando = false,
 }) => {
   if (!abierto) return null;
+
+  const esCierreSesion = textoConfirmar.toLowerCase().includes('sesión');
 
   return (
     <div
@@ -68,7 +76,7 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
               {titulo}
             </h3>
             <span style={{ fontSize: '12px', color: '#FCA5A5', fontWeight: '600' }}>
-              ⚠️ Acción Irreversible
+              {subtitulo}
             </span>
           </div>
           <button
@@ -110,7 +118,7 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
               cursor: 'pointer',
             }}
           >
-            Cancelar
+            {textoCancelar}
           </button>
           <button
             type="button"
@@ -129,8 +137,8 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
               cursor: 'pointer',
             }}
           >
-            <Trash2 size={16} />
-            {cargando ? 'Eliminando...' : 'Sí, Eliminar'}
+            {esCierreSesion ? <LogOut size={16} /> : <Trash2 size={16} />}
+            {cargando ? 'Procesando...' : textoConfirmar}
           </button>
         </div>
       </div>

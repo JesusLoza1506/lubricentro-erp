@@ -32,32 +32,30 @@ pub fn init_db(app_data_dir: PathBuf) -> Result<Connection> {
     }
 
     let db_path = app_data_dir.join("lubricentro_secure.db");
-    let conn = Connection::open(&db_path)?;
+    let mut conn = Connection::open(&db_path)?;
 
     let key = get_or_create_encryption_key();
-
     let _ = conn.execute(&format!("PRAGMA key = '{}';", key), []);
 
+    // Configuración exigida por Esquema V7.0
+    // WAL se ejecuta fuera de la migración para no interferir con la transacción del DDL
     conn.execute_batch(
         "PRAGMA foreign_keys = ON;
+         PRAGMA busy_timeout = 5000;
          PRAGMA journal_mode = WAL;",
     )?;
 
-    let version: i32 = conn.query_row("PRAGMA user_version", [], |row| row.get(0))?;
+    // Verificar la versión del esquema en PRAGMA user_version (700 = v7.0)
+    let user_version: i32 = conn
+        .query_row("PRAGMA user_version;", [], |row| row.get(0))
+        .unwrap_or(0);
 
-    // Migración Versión 1: Esquema Inicial limpio y real
-    if version < 1 {
-        let initial_schema = include_str!("../migrations/0001_initial_schema.sql");
-        conn.execute_batch(initial_schema)?;
-
-        // Crear índice único parcial para zanjas activas en SQLite
-        conn.execute_batch(
-            "CREATE UNIQUE INDEX IF NOT EXISTS idx_zanja_activa 
-             ON ordenes_trabajo(zanja) 
-             WHERE zanja IS NOT NULL AND estado IN ('EN_ESPERA', 'EN_PROCESO');",
-        )?;
-
-        conn.execute("PRAGMA user_version = 1", [])?;
+    if user_version < 700 {
+        // Ejecución atómica del Esquema V7.0 dentro de una transacción
+        let tx = conn.transaction()?;
+        let initial_schema = include_str!("../migrations/0001_initial_schema_v7.sql");
+        tx.execute_batch(initial_schema)?;
+        tx.commit()?;
     }
 
     Ok(conn)
@@ -69,22 +67,50 @@ mod tests {
     use tempfile::tempdir;
 
     #[test]
-    fn test_init_db_and_migrations() {
+    fn test_init_db_and_migrations_v7() {
         let dir = tempdir().unwrap();
         match init_db(dir.path().to_path_buf()) {
             Ok(connection) => {
-                let version: i32 = connection
-                    .query_row("PRAGMA user_version", [], |row| row.get(0))
+                // 1. Verificar versión del esquema
+                let user_version: i32 = connection
+                    .query_row("PRAGMA user_version;", [], |row| row.get(0))
                     .unwrap();
-                assert_eq!(version, 1);
+                assert_eq!(user_version, 700);
 
+                // 2. Verificar existencia de la tabla configuracion
+                let config_exists: i32 = connection
+                    .query_row(
+                        "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='configuracion'",
+                        [],
+                        |row| row.get(0),
+                    )
+                    .unwrap();
+                assert_eq!(config_exists, 1);
+
+                // 3. Verificar activación de Claves Foráneas
                 let fk_enabled: i32 = connection
                     .query_row("PRAGMA foreign_keys", [], |row| row.get(0))
                     .unwrap();
                 assert_eq!(fk_enabled, 1);
+
+                // 4. Verificar que NO existan usuarios por defecto (Primer Admin se crea desde Login)
+                let usuarios_count: i32 = connection
+                    .query_row("SELECT COUNT(*) FROM usuarios", [], |row| row.get(0))
+                    .unwrap();
+                assert_eq!(usuarios_count, 0);
+
+                // 5. Verificar inicialización de datos estáticos (Cliente Varios)
+                let cliente_varios_count: i32 = connection
+                    .query_row(
+                        "SELECT COUNT(*) FROM clientes WHERE es_varios = 1",
+                        [],
+                        |row| row.get(0),
+                    )
+                    .unwrap();
+                assert_eq!(cliente_varios_count, 1);
             }
             Err(e) => {
-                panic!("Error al inicializar la base de datos: {:?}", e);
+                panic!("Error al inicializar la base de datos v7.0: {:?}", e);
             }
         }
     }

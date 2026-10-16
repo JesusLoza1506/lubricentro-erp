@@ -4,6 +4,7 @@ use crate::dto::orden_trabajo_dto::{
 };
 use crate::errors::AppError;
 use rusqlite::{params, Connection, OptionalExtension};
+use uuid::Uuid;
 
 pub struct OrdenesService;
 
@@ -20,28 +21,21 @@ impl OrdenesService {
     }
 
     fn obtener_tipo_aceite_ot(conn: &Connection, id_ot: i64) -> Result<Option<String>, AppError> {
-        let sql = "SELECT p.descripcion
+        let sql = "SELECT p.nombre
                    FROM detalle_ot_productos dp
                    JOIN productos p ON dp.id_producto = p.id_producto
-                   LEFT JOIN categorias c ON p.id_categoria = c.id_categoria
                    WHERE dp.id_ot = ?1
-                     AND (UPPER(c.nombre_categoria) LIKE '%ACEITE%'
-                       OR UPPER(c.nombre_categoria) LIKE '%LUBRICANTE%'
-                       OR UPPER(p.descripcion) LIKE '%ACEITE%'
-                       OR UPPER(p.descripcion) LIKE '%20W%'
-                       OR UPPER(p.descripcion) LIKE '%10W%'
-                       OR UPPER(p.descripcion) LIKE '%5W%')
+                     AND (UPPER(p.categoria) = 'ACEITE' OR UPPER(p.categoria) = 'GRANEL')
                    LIMIT 1";
 
         let resultado = conn.query_row(sql, [id_ot], |row| row.get(0)).optional()?;
         Ok(resultado)
     }
 
-    /// Recalcula el kilometraje actual del vehículo ignorando las órdenes canceladas
     fn recalcular_kilometraje_vehiculo(conn: &Connection, placa: &str) -> Result<(), AppError> {
         let max_km: Option<i64> = conn
             .query_row(
-                "SELECT MAX(kilometraje_ingreso) FROM ordenes_trabajo WHERE placa = ?1 AND estado != 'CANCELADO'",
+                "SELECT MAX(kilometraje_ingreso) FROM ordenes_trabajo WHERE placa_snapshot = ?1 AND estado != 'CANCELADO'",
                 [placa],
                 |row| row.get(0),
             )
@@ -57,7 +51,6 @@ impl OrdenesService {
         Ok(())
     }
 
-    /// Valida que el ID de mecánico exista, esté activo y tenga rol 'MECANICO'
     fn validar_mecanico_activo(conn: &Connection, id_mecanico: i64) -> Result<(), AppError> {
         let es_mecanico_valido: Option<bool> = conn
             .query_row(
@@ -80,7 +73,6 @@ impl OrdenesService {
         }
     }
 
-    /// Valida las transiciones legales de la máquina de estados
     fn validar_transicion_estado(estado_actual: &str, nuevo_estado: &str) -> Result<(), AppError> {
         let actual = estado_actual.trim().to_uppercase();
         let nuevo = nuevo_estado.trim().to_uppercase();
@@ -107,7 +99,6 @@ impl OrdenesService {
         Ok(())
     }
 
-    /// Valida si el usuario ejecutor tiene permiso para modificar los detalles de la OT
     fn validar_permiso_operacion_ot(
         conn: &Connection,
         id_ot: i64,
@@ -130,7 +121,7 @@ impl OrdenesService {
         }
 
         if rol_usuario == "MECANICO" {
-            let id_mecanico_ot: i64 = conn
+            let id_mecanico_ot: Option<i64> = conn
                 .query_row(
                     "SELECT id_mecanico FROM ordenes_trabajo WHERE id_ot = ?1",
                     [id_ot],
@@ -140,9 +131,9 @@ impl OrdenesService {
                     AppError::NotFound(format!("No se encontró la OT con ID {}.", id_ot))
                 })?;
 
-            if id_mecanico_ot != id_usuario {
+            if id_mecanico_ot != Some(id_usuario) {
                 return Err(AppError::Validation(
-                    "Acceso denegado: No tienes permiso para modificar los productos o servicios de la OT de otro mecánico."
+                    "Acceso denegado: No tienes permiso para modificar la OT de otro mecánico."
                         .to_string(),
                 ));
             }
@@ -167,7 +158,6 @@ impl OrdenesService {
             ));
         }
 
-        // 1. Validar estrictamente el tipo de aceite (Solamente MINERAL o SINTETICO)
         let tipo_aceite_upper = req.tipo_aceite.trim().to_uppercase();
         if tipo_aceite_upper != "MINERAL" && tipo_aceite_upper != "SINTETICO" {
             return Err(AppError::Validation(format!(
@@ -176,23 +166,18 @@ impl OrdenesService {
             )));
         }
 
-        // 2. Validar que el mecánico sea válido y activo
         Self::validar_mecanico_activo(conn, req.id_mecanico)?;
 
-        // 3. Verificar existencia del vehículo y comparar kilometraje actual de la Ficha
-        let (existe_vehiculo, km_actual_ficha): (i32, i64) = conn
+        let (id_vehiculo, id_cliente_atendido, km_actual_ficha, nombre_cliente): (i64, i64, i64, String) = conn
             .query_row(
-                "SELECT COUNT(*), COALESCE(kilometraje_actual, 0) FROM vehiculos WHERE placa = ?1 AND activo = 1",
+                "SELECT v.id_vehiculo, v.id_cliente, COALESCE(v.kilometraje_actual, 0), c.nombre_razon_social
+                 FROM vehiculos v
+                 JOIN clientes c ON v.id_cliente = c.id_cliente
+                 WHERE v.placa = ?1 AND v.activo = 1",
                 [&placa],
-                |row| Ok((row.get(0)?, row.get(1)?)),
-            )?;
-
-        if existe_vehiculo == 0 {
-            return Err(AppError::NotFound(format!(
-                "El vehículo con placa {} no se encuentra registrado.",
-                placa
-            )));
-        }
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
+            )
+            .map_err(|_| AppError::NotFound(format!("El vehículo con placa {} no se encuentra registrado.", placa)))?;
 
         if req.kilometraje_ingreso < km_actual_ficha {
             return Err(AppError::Validation(format!(
@@ -201,60 +186,60 @@ impl OrdenesService {
             )));
         }
 
-        // 4. Verificar Zanja única para OTs activas
         if let Some(z) = req.zanja {
-            if z != 1 && z != 2 {
+            if !(1..=6).contains(&z) {
                 return Err(AppError::Validation(
-                    "La zanja asignada debe ser 1 o 2.".to_string(),
+                    "La zanja asignada debe estar entre 1 y 6.".to_string(),
                 ));
             }
 
             let ocupada: i32 = conn.query_row(
-                "SELECT COUNT(*) FROM ordenes_trabajo WHERE zanja = ?1 AND estado IN ('EN_ESPERA', 'EN_PROCESO')",
+                "SELECT COUNT(*) FROM ordenes_trabajo WHERE id_zanja_ejecucion = ?1 AND estado = 'EN_PROCESO'",
                 [z],
                 |row| row.get(0),
             )?;
 
             if ocupada > 0 {
                 return Err(AppError::Validation(format!(
-                    "La zanja {} ya se encuentra ocupada por otra orden activa.",
+                    "La zanja {} ya se encuentra ocupada por otra orden en proceso.",
                     z
                 )));
             }
         }
 
-        let incremento_km = if tipo_aceite_upper == "SINTETICO" {
-            10000
-        } else {
-            5000
-        };
-        let proximo_kilometraje = req.kilometraje_ingreso + incremento_km;
         let codigo_ot = Self::generar_codigo_ot(conn)?;
+        let id_operacion = Uuid::new_v4().to_string();
+        let cliente_snapshot = format!(r#"{{"nombre":"{}"}}"#, nombre_cliente);
 
-        // 5. Transacción SQLite Atómica
         let tx = conn
             .transaction()
             .map_err(|e| AppError::Validation(e.to_string()))?;
 
         tx.execute(
-            "INSERT INTO ordenes_trabajo (codigo_ot, placa, id_mecanico, zanja, estado, kilometraje_ingreso, proximo_kilometraje, observaciones, fecha_ingreso)
-             VALUES (?1, ?2, ?3, ?4, 'EN_ESPERA', ?5, ?6, ?7, datetime('now', 'localtime'))",
+            "INSERT INTO ordenes_trabajo (
+                id_operacion, codigo_ot, id_vehiculo, id_cliente_atendido, placa_snapshot, cliente_snapshot,
+                id_creador, id_mecanico, id_zanja_prevista, estado, kilometraje_ingreso, pedido_cliente, tipo_aceite, fecha_ingreso
+            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, 1, ?7, ?8, 'EN_ESPERA', ?9, ?10, ?11, datetime('now', '-5 hours'))",
             params![
+                id_operacion,
                 codigo_ot,
+                id_vehiculo,
+                id_cliente_atendido,
                 placa,
+                cliente_snapshot,
                 req.id_mecanico,
                 req.zanja,
                 req.kilometraje_ingreso,
-                proximo_kilometraje,
                 req.observaciones,
+                tipo_aceite_upper
             ],
         )?;
 
         let id_ot = tx.last_insert_rowid();
 
         tx.execute(
-            "UPDATE vehiculos SET kilometraje_actual = ?1 WHERE placa = ?2",
-            params![req.kilometraje_ingreso, placa],
+            "UPDATE vehiculos SET kilometraje_actual = ?1 WHERE id_vehiculo = ?2",
+            params![req.kilometraje_ingreso, id_vehiculo],
         )?;
 
         tx.commit()
@@ -275,10 +260,8 @@ impl OrdenesService {
             return Self::obtener_ot_por_id(conn, req.id_ot);
         }
 
-        // 1. Validar máquina de estados
         Self::validar_transicion_estado(&ot_actual.estado, &nuevo_estado)?;
 
-        // 2. Validar rol y permisos específicos
         let id_u = id_usuario.ok_or_else(|| {
             AppError::Validation(
                 "Se requiere un usuario válido para cambiar el estado.".to_string(),
@@ -291,9 +274,8 @@ impl OrdenesService {
                 [id_u],
                 |row| row.get(0),
             )
-            .map_err(|_| AppError::Validation("Usuario no encontrado o inactivo.".to_string()))?;
+            .map_err(|_| AppError::Validation("Actor inactivo o rol no autorizado".to_string()))?;
 
-        // Cancelación es exclusiva del ADMINISTRADOR
         if nuevo_estado == "CANCELADO" && rol_usuario != "ADMINISTRADOR" {
             return Err(AppError::Validation(
                 "Acceso denegado: Solo un usuario ADMINISTRADOR puede cancelar una Orden de Trabajo."
@@ -301,7 +283,6 @@ impl OrdenesService {
             ));
         }
 
-        // Restricción de Mecánico: Solo opera sus propias OTs
         if rol_usuario == "MECANICO" && ot_actual.id_mecanico != id_u {
             return Err(AppError::Validation(
                 "Acceso denegado: Solo puedes modificar las órdenes de trabajo asignadas a ti."
@@ -313,18 +294,12 @@ impl OrdenesService {
             let zanja_asignada = req.zanja.or(ot_actual.zanja);
             let z = zanja_asignada.ok_or_else(|| {
                 AppError::Validation(
-                    "Para pasar a estado EN_PROCESO debe especificar la zanja (1 o 2).".to_string(),
+                    "Para pasar a estado EN_PROCESO debe especificar la zanja.".to_string(),
                 )
             })?;
 
-            if z != 1 && z != 2 {
-                return Err(AppError::Validation(
-                    "La zanja asignada debe ser 1 o 2.".to_string(),
-                ));
-            }
-
             let ocupada: i32 = conn.query_row(
-                "SELECT COUNT(*) FROM ordenes_trabajo WHERE zanja = ?1 AND estado IN ('EN_ESPERA', 'EN_PROCESO') AND id_ot != ?2",
+                "SELECT COUNT(*) FROM ordenes_trabajo WHERE id_zanja_ejecucion = ?1 AND estado = 'EN_PROCESO' AND id_ot != ?2",
                 params![z, req.id_ot],
                 |row| row.get(0),
             )?;
@@ -337,72 +312,21 @@ impl OrdenesService {
             }
 
             conn.execute(
-                "UPDATE ordenes_trabajo SET estado = ?1, zanja = ?2 WHERE id_ot = ?3",
-                params![nuevo_estado, z, req.id_ot],
+                "UPDATE ordenes_trabajo 
+                 SET estado = ?1, id_zanja_ejecucion = ?2, id_mecanico = ?3, fecha_inicio = datetime('now', '-5 hours') 
+                 WHERE id_ot = ?4",
+                params![nuevo_estado, z, id_u, req.id_ot],
             )?;
         } else if nuevo_estado == "CANCELADO" {
             let tx = conn
                 .transaction()
                 .map_err(|e| AppError::Validation(e.to_string()))?;
 
-            {
-                let mut stmt_prods = tx.prepare(
-                    "SELECT id_detalle, id_producto, cantidad FROM detalle_ot_productos WHERE id_ot = ?1",
-                )?;
-
-                let prods_iter = stmt_prods.query_map([req.id_ot], |row| {
-                    Ok((
-                        row.get::<_, i64>(0)?,
-                        row.get::<_, i64>(1)?,
-                        row.get::<_, f64>(2)?,
-                    ))
-                })?;
-
-                for prod_res in prods_iter {
-                    let (id_det, id_prod, cant) = prod_res?;
-
-                    let mov_existente: Option<i64> = tx
-                        .query_row(
-                            "SELECT id_movimiento FROM movimientos_inventario WHERE id_detalle_ot = ?1",
-                            [id_det],
-                            |row| row.get(0),
-                        )
-                        .optional()?;
-
-                    if mov_existente.is_some() {
-                        let stock_actual: f64 = tx.query_row(
-                            "SELECT stock_actual FROM productos WHERE id_producto = ?1",
-                            [id_prod],
-                            |row| row.get(0),
-                        )?;
-
-                        let nuevo_stock = stock_actual + cant;
-
-                        tx.execute(
-                            "UPDATE productos SET stock_actual = ?1 WHERE id_producto = ?2",
-                            params![nuevo_stock, id_prod],
-                        )?;
-
-                        tx.execute(
-                            "INSERT INTO movimientos_inventario (id_producto, id_usuario, id_detalle_ot, tipo_movimiento, stock_anterior, diferencia, stock_resultante, referencia, fecha_movimiento)
-                             VALUES (?1, ?2, ?3, 'AJUSTE', ?4, ?5, ?6, ?7, datetime('now', 'localtime'))",
-                            params![
-                                id_prod,
-                                id_u,
-                                id_det,
-                                stock_actual,
-                                cant,
-                                nuevo_stock,
-                                format!("Devolución por cancelación de OT {}", ot_actual.codigo_ot)
-                            ],
-                        )?;
-                    }
-                }
-            }
-
             tx.execute(
-                "UPDATE ordenes_trabajo SET estado = 'CANCELADO', zanja = NULL WHERE id_ot = ?1",
-                params![req.id_ot],
+                "UPDATE ordenes_trabajo 
+                 SET estado = 'CANCELADO', id_zanja_ejecucion = NULL, fecha_cancelacion = datetime('now', '-5 hours'), id_usuario_cancelacion = ?1, motivo_cancelacion = 'Cancelación por usuario administrador' 
+                 WHERE id_ot = ?2",
+                params![id_u, req.id_ot],
             )?;
 
             tx.commit()
@@ -411,7 +335,9 @@ impl OrdenesService {
             Self::recalcular_kilometraje_vehiculo(conn, &ot_actual.placa)?;
         } else if nuevo_estado == "FINALIZADO" {
             conn.execute(
-                "UPDATE ordenes_trabajo SET estado = 'FINALIZADO', zanja = NULL WHERE id_ot = ?1",
+                "UPDATE ordenes_trabajo 
+                 SET estado = 'FINALIZADO', id_zanja_ejecucion = NULL, fecha_fin = datetime('now', '-5 hours'), kilometraje_salida = kilometraje_ingreso, id_mecanico_terminal = id_mecanico, resumen_publico = COALESCE(pedido_cliente, 'Mantenimiento finalizado correctamente') 
+                 WHERE id_ot = ?1",
                 params![req.id_ot],
             )?;
         }
@@ -432,7 +358,6 @@ impl OrdenesService {
             ));
         }
 
-        // Validar que el nuevo mecánico sea válido y activo
         Self::validar_mecanico_activo(conn, req.nuevo_id_mecanico)?;
 
         conn.execute(
@@ -465,8 +390,8 @@ impl OrdenesService {
 
         let mut sql = String::from(
             "SELECT
-                ot.id_ot, ot.codigo_ot, ot.placa, ot.id_mecanico, ot.zanja, ot.estado,
-                ot.kilometraje_ingreso, ot.proximo_kilometraje, ot.observaciones, ot.fecha_ingreso,
+                ot.id_ot, ot.codigo_ot, ot.placa_snapshot, ot.id_mecanico, ot.id_zanja_ejecucion, ot.estado,
+                ot.kilometraje_ingreso, ot.pedido_cliente, ot.fecha_ingreso,
                 u.nombre_completo
              FROM ordenes_trabajo ot
              LEFT JOIN usuarios u ON ot.id_mecanico = u.id_usuario",
@@ -484,14 +409,13 @@ impl OrdenesService {
                 row.get::<_, i64>(0)?,
                 row.get::<_, String>(1)?,
                 row.get::<_, String>(2)?,
-                row.get::<_, i64>(3)?,
+                row.get::<_, Option<i64>>(3)?,
                 row.get::<_, Option<i32>>(4)?,
                 row.get::<_, String>(5)?,
                 row.get::<_, i64>(6)?,
-                row.get::<_, i64>(7)?,
-                row.get::<_, Option<String>>(8)?,
-                row.get::<_, String>(9)?,
-                row.get::<_, Option<String>>(10)?,
+                row.get::<_, Option<String>>(7)?,
+                row.get::<_, String>(8)?,
+                row.get::<_, Option<String>>(9)?,
             ))
         })?;
 
@@ -505,14 +429,14 @@ impl OrdenesService {
                 id_ot: raw_data.0,
                 codigo_ot: raw_data.1,
                 placa: raw_data.2,
-                id_mecanico: raw_data.3,
+                id_mecanico: raw_data.3.unwrap_or(0),
                 zanja: raw_data.4,
                 estado: raw_data.5,
                 kilometraje_ingreso: raw_data.6,
-                proximo_kilometraje: raw_data.7,
-                observaciones: raw_data.8,
-                fecha_ingreso: Some(raw_data.9),
-                nombre_mecanico: raw_data.10,
+                proximo_kilometraje: raw_data.6 + 5000,
+                observaciones: raw_data.7,
+                fecha_ingreso: Some(raw_data.8),
+                nombre_mecanico: raw_data.9,
                 tipo_aceite,
                 detalles,
             });
@@ -530,12 +454,11 @@ impl OrdenesService {
         let mut stmt_prod = conn.prepare(
             "SELECT
                 dp.id_detalle,
-                p.descripcion,
+                dp.nombre_snapshot,
                 dp.cantidad,
-                (dp.precio_aplicado / 100.0) AS precio_unitario,
-                ((dp.cantidad * dp.precio_aplicado - dp.descuento) / 100.0) AS subtotal
+                (dp.precio_unitario_cent / 100.0) AS precio_unitario,
+                ((dp.cantidad * dp.precio_unitario_cent) / 100.0) AS subtotal
              FROM detalle_ot_productos dp
-             JOIN productos p ON dp.id_producto = p.id_producto
              WHERE dp.id_ot = ?1",
         )?;
 
@@ -543,7 +466,7 @@ impl OrdenesService {
             Ok(DetalleItemOtDto {
                 id_detalle: row.get(0)?,
                 descripcion: row.get(1)?,
-                cantidad: row.get(2)?,
+                cantidad: row.get::<_, i64>(2)? as f64,
                 precio_unitario: row.get(3)?,
                 subtotal: row.get(4)?,
                 tipo: "PRODUCTO".to_string(),
@@ -557,20 +480,19 @@ impl OrdenesService {
         let mut stmt_serv = conn.prepare(
             "SELECT
                 ds.id_detalle,
-                s.descripcion,
-                1.0 AS cantidad,
-                (ds.precio_aplicado / 100.0) AS precio_unitario,
-                ((ds.precio_aplicado - ds.descuento) / 100.0) AS subtotal
+                ds.nombre_snapshot,
+                ds.cantidad,
+                (ds.precio_unitario_cent / 100.0) AS precio_unitario,
+                ((ds.cantidad * ds.precio_unitario_cent) / 100.0) AS subtotal
              FROM detalle_ot_servicios ds
-             JOIN servicios s ON ds.id_servicio = s.id_servicio
-             WHERE ds.id_ot = ?1",
+             WHERE ds.id_ot = ?1 AND ds.vigente = 1",
         )?;
 
         let iter_serv = stmt_serv.query_map([id_ot], |row| {
             Ok(DetalleItemOtDto {
                 id_detalle: row.get(0)?,
                 descripcion: row.get(1)?,
-                cantidad: row.get(2)?,
+                cantidad: row.get::<_, i64>(2)? as f64,
                 precio_unitario: row.get(3)?,
                 subtotal: row.get(4)?,
                 tipo: "SERVICIO".to_string(),
@@ -590,8 +512,8 @@ impl OrdenesService {
     ) -> Result<OrdenTrabajoHistorialDto, AppError> {
         let mut stmt = conn.prepare(
             "SELECT
-                ot.id_ot, ot.codigo_ot, ot.placa, ot.id_mecanico, ot.zanja, ot.estado,
-                ot.kilometraje_ingreso, ot.proximo_kilometraje, ot.observaciones, ot.fecha_ingreso,
+                ot.id_ot, ot.codigo_ot, ot.placa_snapshot, ot.id_mecanico, ot.id_zanja_ejecucion, ot.estado,
+                ot.kilometraje_ingreso, ot.pedido_cliente, ot.fecha_ingreso,
                 u.nombre_completo
              FROM ordenes_trabajo ot
              LEFT JOIN usuarios u ON ot.id_mecanico = u.id_usuario
@@ -604,14 +526,13 @@ impl OrdenesService {
                     row.get::<_, i64>(0)?,
                     row.get::<_, String>(1)?,
                     row.get::<_, String>(2)?,
-                    row.get::<_, i64>(3)?,
+                    row.get::<_, Option<i64>>(3)?,
                     row.get::<_, Option<i32>>(4)?,
                     row.get::<_, String>(5)?,
                     row.get::<_, i64>(6)?,
-                    row.get::<_, i64>(7)?,
-                    row.get::<_, Option<String>>(8)?,
-                    row.get::<_, String>(9)?,
-                    row.get::<_, Option<String>>(10)?,
+                    row.get::<_, Option<String>>(7)?,
+                    row.get::<_, String>(8)?,
+                    row.get::<_, Option<String>>(9)?,
                 ))
             })
             .map_err(|_| AppError::NotFound(format!("No se encontró la OT con ID {}", id_ot)))?;
@@ -623,14 +544,14 @@ impl OrdenesService {
             id_ot: raw_data.0,
             codigo_ot: raw_data.1,
             placa: raw_data.2,
-            id_mecanico: raw_data.3,
+            id_mecanico: raw_data.3.unwrap_or(0),
             zanja: raw_data.4,
             estado: raw_data.5,
             kilometraje_ingreso: raw_data.6,
-            proximo_kilometraje: raw_data.7,
-            observaciones: raw_data.8,
-            fecha_ingreso: Some(raw_data.9),
-            nombre_mecanico: raw_data.10,
+            proximo_kilometraje: raw_data.6 + 5000,
+            observaciones: raw_data.7,
+            fecha_ingreso: Some(raw_data.8),
+            nombre_mecanico: raw_data.9,
             tipo_aceite,
             detalles,
         })
@@ -643,12 +564,12 @@ impl OrdenesService {
         let placa_clean = placa.trim().to_uppercase();
         let mut stmt = conn.prepare(
             "SELECT
-                ot.id_ot, ot.codigo_ot, ot.placa, ot.id_mecanico, ot.zanja, ot.estado,
-                ot.kilometraje_ingreso, ot.proximo_kilometraje, ot.observaciones, ot.fecha_ingreso,
+                ot.id_ot, ot.codigo_ot, ot.placa_snapshot, ot.id_mecanico, ot.id_zanja_ejecucion, ot.estado,
+                ot.kilometraje_ingreso, ot.pedido_cliente, ot.fecha_ingreso,
                 u.nombre_completo
              FROM ordenes_trabajo ot
              LEFT JOIN usuarios u ON ot.id_mecanico = u.id_usuario
-             WHERE ot.placa = ?1
+             WHERE ot.placa_snapshot = ?1
              ORDER BY ot.fecha_ingreso DESC, ot.id_ot DESC",
         )?;
 
@@ -657,14 +578,13 @@ impl OrdenesService {
                 row.get::<_, i64>(0)?,
                 row.get::<_, String>(1)?,
                 row.get::<_, String>(2)?,
-                row.get::<_, i64>(3)?,
+                row.get::<_, Option<i64>>(3)?,
                 row.get::<_, Option<i32>>(4)?,
                 row.get::<_, String>(5)?,
                 row.get::<_, i64>(6)?,
-                row.get::<_, i64>(7)?,
-                row.get::<_, Option<String>>(8)?,
-                row.get::<_, String>(9)?,
-                row.get::<_, Option<String>>(10)?,
+                row.get::<_, Option<String>>(7)?,
+                row.get::<_, String>(8)?,
+                row.get::<_, Option<String>>(9)?,
             ))
         })?;
 
@@ -678,14 +598,14 @@ impl OrdenesService {
                 id_ot: raw_data.0,
                 codigo_ot: raw_data.1,
                 placa: raw_data.2,
-                id_mecanico: raw_data.3,
+                id_mecanico: raw_data.3.unwrap_or(0),
                 zanja: raw_data.4,
                 estado: raw_data.5,
                 kilometraje_ingreso: raw_data.6,
-                proximo_kilometraje: raw_data.7,
-                observaciones: raw_data.8,
-                fecha_ingreso: Some(raw_data.9),
-                nombre_mecanico: raw_data.10,
+                proximo_kilometraje: raw_data.6 + 5000,
+                observaciones: raw_data.7,
+                fecha_ingreso: Some(raw_data.8),
+                nombre_mecanico: raw_data.9,
                 tipo_aceite,
                 detalles,
             });
@@ -714,51 +634,64 @@ impl OrdenesService {
             ));
         }
 
-        let (precio_pen_cents, stock_actual, descripcion_prod): (i64, f64, String) = conn
+        let (precio_venta_cent, stock_actual, nombre_prod, codigo_prod, unidad_medida): (i64, i64, String, String, String) = conn
             .query_row(
-                "SELECT precio_venta, stock_actual, descripcion FROM productos WHERE id_producto = ?1 AND activo = 1",
+                "SELECT precio_venta_cent, stock_actual, nombre, codigo, unidad_medida FROM productos WHERE id_producto = ?1 AND activo = 1",
                 [req.id_producto],
-                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?, row.get(4)?)),
             )
             .map_err(|_| AppError::NotFound("Producto no encontrado o inactivo.".to_string()))?;
 
-        if stock_actual < req.cantidad {
+        let cant_entera = req.cantidad as i64;
+        if stock_actual < cant_entera {
             return Err(AppError::Validation(format!(
                 "Stock insuficiente para '{}'. Disponible: {}, solicitado: {}",
-                descripcion_prod, stock_actual, req.cantidad
+                nombre_prod, stock_actual, cant_entera
             )));
         }
 
-        // Transacción Atómica SQLite
+        let id_op_det = Uuid::new_v4().to_string();
+
         let tx = conn
             .transaction()
             .map_err(|e| AppError::Validation(e.to_string()))?;
 
         tx.execute(
-            "INSERT INTO detalle_ot_productos (id_ot, id_producto, cantidad, precio_aplicado, descuento)
-             VALUES (?1, ?2, ?3, ?4, 0)",
-            params![req.id_ot, req.id_producto, req.cantidad, precio_pen_cents],
+            "INSERT INTO detalle_ot_productos (
+                id_operacion, id_ot, id_producto, codigo_snapshot, nombre_snapshot, unidad_medida,
+                cantidad, precio_unitario_cent, costo_unitario_micro, valor_consumido_micro, recuperable, id_usuario
+            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, 0, 0, 1, ?9)",
+            params![
+                id_op_det,
+                req.id_ot,
+                req.id_producto,
+                codigo_prod,
+                nombre_prod,
+                unidad_medida,
+                cant_entera,
+                precio_venta_cent,
+                id_usuario_ejecutor
+            ],
         )?;
 
         let id_detalle_ot = tx.last_insert_rowid();
-
-        let stock_resultante = stock_actual - req.cantidad;
-        tx.execute(
-            "UPDATE productos SET stock_actual = ?1 WHERE id_producto = ?2",
-            params![stock_resultante, req.id_producto],
-        )?;
+        let id_op_kardex = Uuid::new_v4().to_string();
 
         tx.execute(
-            "INSERT INTO movimientos_inventario (id_producto, id_usuario, id_detalle_ot, tipo_movimiento, stock_anterior, diferencia, stock_resultante, referencia, fecha_movimiento)
-             VALUES (?1, ?2, ?3, 'EGRESO_VENTA', ?4, ?5, ?6, ?7, datetime('now', 'localtime'))",
+            "INSERT INTO movimientos_inventario (
+                id_operacion, id_producto, id_usuario, tipo_movimiento, id_consumo_ot, unidad_medida,
+                stock_anterior, diferencia, stock_resultante, valor_anterior_micro, valor_delta_micro,
+                valor_resultante_micro, costo_unitario_micro
+            ) VALUES (?1, ?2, ?3, 'USO_OT', ?4, ?5, ?6, ?7, ?8, 0, 0, 0, 0)",
             params![
+                id_op_kardex,
                 req.id_producto,
                 id_usuario_ejecutor,
                 id_detalle_ot,
+                unidad_medida,
                 stock_actual,
-                -req.cantidad,
-                stock_resultante,
-                format!("Asignado a OT {}", ot.codigo_ot)
+                -cant_entera,
+                stock_actual - cant_entera
             ],
         )?;
 
@@ -783,52 +716,51 @@ impl OrdenesService {
             ));
         }
 
-        let detalle_opt: Option<(i64, f64)> = conn
-            .query_row(
-                "SELECT id_producto, cantidad FROM detalle_ot_productos WHERE id_detalle = ?1 AND id_ot = ?2",
-                params![id_detalle, id_ot],
-                |row| Ok((row.get(0)?, row.get(1)?)),
-            )
-            .optional()?;
-
         let tx = conn
             .transaction()
             .map_err(|e| AppError::Validation(e.to_string()))?;
 
-        if let Some((id_prod, cant)) = detalle_opt {
-            let mov_existente: Option<i64> = tx
-                .query_row(
-                    "SELECT id_movimiento FROM movimientos_inventario WHERE id_detalle_ot = ?1",
-                    [id_detalle],
-                    |row| row.get(0),
-                )
-                .optional()?;
+        let detalle_opt: Option<(i64, i64, String)> = tx
+            .query_row(
+                "SELECT id_producto, cantidad, unidad_medida FROM detalle_ot_productos WHERE id_detalle = ?1 AND id_ot = ?2",
+                params![id_detalle, id_ot],
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+            )
+            .optional()?;
 
-            if mov_existente.is_some() {
-                let stock_actual: f64 = tx.query_row(
-                    "SELECT stock_actual FROM productos WHERE id_producto = ?1",
-                    [id_prod],
-                    |row| row.get(0),
-                )?;
+        if let Some((id_prod, cant, unidad_medida)) = detalle_opt {
+            let stock_actual: i64 = tx.query_row(
+                "SELECT stock_actual FROM productos WHERE id_producto = ?1",
+                [id_prod],
+                |row| row.get(0),
+            )?;
 
-                let stock_resultante = stock_actual + cant;
+            let stock_resultante = stock_actual + cant;
+            let id_op_kardex = Uuid::new_v4().to_string();
 
-                tx.execute(
-                    "UPDATE productos SET stock_actual = ?1 WHERE id_producto = ?2",
-                    params![stock_resultante, id_prod],
-                )?;
+            tx.execute(
+                "INSERT INTO movimientos_inventario (
+                    id_operacion, id_producto, id_usuario, tipo_movimiento, id_consumo_ot, unidad_medida,
+                    stock_anterior, diferencia, stock_resultante, valor_anterior_micro, valor_delta_micro,
+                    valor_resultante_micro, costo_unitario_micro, motivo
+                ) VALUES (?1, ?2, ?3, 'RETORNO_OT', ?4, ?5, ?6, ?7, ?8, 0, 0, 0, 0, 'Devolucion de producto por eliminacion de detalle en OT')",
+                params![
+                    id_op_kardex,
+                    id_prod,
+                    id_usuario_ejecutor,
+                    id_detalle,
+                    unidad_medida,
+                    stock_actual,
+                    cant,
+                    stock_resultante
+                ],
+            )?;
 
-                tx.execute(
-                    "DELETE FROM movimientos_inventario WHERE id_detalle_ot = ?1",
-                    [id_detalle],
-                )?;
-            }
+            tx.execute(
+                "DELETE FROM detalle_ot_productos WHERE id_detalle = ?1 AND id_ot = ?2",
+                params![id_detalle, id_ot],
+            )?;
         }
-
-        tx.execute(
-            "DELETE FROM detalle_ot_productos WHERE id_detalle = ?1 AND id_ot = ?2",
-            params![id_detalle, id_ot],
-        )?;
 
         tx.commit()
             .map_err(|e| AppError::Validation(e.to_string()))?;
@@ -850,18 +782,30 @@ impl OrdenesService {
             ));
         }
 
-        let precio_referencial: i64 = conn
+        let (precio_venta_cent, nombre_serv, codigo_serv, es_cambio): (i64, String, String, i32) = conn
             .query_row(
-                "SELECT precio_referencial FROM servicios WHERE id_servicio = ?1 AND activo = 1",
+                "SELECT precio_venta_cent, nombre, codigo, es_cambio_aceite FROM servicios WHERE id_servicio = ?1 AND activo = 1",
                 [req.id_servicio],
-                |row| row.get(0),
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
             )
             .map_err(|_| AppError::NotFound("Servicio no encontrado o inactivo.".to_string()))?;
 
+        let id_op_serv = Uuid::new_v4().to_string();
+
         conn.execute(
-            "INSERT INTO detalle_ot_servicios (id_ot, id_servicio, id_mecanico_ejecutor, precio_aplicado, descuento)
-             VALUES (?1, ?2, ?3, ?4, 0)",
-            params![req.id_ot, req.id_servicio, id_usuario_ejecutor, precio_referencial],
+            "INSERT INTO detalle_ot_servicios (
+                id_operacion, id_ot, id_servicio, codigo_snapshot, nombre_snapshot, cantidad, precio_unitario_cent, es_cambio_aceite, id_usuario
+            ) VALUES (?1, ?2, ?3, ?4, ?5, 1, ?6, ?7, ?8)",
+            params![
+                id_op_serv,
+                req.id_ot,
+                req.id_servicio,
+                codigo_serv,
+                nombre_serv,
+                precio_venta_cent,
+                es_cambio,
+                id_usuario_ejecutor
+            ],
         )?;
 
         Self::obtener_ot_por_id(conn, req.id_ot)
@@ -883,7 +827,7 @@ impl OrdenesService {
         }
 
         conn.execute(
-            "DELETE FROM detalle_ot_servicios WHERE id_detalle = ?1 AND id_ot = ?2",
+            "UPDATE detalle_ot_servicios SET vigente = 0 WHERE id_detalle = ?1 AND id_ot = ?2",
             params![id_detalle, id_ot],
         )?;
 
@@ -892,10 +836,10 @@ impl OrdenesService {
 
     pub fn listar_servicios(conn: &Connection) -> Result<Vec<ServicioResumenDto>, AppError> {
         let mut stmt = conn.prepare(
-            "SELECT id_servicio, descripcion, (precio_referencial / 100.0) AS precio_base
+            "SELECT id_servicio, nombre, (precio_venta_cent / 100.0) AS precio_base
              FROM servicios
              WHERE activo = 1
-             ORDER BY descripcion ASC",
+             ORDER BY nombre ASC",
         )?;
 
         let iter = stmt.query_map([], |row| {

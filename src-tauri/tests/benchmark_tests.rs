@@ -1,61 +1,82 @@
 use lubricentro_erp_lib::services::cliente_service::ClienteService;
-use rusqlite::Connection;
+use rusqlite::{params, Connection};
 use std::time::Instant;
+use uuid::Uuid;
+
+const DUMMY_ARGON2_HASH: &str =
+    "$argon2id$v=19$m=19456,t=2,p=1$Z3VpZGVsaW5lc3NhbHQ$5Vw5O7hK5W9u8P0s5vX+A1B2C3D4E5F6G7H8I9J0K1L";
 
 #[test]
 fn benchmark_exhaustivo_p50_p95_50k_vehiculos() {
     let conn = Connection::open_in_memory().unwrap();
     conn.execute_batch("PRAGMA foreign_keys = ON;").unwrap();
 
-    let initial_schema = include_str!("../migrations/0001_initial_schema.sql");
+    // Carga de la migración V5 real del proyecto
+    let initial_schema = include_str!("../migrations/0001_initial_schema_v7.sql");
     conn.execute_batch(initial_schema).unwrap();
 
+    // 1. Insertar Usuario Administrador con Hash Argon2id Válido
     conn.execute(
-        "INSERT INTO usuarios (id_usuario, nombre_completo, username, password_hash, rol)
-         VALUES (1, 'Mecanico Senior', 'meca_pro', 'hash', 'MECANICO')",
-        [],
+        "INSERT INTO usuarios (id_usuario, nombre_completo, username, password_hash, rol, activo)
+         VALUES (1, 'Admin Senior', 'admin_bench', ?1, 'ADMINISTRADOR', 1)",
+        [DUMMY_ARGON2_HASH],
     )
     .unwrap();
 
-    conn.execute(
-        "INSERT INTO categorias (id_categoria, nombre_categoria) VALUES (1, 'ACEITES Y LUBRICANTES')",
-        [],
-    ).unwrap();
-
-    conn.execute(
-        "INSERT INTO productos (id_producto, id_categoria, descripcion, precio_venta, precio_compra, stock_actual, stock_minimo, unidad_medida) 
-         VALUES (1, 1, 'Aceite Sintetico 5W-30', 5000, 4000, 10.0, 2.0, 'GALON')",
-        [],
-    ).unwrap();
-
-    println!("Iniciando inserción masiva de 50,000 registros para benchmark avanzado...");
+    println!("Iniciando inserción masiva de 50,000 registros para benchmark V5...");
     let start_seed = Instant::now();
 
     let mut placas_guardadas = Vec::with_capacity(50000);
-
     conn.execute_batch("BEGIN TRANSACTION;").unwrap();
     for i in 1..=50000 {
-        let placa = format!("Z{:03x}-{}", i % 4096, i).to_uppercase();
+        let c1 = (b'A' + ((i / (26 * 26 * 1000)) % 26) as u8) as char;
+        let c2 = (b'A' + ((i / (26 * 1000)) % 26) as u8) as char;
+        let c3 = (b'A' + ((i / 1000) % 26) as u8) as char;
+        let num = i % 1000;
+        let placa = format!("{}{}{}{:03}", c1, c2, c3, num);
         placas_guardadas.push(placa.clone());
 
         conn.execute(
-            "INSERT INTO clientes (id_cliente, tipo_documento, numero_documento, nombre_razon_social)
-             VALUES (?1, 'DNI', ?2, ?3)",
-            rusqlite::params![i, format!("{:08}", i), format!("Cliente Empresa {}", i)],
-        ).unwrap();
-
-        conn.execute(
-            "INSERT INTO vehiculos (placa, id_cliente, marca, modelo, anio, kilometraje_actual)
-             VALUES (?1, ?2, 'Toyota', 'Hilux', 2022, 35000)",
-            rusqlite::params![placa, i],
+            "INSERT INTO clientes (tipo_documento, numero_documento, nombre_razon_social, activo)
+             VALUES ('DNI', ?1, ?2, 1)",
+            params![
+                format!("{:08}", i % 100000000),
+                format!("Cliente Empresa {}", i)
+            ],
         )
         .unwrap();
 
+        let id_cliente_creado = conn.last_insert_rowid();
+
         conn.execute(
-            "INSERT INTO ordenes_trabajo (codigo_ot, placa, id_mecanico, estado, kilometraje_ingreso, proximo_kilometraje)
-             VALUES (?1, ?2, 1, 'FINALIZADO', 35000, 40000)",
-            rusqlite::params![format!("OT-{:06}", i), placa],
-        ).unwrap();
+            "INSERT INTO vehiculos (placa, id_cliente, marca, modelo, anio, kilometraje_actual, activo)
+             VALUES (?1, ?2, 'Toyota', 'Hilux', 2022, 35000, 1)",
+            params![placa, id_cliente_creado],
+        )
+        .unwrap();
+
+        let id_vehiculo_creado = conn.last_insert_rowid();
+
+        let id_op_ot = Uuid::new_v4().to_string();
+        let codigo_ot = format!("OT-{:06}", i);
+        let cliente_json = format!(r#"{{"nombre":"Cliente Empresa {}"}}"#, i);
+
+        conn.execute(
+            "INSERT INTO ordenes_trabajo (
+                id_operacion, codigo_ot, id_vehiculo, id_cliente_atendido,
+                placa_snapshot, cliente_snapshot, id_creador, id_zanja_prevista,
+                estado, kilometraje_ingreso
+            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, 1, 1, 'EN_ESPERA', 35000)",
+            params![
+                id_op_ot,
+                codigo_ot,
+                id_vehiculo_creado,
+                id_cliente_creado,
+                placa,
+                cliente_json
+            ],
+        )
+        .unwrap();
     }
     conn.execute_batch("COMMIT;").unwrap();
     println!(

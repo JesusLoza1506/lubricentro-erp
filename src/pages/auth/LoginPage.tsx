@@ -1,173 +1,314 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../../context/AuthContext';
-import {
-  Droplets,
-  ShieldAlert,
-  ArrowRight,
-  UserCheck,
-  Wrench,
-  Lock,
-  User,
-  Sparkles,
-} from 'lucide-react';
+import { ShieldAlert } from 'lucide-react';
 import { loginStyles as s } from '../../styles/loginStyles';
+import {
+  apiCambiarClaveObligatoria,
+  apiInstalacionInicial,
+  apiRecuperarAccesoAdmin,
+  apiVerificarInstalacion,
+} from '../../services/authService';
+
+import { LoginBrandPanel } from './components/LoginBrandPanel';
+import { LoginForm } from './components/LoginForm';
+import { LoginPasswordChange } from './components/LoginPasswordChange';
+import { LoginInstallForm } from './components/LoginInstallForm';
+import { LoginRecoverForm } from './components/LoginRecoverForm';
+
+type ModoPantalla = 'LOGIN' | 'INSTALACION' | 'RECUPERACION' | 'CAMBIO_OBLIGATORIO';
 
 export const LoginPage: React.FC = () => {
-  const { iniciarSesion, cargando } = useAuth();
+  const {
+    iniciarSesion,
+    isLoggingIn,
+    appVersion,
+    estadoSesion,
+    cerrarSesion,
+    completarCambioObligatorio,
+    mensajeInactividad,
+    limpiarMensajeInactividad,
+  } = useAuth();
+
+  const usuarioInputRef = useRef<HTMLInputElement>(null);
+
+  const [modo, setModo] = useState<ModoPantalla>('LOGIN');
+  const [mostrarPassword, setMostrarPassword] = useState(false);
+
+  // Formulario Login
   const [usuarioInput, setUsuarioInput] = useState('');
   const [passwordInput, setPasswordInput] = useState('');
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  // Formulario Cambio Obligatorio
+  const [nuevaClaveOblig, setNuevaClaveOblig] = useState('');
+  const [confirmClaveOblig, setConfirmClaveOblig] = useState('');
+
+  // Formulario Instalación Inicial
+  const [instNombre, setInstNombre] = useState('');
+  const [instUsername, setInstUsername] = useState('');
+  const [instPassword, setInstPassword] = useState('');
+  const [instConfirmPassword, setInstConfirmPassword] = useState('');
+  const [codigoGenerado, setCodigoGenerado] = useState<string | null>(null);
+  const [codigoGuardadoConfirmado, setCodigoGuardadoConfirmado] = useState(false);
+  const [copiado, setCopiado] = useState(false);
+
+  // Formulario Recuperación Admin
+  const [recUsername, setRecUsername] = useState('');
+  const [recCodigo, setRecCodigo] = useState('');
+  const [recNuevaPassword, setRecNuevaPassword] = useState('');
+  const [recConfirmNuevaPassword, setRecConfirmNuevaPassword] = useState('');
+  const [nuevoCodigoTrasRecuperar, setNuevoCodigoTrasRecuperar] = useState<string | null>(null);
+
+  // Notificaciones y spinners
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [exitoMsg, setExitoMsg] = useState<string | null>(null);
+  const [procesando, setProcesando] = useState(false);
+
+  const cambiarModo = (nuevoModo: ModoPantalla) => {
+    setErrorMsg(null);
+    setExitoMsg(null);
+    setMostrarPassword(false);
+
+    setUsuarioInput('');
+    setPasswordInput('');
+    setNuevaClaveOblig('');
+    setConfirmClaveOblig('');
+    setInstNombre('');
+    setInstUsername('');
+    setInstPassword('');
+    setInstConfirmPassword('');
+    setCodigoGenerado(null);
+    setCodigoGuardadoConfirmado(false);
+    setRecUsername('');
+    setRecCodigo('');
+    setRecNuevaPassword('');
+    setRecConfirmNuevaPassword('');
+    setNuevoCodigoTrasRecuperar(null);
+
+    setModo(nuevoModo);
+  };
+
+  useEffect(() => {
+    if (estadoSesion === 'CAMBIO_OBLIGATORIO') {
+      setModo('CAMBIO_OBLIGATORIO');
+      return;
+    }
+
+    if (estadoSesion === 'SIN_SESION') {
+      cambiarModo('LOGIN');
+
+      const verificarArranque = async () => {
+        try {
+          const necesitaInstalacion = await apiVerificarInstalacion();
+          if (necesitaInstalacion) {
+            setModo('INSTALACION');
+          }
+        } catch {
+          // Se conserva modo LOGIN
+        }
+      };
+
+      verificarArranque();
+    }
+  }, [estadoSesion]);
+
+  useEffect(() => {
+    if (modo === 'LOGIN' && usuarioInputRef.current) {
+      usuarioInputRef.current.focus();
+    }
+  }, [modo]);
+
+  const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg(null);
+    setExitoMsg(null);
+    limpiarMensajeInactividad();
 
-    if (!usuarioInput.trim() || !passwordInput.trim()) {
+    const userClean = usuarioInput.trim();
+    if (!userClean || !passwordInput) {
       setErrorMsg('Por favor, ingresa tu usuario y contraseña.');
       return;
     }
 
+    if (passwordInput.length > 128) {
+      setErrorMsg('La contraseña no puede exceder los 128 caracteres.');
+      return;
+    }
+
     try {
-      await iniciarSesion(usuarioInput, passwordInput);
+      const datos = await iniciarSesion(userClean, passwordInput);
+      if (datos.estado_sesion === 'CAMBIO_OBLIGATORIO') {
+        setModo('CAMBIO_OBLIGATORIO');
+      }
     } catch (err: any) {
-      // Ojeiporu upe mensaje genérico oúva backend-gui seguridáre
-      setErrorMsg(err.message || 'Credenciales incorrectas o usuario no encontrado.');
+      const mensaje = typeof err === 'string' ? err : err?.message || 'Credenciales inválidas.';
+      setErrorMsg(mensaje);
+    }
+  };
+
+  const handleCambioObligatorioSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setErrorMsg(null);
+    setExitoMsg(null);
+
+    if (!nuevaClaveOblig.trim() || !confirmClaveOblig.trim()) {
+      setErrorMsg('Todos los campos son obligatorios.');
+      return;
+    }
+
+    if (nuevaClaveOblig !== confirmClaveOblig) {
+      setErrorMsg('La confirmación de la nueva contraseña no coincide.');
+      return;
+    }
+
+    if (nuevaClaveOblig.length < 8 || nuevaClaveOblig.length > 128) {
+      setErrorMsg('La nueva contraseña debe tener entre 8 y 128 caracteres.');
+      return;
+    }
+
+    const tieneLetra = /[a-zA-Z]/.test(nuevaClaveOblig);
+    const tieneNumero = /[0-9]/.test(nuevaClaveOblig);
+    if (!tieneLetra || !tieneNumero) {
+      setErrorMsg('La nueva contraseña debe incluir al menos una letra y un número.');
+      return;
+    }
+
+    setProcesando(true);
+    try {
+      await apiCambiarClaveObligatoria({ nueva_password: nuevaClaveOblig });
+      completarCambioObligatorio();
+    } catch (err: any) {
+      const mensaje =
+        typeof err === 'string' ? err : err?.message || 'Error al actualizar la contraseña.';
+      setErrorMsg(mensaje);
+    } finally {
+      setProcesando(false);
+    }
+  };
+
+  const handleInstalacionSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setErrorMsg(null);
+    setExitoMsg(null);
+
+    if (
+      !instNombre.trim() ||
+      !instUsername.trim() ||
+      !instPassword.trim() ||
+      !instConfirmPassword.trim()
+    ) {
+      setErrorMsg('Todos los campos son obligatorios.');
+      return;
+    }
+
+    if (instPassword !== instConfirmPassword) {
+      setErrorMsg('Las contraseñas ingresadas no coinciden.');
+      return;
+    }
+
+    if (instPassword.length < 8 || instPassword.length > 128) {
+      setErrorMsg('La contraseña debe tener entre 8 y 128 caracteres.');
+      return;
+    }
+
+    const tieneLetra = /[a-zA-Z]/.test(instPassword);
+    const tieneNumero = /[0-9]/.test(instPassword);
+    if (!tieneLetra || !tieneNumero) {
+      setErrorMsg('La contraseña debe incluir al menos una letra y un número.');
+      return;
+    }
+
+    setProcesando(true);
+    try {
+      const res = await apiInstalacionInicial({
+        nombre_completo: instNombre.trim(),
+        username: instUsername.trim(),
+        password: instPassword,
+      });
+      setCodigoGenerado(res.codigo_recuperacion);
+      setExitoMsg('Instalación realizada con éxito. Guarda bien tu código de recuperación.');
+    } catch (err: any) {
+      const mensaje =
+        typeof err === 'string' ? err : err?.message || 'Error al realizar la instalación inicial.';
+      setErrorMsg(mensaje);
+    } finally {
+      setProcesando(false);
+    }
+  };
+
+  const copiarCodigo = (codigo: string) => {
+    navigator.clipboard.writeText(codigo);
+    setCopiado(true);
+    setTimeout(() => setCopiado(false), 3000);
+  };
+
+  const handleRecuperarSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setErrorMsg(null);
+    setExitoMsg(null);
+
+    if (
+      !recUsername.trim() ||
+      !recCodigo.trim() ||
+      !recNuevaPassword.trim() ||
+      !recConfirmNuevaPassword.trim()
+    ) {
+      setErrorMsg('Todos los campos son obligatorios.');
+      return;
+    }
+
+    if (recNuevaPassword !== recConfirmNuevaPassword) {
+      setErrorMsg('La confirmación de la nueva contraseña no coincide.');
+      return;
+    }
+
+    setProcesando(true);
+    try {
+      const res = await apiRecuperarAccesoAdmin({
+        username: recUsername.trim(),
+        codigo_recuperacion: recCodigo.trim(),
+        nueva_password: recNuevaPassword,
+      });
+      setNuevoCodigoTrasRecuperar(res.codigo_recuperacion);
+      setExitoMsg(
+        'Acceso restablecido exitosamente. Tu nuevo código de recuperación ha sido generado.'
+      );
+    } catch (err: any) {
+      const mensaje =
+        typeof err === 'string'
+          ? err
+          : err?.message || 'No se pudo recuperar el acceso con los datos ingresados.';
+      setErrorMsg(mensaje);
+    } finally {
+      setProcesando(false);
     }
   };
 
   return (
     <div style={s.container}>
-      {/* PANEL IZQUIERDO: Branding Imponente */}
-      <div style={s.leftPanel}>
-        <div style={s.glowOrb1} />
-        <div style={s.glowOrb2} />
+      <LoginBrandPanel appVersion={appVersion} />
 
-        {/* Header Logo */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '16px', zIndex: 2 }}>
-          <div
-            style={{
-              backgroundColor: '#2563EB',
-              padding: '14px',
-              borderRadius: '16px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              boxShadow: '0 0 30px rgba(37, 99, 235, 0.6)',
-            }}
-          >
-            <Droplets size={32} color="#FFFFFF" />
-          </div>
-          <div>
-            <h2 style={{ fontSize: '24px', fontWeight: '900', margin: 0, letterSpacing: '1px' }}>
-              LUBRICENTRO GLORIA
-            </h2>
-            <span style={{ fontSize: '13px', color: '#38BDF8', fontWeight: '600' }}>
-              ERP Desktop & Cloud Engine v0.1.0
-            </span>
-          </div>
-        </div>
-
-        {/* Hero Central */}
-        <div style={{ zIndex: 2, maxWidth: '520px' }}>
-          <div
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '8px',
-              padding: '6px 14px',
-              backgroundColor: 'rgba(37, 99, 235, 0.15)',
-              border: '1px solid rgba(37, 99, 235, 0.4)',
-              borderRadius: '30px',
-              marginBottom: '24px',
-            }}
-          >
-            <Sparkles size={14} color="#38BDF8" />
-            <span
-              style={{
-                fontSize: '12px',
-                color: '#38BDF8',
-                fontWeight: '700',
-                letterSpacing: '0.8px',
-              }}
-            >
-              SISTEMA DE ALTO RENDIMIENTO
-            </span>
-          </div>
-
-          <h1
-            style={{
-              fontSize: '48px',
-              fontWeight: '900',
-              lineHeight: '1.1',
-              marginBottom: '20px',
-              color: '#F8FAFC',
-              letterSpacing: '-1px',
-            }}
-          >
-            Control Total de Taller, POS y Stock.
-          </h1>
-
-          <p
-            style={{ fontSize: '16px', color: '#94A3B8', lineHeight: '1.7', marginBottom: '40px' }}
-          >
-            Plataforma integral diseñada para la automatización de órdenes de trabajo, facturación
-            electrónica SUNAT en tiempo real y trazabilidad de inventarios.
-          </p>
-
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-            <div style={s.featureBadge}>
-              <div
-                style={{
-                  padding: '8px',
-                  backgroundColor: 'rgba(56, 189, 248, 0.15)',
-                  borderRadius: '10px',
-                }}
-              >
-                <Wrench size={20} color="#38BDF8" />
-              </div>
-              <span>Gestión de Talleres</span>
-            </div>
-
-            <div style={s.featureBadge}>
-              <div
-                style={{
-                  padding: '8px',
-                  backgroundColor: 'rgba(52, 211, 153, 0.15)',
-                  borderRadius: '10px',
-                }}
-              >
-                <UserCheck size={20} color="#34D399" />
-              </div>
-              <span>Facturación SUNAT</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Footer */}
-        <div style={{ fontSize: '12px', color: '#64748B', zIndex: 2, fontWeight: '500' }}>
-          © 2026 Lubricentro Gloria S.R.L. — Todos los derechos reservados.
-        </div>
-      </div>
-
-      {/* PANEL DERECHO: Formulario */}
       <div style={s.rightPanel}>
         <div style={s.card}>
-          <div style={{ marginBottom: '28px' }}>
-            <h2
+          {mensajeInactividad && (
+            <div
               style={{
-                fontSize: '26px',
-                fontWeight: '800',
-                color: '#F8FAFC',
-                marginBottom: '8px',
-                letterSpacing: '-0.5px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '12px',
+                padding: '12px 14px',
+                backgroundColor: 'rgba(234, 179, 8, 0.15)',
+                border: '1px solid rgba(234, 179, 8, 0.4)',
+                color: '#FDE047',
+                borderRadius: '12px',
+                fontSize: '13px',
+                marginBottom: '20px',
+                fontWeight: '600',
               }}
             >
-              Bienvenido de nuevo
-            </h2>
-            <p style={{ fontSize: '14px', color: '#94A3B8', margin: 0 }}>
-              Introduce tus credenciales para iniciar sesión.
-            </p>
-          </div>
+              <ShieldAlert size={18} style={{ flexShrink: 0 }} />
+              <span>{mensajeInactividad}</span>
+            </div>
+          )}
 
           {errorMsg && (
             <div
@@ -175,99 +316,101 @@ export const LoginPage: React.FC = () => {
                 display: 'flex',
                 alignItems: 'center',
                 gap: '12px',
-                padding: '14px 16px',
+                padding: '12px 14px',
                 backgroundColor: 'rgba(220, 38, 38, 0.15)',
                 border: '1px solid rgba(239, 68, 68, 0.4)',
                 color: '#FCA5A5',
                 borderRadius: '12px',
                 fontSize: '13px',
-                marginBottom: '24px',
+                marginBottom: '20px',
                 fontWeight: '600',
               }}
             >
-              <ShieldAlert size={20} style={{ flexShrink: 0 }} />
+              <ShieldAlert size={18} style={{ flexShrink: 0 }} />
               <span>{errorMsg}</span>
             </div>
           )}
 
-          <form onSubmit={handleSubmit}>
-            <div style={{ marginBottom: '20px' }}>
-              <label
-                style={{
-                  display: 'block',
-                  fontSize: '12px',
-                  fontWeight: '700',
-                  color: '#94A3B8',
-                  marginBottom: '8px',
-                  letterSpacing: '0.5px',
-                  textTransform: 'uppercase',
-                }}
-              >
-                Usuario
-              </label>
-              <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-                <User size={18} color="#64748B" style={{ position: 'absolute', left: '16px' }} />
-                <input
-                  type="text"
-                  value={usuarioInput}
-                  onChange={(e) => setUsuarioInput(e.target.value)}
-                  placeholder="Ej. LOZA"
-                  style={s.inputBox}
-                />
-              </div>
-            </div>
-
-            <div style={{ marginBottom: '28px' }}>
-              <label
-                style={{
-                  display: 'block',
-                  fontSize: '12px',
-                  fontWeight: '700',
-                  color: '#94A3B8',
-                  marginBottom: '8px',
-                  letterSpacing: '0.5px',
-                  textTransform: 'uppercase',
-                }}
-              >
-                Contraseña
-              </label>
-              <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-                <Lock size={18} color="#64748B" style={{ position: 'absolute', left: '16px' }} />
-                <input
-                  type="password"
-                  value={passwordInput}
-                  onChange={(e) => setPasswordInput(e.target.value)}
-                  placeholder="••••••••"
-                  style={s.inputBox}
-                />
-              </div>
-            </div>
-
-            <button
-              type="submit"
-              disabled={cargando}
+          {exitoMsg && modo !== 'LOGIN' && (
+            <div
               style={{
-                width: '100%',
-                padding: '16px',
-                backgroundColor: '#2563EB',
-                color: '#FFFFFF',
-                border: 'none',
-                borderRadius: '12px',
-                fontSize: '15px',
-                fontWeight: '700',
-                cursor: cargando ? 'not-allowed' : 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '10px',
-                boxShadow: '0 8px 25px rgba(37, 99, 235, 0.45)',
-                transition: 'all 0.3s ease',
+                ...s.warningCard,
+                backgroundColor: 'rgba(34, 197, 94, 0.15)',
+                borderColor: 'rgba(34, 197, 94, 0.4)',
+                color: '#86EFAC',
+                marginBottom: '20px',
               }}
             >
-              <span>{cargando ? 'Verificando sistema...' : 'Ingresar al ERP'}</span>
-              <ArrowRight size={18} />
-            </button>
-          </form>
+              {exitoMsg}
+            </div>
+          )}
+
+          {modo === 'LOGIN' && (
+            <LoginForm
+              usuarioInput={usuarioInput}
+              setUsuarioInput={setUsuarioInput}
+              passwordInput={passwordInput}
+              setPasswordInput={setPasswordInput}
+              isLoggingIn={isLoggingIn}
+              mostrarPassword={mostrarPassword}
+              setMostrarPassword={setMostrarPassword}
+              usuarioInputRef={usuarioInputRef}
+              onSubmit={handleLoginSubmit}
+              onIrARecuperacion={() => cambiarModo('RECUPERACION')}
+            />
+          )}
+
+          {modo === 'CAMBIO_OBLIGATORIO' && (
+            <LoginPasswordChange
+              nuevaClaveOblig={nuevaClaveOblig}
+              setNuevaClaveOblig={setNuevaClaveOblig}
+              confirmClaveOblig={confirmClaveOblig}
+              setConfirmClaveOblig={setConfirmClaveOblig}
+              procesando={procesando}
+              onSubmit={handleCambioObligatorioSubmit}
+              onCerrarSesion={cerrarSesion}
+            />
+          )}
+
+          {modo === 'INSTALACION' && (
+            <LoginInstallForm
+              instNombre={instNombre}
+              setInstNombre={setInstNombre}
+              instUsername={instUsername}
+              setInstUsername={setInstUsername}
+              instPassword={instPassword}
+              setInstPassword={setInstPassword}
+              instConfirmPassword={instConfirmPassword}
+              setInstConfirmPassword={setInstConfirmPassword}
+              procesando={procesando}
+              codigoGenerado={codigoGenerado}
+              codigoGuardadoConfirmado={codigoGuardadoConfirmado}
+              setCodigoGuardadoConfirmado={setCodigoGuardadoConfirmado}
+              copiado={copiado}
+              onCopiarCodigo={copiarCodigo}
+              onSubmit={handleInstalacionSubmit}
+              onVolverLogin={() => cambiarModo('LOGIN')}
+            />
+          )}
+
+          {modo === 'RECUPERACION' && (
+            <LoginRecoverForm
+              recUsername={recUsername}
+              setRecUsername={setRecUsername}
+              recCodigo={recCodigo}
+              setRecCodigo={setRecCodigo}
+              recNuevaPassword={recNuevaPassword}
+              setRecNuevaPassword={setRecNuevaPassword}
+              recConfirmNuevaPassword={recConfirmNuevaPassword}
+              setRecConfirmNuevaPassword={setRecConfirmNuevaPassword}
+              procesando={procesando}
+              nuevoCodigoTrasRecuperar={nuevoCodigoTrasRecuperar}
+              copiado={copiado}
+              onCopiarCodigo={copiarCodigo}
+              onSubmit={handleRecuperarSubmit}
+              onVolverLogin={() => cambiarModo('LOGIN')}
+            />
+          )}
         </div>
       </div>
     </div>

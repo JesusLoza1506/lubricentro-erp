@@ -249,7 +249,6 @@ impl ClienteService {
         let detalle_auditoria: String;
 
         if placa_existe > 0 {
-            // Reasignación / Venta de vehículo a un cliente nuevo o existente
             conn.execute(
                 "UPDATE vehiculos 
                  SET id_cliente = ?1, marca = ?2, modelo = ?3, anio = ?4, tipo_motor = ?5, kilometraje_actual = ?6, activo = 1
@@ -265,13 +264,12 @@ impl ClienteService {
                 ],
             )?;
 
-            accion_auditoria = "UPDATE";
+            accion_auditoria = "ACTUALIZAR_VEHICULO";
             detalle_auditoria = format!(
                 "Reasignación/Venta de vehículo placa: {} a cliente ID: {}",
                 placa, id_cliente_final
             );
         } else {
-            // Registro de un vehículo nuevo
             conn.execute(
                 "INSERT INTO vehiculos (placa, id_cliente, marca, modelo, anio, tipo_motor, kilometraje_actual, activo)
                  VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, 1)",
@@ -286,22 +284,31 @@ impl ClienteService {
                 ],
             )?;
 
-            accion_auditoria = "INSERT";
+            accion_auditoria = "REGISTRAR_VEHICULO";
             detalle_auditoria = format!(
                 "Registro de vehículo placa: {}, cliente ID: {}",
                 placa, id_cliente_final
             );
         }
 
-        let id_u32 = id_usuario.map(|id| id as i32);
-        AuditoriaService::registrar(
+        let _ = AuditoriaService::registrar_v5(
             conn,
-            id_u32,
-            "vehiculos",
+            id_usuario,
+            if id_usuario.is_some() {
+                "USUARIO"
+            } else {
+                "NO_IDENTIFICADO"
+            },
+            None,
+            None,
+            None,
+            "FICHA_VEHICULAR",
             accion_auditoria,
-            &detalle_auditoria,
-        )
-        .map_err(|e| AppError::Validation(format!("Error de auditoría: {}", e)))?;
+            Some("vehiculos"),
+            Some(&placa),
+            Some(&detalle_auditoria),
+            "OK",
+        );
 
         Ok(placa)
     }
@@ -333,7 +340,7 @@ impl ClienteService {
 
         let max_km_historico: Option<i64> = conn
             .query_row(
-                "SELECT MAX(kilometraje_ingreso) FROM ordenes_trabajo WHERE placa = ?1",
+                "SELECT MAX(kilometraje_ingreso) FROM ordenes_trabajo WHERE placa_snapshot = ?1",
                 [&placa],
                 |row| row.get(0),
             )
@@ -449,10 +456,25 @@ impl ClienteService {
             }
         }
 
-        let id_u32 = id_usuario.map(|id| id as i32);
         let detalle = format!("Actualización de vehículo placa: {}", placa);
-        AuditoriaService::registrar(conn, id_u32, "vehiculos", "UPDATE", &detalle)
-            .map_err(|e| AppError::Validation(format!("Error de auditoría: {}", e)))?;
+        let _ = AuditoriaService::registrar_v5(
+            conn,
+            id_usuario,
+            if id_usuario.is_some() {
+                "USUARIO"
+            } else {
+                "NO_IDENTIFICADO"
+            },
+            None,
+            None,
+            None,
+            "FICHA_VEHICULAR",
+            "ACTUALIZAR_VEHICULO",
+            Some("vehiculos"),
+            Some(&placa),
+            Some(&detalle),
+            "OK",
+        );
 
         Ok(())
     }
@@ -543,7 +565,7 @@ impl ClienteService {
         }
 
         let total_ots: i32 = conn.query_row(
-            "SELECT COUNT(*) FROM ordenes_trabajo WHERE placa = ?1",
+            "SELECT COUNT(*) FROM ordenes_trabajo WHERE placa_snapshot = ?1",
             [&placa_clean],
             |row| row.get(0),
         )?;
@@ -558,8 +580,8 @@ impl ClienteService {
         let total_comprobantes: i32 = conn.query_row(
             "SELECT COUNT(*)
              FROM comprobantes c
-             JOIN ordenes_trabajo ot ON ot.id_ot = c.id_ot
-             WHERE ot.placa = ?1",
+             JOIN ordenes_trabajo ot ON ot.id_ot = c.id_venta
+             WHERE ot.placa_snapshot = ?1",
             [&placa_clean],
             |row| row.get(0),
         )?;
@@ -583,10 +605,25 @@ impl ClienteService {
             )));
         }
 
-        let id_u32 = id_usuario.map(|id| id as i32);
         let detalle = format!("Eliminación lógica de vehículo placa: {}", placa_clean);
-        AuditoriaService::registrar(conn, id_u32, "vehiculos", "DELETE", &detalle)
-            .map_err(|e| AppError::Validation(format!("Error de auditoría: {}", e)))?;
+        let _ = AuditoriaService::registrar_v5(
+            conn,
+            id_usuario,
+            if id_usuario.is_some() {
+                "USUARIO"
+            } else {
+                "NO_IDENTIFICADO"
+            },
+            None,
+            None,
+            None,
+            "FICHA_VEHICULAR",
+            "ELIMINAR_VEHICULO",
+            Some("vehiculos"),
+            Some(&placa_clean),
+            Some(&detalle),
+            "OK",
+        );
 
         Ok(())
     }

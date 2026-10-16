@@ -9,6 +9,7 @@ use commands::{
     auth_commands::*, caja_commands::*, cliente_commands::*, comprobante_commands::*,
     dashboard_commands::*, inventario_commands::*, ordenes_commands::*,
 };
+use services::session_manager::SessionState;
 use std::sync::Mutex;
 use tauri::Manager;
 
@@ -25,33 +26,40 @@ pub fn run() {
                 .expect("Fallo al obtener el directorio de la aplicación");
 
             tracing::info!(
-                "📂 Directorio de Datos de la App (SQLite V3): {:?}",
+                "📂 Directorio de Datos de la App (SQLite V7.0): {:?}",
                 app_data_dir
             );
 
             let conn = crate::db::init_db(app_data_dir.clone())
                 .expect("Error al inicializar la base de datos");
 
-            // --- CORRECCIÓN GLOBAL DE FECHAS EN TODAS LAS TABLAS ---
-            // Actualiza registros pasados de UTC a hora local de Perú (-5 hrs) si existían
-            // y fuerza a SQLite a usar la zona horaria local en la sesión
             let _ = conn.execute_batch(
                 "
                 PRAGMA default_cache_size = 10000;
                 ",
             );
 
+            // Registrar el estado de la conexión a la BD y el estado de sesión en memoria (V7.0)
             app.manage(Mutex::new(conn));
+            app.manage(Mutex::new(SessionState::new()));
 
             Ok(())
         })
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![
-            // Auth & Usuario
-            login_cmd,
-            obtener_usuario_sesion_cmd,
-            crear_usuario_cmd,
-            // Clientes & Vehículos (Fase 3)
+            // Auth & Sesión V7.0
+            requiere_instalacion,
+            login_usuario,
+            instalacion_inicial,
+            recuperar_acceso_admin,
+            obtener_sesion,
+            cambiar_clave_obligatoria,
+            cambiar_clave_voluntaria,
+            registrar_actividad,
+            cerrar_sesion,
+            reautenticar,
+            autorizar_descuento,
+            // Clientes & Vehículos
             registrar_cliente_cmd,
             buscar_cliente_por_doc_cmd,
             registrar_vehiculo_cmd,
@@ -60,14 +68,17 @@ pub fn run() {
             obtener_todos_vehiculos_cmd,
             obtener_ficha_vehicular_completa_cmd,
             eliminar_vehiculo_cmd,
-            // Inventario (Fase 2)
+            // Inventario
             listar_productos_cmd,
             listar_productos_publicos_cmd,
+            listar_productos_criticos_cmd,
             registrar_producto_cmd,
             actualizar_producto_cmd,
             eliminar_producto_cmd,
+            despachar_producto_granel_cmd,
+            ajustar_stock_cmd,
             listar_categorias_cmd,
-            // Órdenes de Trabajo (Fase 3 & Paso 4 Completo)
+            // Órdenes de Trabajo
             listar_ordenes_trabajo_cmd,
             crear_orden_trabajo_cmd,
             cambiar_estado_ot_cmd,
@@ -79,11 +90,11 @@ pub fn run() {
             agregar_servicio_ot_cmd,
             eliminar_servicio_ot_cmd,
             listar_servicios_cmd,
-            // Caja Chica & POS (Fase 4)
+            // Caja Chica & POS
             abrir_caja_cmd,
             cerrar_caja_cmd,
             emitir_comprobante_cmd,
-            // Dashboard, Fidelización & Backups (Fase 5)
+            // Dashboard, Fidelización & Backups
             obtener_dashboard_cmd,
             listar_alertas_fidelizacion_cmd,
             generar_backup_cmd,
