@@ -56,19 +56,25 @@ export const LoginRecoverForm: React.FC<LoginRecoverFormProps> = ({
       {!nuevoCodigoTrasRecuperar ? (
         <form onSubmit={onSubmit}>
           <div style={{ marginBottom: '14px' }}>
-            <label style={s.label}>Usuario Administrador</label>
+            <label htmlFor="rec-username" style={s.label}>
+              Usuario Administrador
+            </label>
             <input
+              id="rec-username"
               type="text"
               disabled={procesando}
               value={recUsername}
               onChange={(e) => setRecUsername(e.target.value)}
               placeholder="Ej. admin"
               style={s.inputBox}
+              autoComplete="username"
             />
           </div>
 
           <div style={{ marginBottom: '14px' }}>
-            <label style={s.label}>Código de Recuperación</label>
+            <label htmlFor="rec-codigo" style={s.label}>
+              Código de Recuperación
+            </label>
             <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
               <KeyRound
                 size={18}
@@ -76,32 +82,41 @@ export const LoginRecoverForm: React.FC<LoginRecoverFormProps> = ({
                 style={{ position: 'absolute', left: '14px', pointerEvents: 'none' }}
               />
               <input
+                id="rec-codigo"
                 type="text"
                 disabled={procesando}
                 value={recCodigo}
                 onChange={(e) => setRecCodigo(e.target.value)}
                 placeholder="XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX"
                 style={s.inputWithIcon}
+                autoComplete="off"
               />
             </div>
           </div>
 
           <div style={{ marginBottom: '14px' }}>
-            <label style={s.label}>Nueva Contraseña</label>
+            <label htmlFor="rec-nueva-password" style={s.label}>
+              Nueva Contraseña
+            </label>
             <input
+              id="rec-nueva-password"
               type="password"
               disabled={procesando}
               value={recNuevaPassword}
               onChange={(e) => setRecNuevaPassword(e.target.value)}
-              placeholder="Mínimo 8 caracteres (letras y números)"
+              placeholder="7 a 128 caracteres (letras y números)"
               maxLength={128}
               style={s.inputBox}
+              autoComplete="new-password"
             />
           </div>
 
           <div style={{ marginBottom: '20px' }}>
-            <label style={s.label}>Confirmar Nueva Contraseña</label>
+            <label htmlFor="rec-confirm-password" style={s.label}>
+              Confirmar Nueva Contraseña
+            </label>
             <input
+              id="rec-confirm-password"
               type="password"
               disabled={procesando}
               value={recConfirmNuevaPassword}
@@ -109,6 +124,7 @@ export const LoginRecoverForm: React.FC<LoginRecoverFormProps> = ({
               placeholder="Repite la nueva contraseña"
               maxLength={128}
               style={s.inputBox}
+              autoComplete="new-password"
             />
           </div>
 
@@ -135,7 +151,9 @@ export const LoginRecoverForm: React.FC<LoginRecoverFormProps> = ({
             código:
           </p>
 
-          <div style={s.codeBox}>{nuevoCodigoTrasRecuperar}</div>
+          <div style={s.codeBox} tabIndex={0} aria-label="Nuevo código de recuperación">
+            {nuevoCodigoTrasRecuperar}
+          </div>
 
           <button
             type="button"

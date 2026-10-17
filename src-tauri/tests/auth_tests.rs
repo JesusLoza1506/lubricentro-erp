@@ -6,13 +6,16 @@ use lubricentro_erp_lib::dto::usuario_dto::{
     CambiarClaveVoluntariaRequestDto, InstalacionInicialRequestDto, LoginRequestDto,
     RecuperarAccesoAdminRequestDto,
 };
+use lubricentro_erp_lib::errors::AppError;
 use lubricentro_erp_lib::services::auth_service::AuthService;
-use lubricentro_erp_lib::services::session_manager::{EstadoSesion, SessionState};
+use lubricentro_erp_lib::services::session_manager::{
+    EstadoSesion, IntentoVerificacionAdmin, SessionState,
+};
 
 /// Carga en tiempo de compilación el esquema SQL oficial V7 desde el archivo de migración físico
 const INITIAL_SCHEMA_V7: &str = include_str!("../migrations/0001_initial_schema_v7.sql");
 
-/// Inicializa una base de datos SQLite en memoria ejecutando directamente la migración oficial
+/// Inicializa una base de datos SQLite en memoria ejecutando directamente la migración oficial V7.0
 fn setup_inmemory_db_v7() -> Connection {
     let conn = Connection::open_in_memory().unwrap();
 
@@ -57,11 +60,11 @@ fn test_tc_log_02_dummy_hash_timing_attack_protection() {
 }
 
 // =========================================================================
-// BLOQUE 2: Instalación Inicial (RF-LOG-01 / RB06 / Tarea 3)
+// BLOQUE 2: Instalación Inicial y Atomicidad (RF-LOG-01 / RB06)
 // =========================================================================
 
 #[test]
-fn test_tc_log_03_instalacion_inicial_primer_admin() {
+fn test_tc_log_03_instalacion_inicial_primer_admin_y_auditoria_atomica() {
     let mut conn = setup_inmemory_db_v7();
 
     let res = AuthService::instalacion_inicial(
@@ -75,16 +78,16 @@ fn test_tc_log_03_instalacion_inicial_primer_admin() {
     .unwrap();
 
     assert_eq!(res.username, "admin");
-    assert_eq!(res.codigo_recuperacion.len(), 39); // 32 caracteres + 7 guiones de formato
+    assert_eq!(res.codigo_recuperacion.len(), 39);
 
-    let debe_cambiar: i32 = conn
+    let aud_count: i64 = conn
         .query_row(
-            "SELECT debe_cambiar_clave FROM usuarios WHERE username = 'admin'",
+            "SELECT COUNT(*) FROM auditoria WHERE accion = 'INSTALACION_INICIAL'",
             [],
             |r| r.get(0),
         )
         .unwrap();
-    assert_eq!(debe_cambiar, 0);
+    assert_eq!(aud_count, 1);
 
     let err_duplicado = AuthService::instalacion_inicial(
         &mut conn,
@@ -98,7 +101,7 @@ fn test_tc_log_03_instalacion_inicial_primer_admin() {
 }
 
 // =========================================================================
-// BLOQUE 3: Login, Bloqueo Persistente y Limpieza (RF-LOG-02 / RB02)
+// BLOQUE 3: Login, Control de Versión y Reinicio de Bloqueos (RF-LOG-02 / RB02)
 // =========================================================================
 
 #[test]
@@ -143,29 +146,62 @@ fn test_tc_log_04_bloqueo_5_fallos_y_limpieza_al_ingresar() {
     assert!(err_bloqueo.is_err());
 }
 
-// =========================================================================
-// BLOQUE 4: Cambio Obligatorio y Voluntario (RF-LOG-03 / RF-LOG-04 / RB03)
-// =========================================================================
-
 #[test]
-fn test_tc_log_05_cambio_obligatorio_y_voluntario() {
+fn test_tc_log_04_b_reinicio_contadores_post_expiracion_15_minutos() {
     let conn = setup_inmemory_db_v7();
-    let mut session = SessionState::new();
+    let hash = AuthService::hash_password("ClaveValida123").unwrap();
 
-    let hash = AuthService::hash_password("Temporal123").unwrap();
     conn.execute(
-        "INSERT INTO usuarios (id_usuario, nombre_completo, username, password_hash, rol, debe_cambiar_clave) VALUES (1, 'User Temp', 'usertemp', ?1, 'MECANICO', 1)",
+        "INSERT INTO usuarios (nombre_completo, username, password_hash, rol, activo, intentos_fallidos, bloqueado_hasta) 
+         VALUES ('Cajero Exp', 'cajeroexp', ?1, 'CAJERO', 1, 5, datetime('now', '-5 hours', '-16 minutes'))",
         [&hash],
     )
     .unwrap();
 
-    session.abrir_sesion(1, "usertemp".to_string(), "MECANICO".to_string(), true);
+    let _ = AuthService::login(
+        &conn,
+        LoginRequestDto {
+            username: "cajeroexp".to_string(),
+            password: "ClaveWrong123".to_string(),
+        },
+    );
+
+    let (intentos, bloqueado_hasta): (i32, Option<String>) = conn
+        .query_row(
+            "SELECT intentos_fallidos, bloqueado_hasta FROM usuarios WHERE username = 'cajeroexp'",
+            [],
+            |r| Ok((r.get(0)?, r.get(1)?)),
+        )
+        .unwrap();
+
+    assert_eq!(intentos, 1);
+    assert!(bloqueado_hasta.is_none());
+}
+
+// =========================================================================
+// BLOQUE 4: Cambio Obligatorio y Revocación por Versión (RF-LOG-03 / RF-LOG-04)
+// =========================================================================
+
+#[test]
+fn test_tc_log_05_cambio_obligatorio_y_voluntario_con_incremento_version() {
+    let mut conn = setup_inmemory_db_v7();
+    let mut session = SessionState::new();
+
+    let hash = AuthService::hash_password("Temporal123").unwrap();
+    conn.execute(
+        "INSERT INTO usuarios (id_usuario, nombre_completo, username, password_hash, rol, debe_cambiar_clave, version) 
+         VALUES (1, 'User Temp', 'usertemp', ?1, 'MECANICO', 1, 1)",
+        [&hash],
+    )
+    .unwrap();
+
+    session.abrir_sesion(1, 1, "usertemp".to_string(), "MECANICO".to_string(), true);
     assert_eq!(session.estado_sesion, EstadoSesion::CambioObligatorio);
 
     assert!(session.validar_sesion_operativa(&conn).is_err());
 
     AuthService::cambiar_clave_obligatoria(
-        &conn,
+        &mut conn,
         &mut session,
         1,
         CambiarClaveObligatoriaRequestDto {
@@ -178,7 +214,7 @@ fn test_tc_log_05_cambio_obligatorio_y_voluntario() {
     assert_eq!(session.validar_sesion_operativa(&conn).unwrap(), 1);
 
     let err_vol = AuthService::cambiar_clave_voluntaria(
-        &conn,
+        &mut conn,
         &mut session,
         1,
         CambiarClaveVoluntariaRequestDto {
@@ -187,19 +223,45 @@ fn test_tc_log_05_cambio_obligatorio_y_voluntario() {
         },
     );
     assert!(err_vol.is_err());
+}
 
-    let intentos: i32 = conn
-        .query_row(
-            "SELECT intentos_fallidos FROM usuarios WHERE id_usuario = 1",
-            [],
-            |r| r.get(0),
-        )
-        .unwrap();
-    assert_eq!(intentos, 0);
+#[test]
+fn test_tc_log_05_b_rechazar_sesion_temporal_anterior_a_restablecimiento() {
+    let mut conn = setup_inmemory_db_v7();
+    let mut session = SessionState::new();
+
+    let hash = AuthService::hash_password("TempPassword123").unwrap();
+    conn.execute(
+        "INSERT INTO usuarios (id_usuario, nombre_completo, username, password_hash, rol, debe_cambiar_clave, version) 
+         VALUES (10, 'Temp User', 'tempuser', ?1, 'CAJERO', 1, 1)",
+        [&hash],
+    )
+    .unwrap();
+
+    session.abrir_sesion(10, 1, "tempuser".to_string(), "CAJERO".to_string(), true);
+
+    // Se restablece la cuenta externamente incrementando 'version' a 2 en la BD
+    conn.execute(
+        "UPDATE usuarios SET version = version + 1 WHERE id_usuario = 10",
+        [],
+    )
+    .unwrap();
+
+    let res = AuthService::cambiar_clave_obligatoria(
+        &mut conn,
+        &mut session,
+        10,
+        CambiarClaveObligatoriaRequestDto {
+            nueva_password: "NuevaPassword2026".to_string(),
+        },
+    );
+
+    assert!(matches!(res, Err(AppError::NoAutenticado)));
+    assert_eq!(session.estado_sesion, EstadoSesion::SinSesion);
 }
 
 // =========================================================================
-// BLOQUE 5: Verificaciones Administrativas e Independencia (RB03 / RB08)
+// BLOQUE 5: Verificaciones Administrativas e Pausas (RB03 / RB08)
 // =========================================================================
 
 #[test]
@@ -219,31 +281,77 @@ fn test_tc_log_06_limite_independiente_verificaciones_admin() {
     assert!(!session.esta_verificacion_admin_pausada(admin_id));
 }
 
+#[test]
+fn test_tc_log_06_b_reiniciar_pausa_admin_al_vencer() {
+    let mut session = SessionState::new();
+    let admin_id = 101;
+
+    session.verificaciones_admin_fallos.insert(
+        admin_id,
+        IntentoVerificacionAdmin {
+            fallos: 5,
+            pausado_hasta: Some(Instant::now() - Duration::from_secs(960)),
+        },
+    );
+
+    assert!(!session.esta_verificacion_admin_pausada(admin_id));
+
+    let entry = session.verificaciones_admin_fallos.get(&admin_id).unwrap();
+    assert_eq!(entry.fallos, 0);
+    assert!(entry.pausado_hasta.is_none());
+}
+
 // =========================================================================
-// BLOQUE 6: Inactividad y Autorizaciones Temporales (RF-LOG-06 / RB04)
+// BLOQUE 6: Inactividad y Autorización Vincular en Origen (RF-LOG-06 / RB04 / Punto 10)
 // =========================================================================
 
 #[test]
-fn test_tc_log_07_inactividad_15_minutos_y_autorizacion_temporal() {
+fn test_tc_log_07_inactividad_15_minutos_y_vinculacion_origen_single_use() {
     let mut session = SessionState::new();
-    session.abrir_sesion(10, "cajero1".to_string(), "CAJERO".to_string(), false);
+    let id_cajero = 10;
+    let id_admin = 1;
+
+    session.abrir_sesion(
+        id_cajero,
+        1,
+        "cajero1".to_string(),
+        "CAJERO".to_string(),
+        false,
+    );
 
     session.ultima_actividad = Instant::now() - Duration::from_secs(901);
-
     assert!(session.verificar_inactividad());
     assert_eq!(session.estado_sesion, EstadoSesion::SinSesion);
 
-    session.abrir_sesion(10, "cajero1".to_string(), "CAJERO".to_string(), false);
-    let token = "token_desc_123".to_string();
+    session.abrir_sesion(
+        id_cajero,
+        1,
+        "cajero1".to_string(),
+        "CAJERO".to_string(),
+        false,
+    );
+    let token = "desc_token_123".to_string();
+
+    // Guardar token vinculando autorizante (1) con solicitante (id_cajero = 10)
     session.guardar_autorizacion(
         token.clone(),
-        1,
+        id_admin,
+        id_cajero,
         "DESCUENTO_POS".to_string(),
         "REF-1001".to_string(),
     );
 
-    assert!(session.consumir_autorizacion(&token, "DESCUENTO_POS", "REF-1001"));
-    assert!(!session.consumir_autorizacion(&token, "DESCUENTO_POS", "REF-1001"));
+    // Intentar consumir desde otro usuario/solicitante debe ser rechazado
+    let res_impostor = session.consumir_autorizacion(&token, 999, "DESCUENTO_POS", "REF-1001");
+    assert!(res_impostor.is_err());
+
+    // Consumo legítimo por parte del cajero titular
+    let res_valido = session.consumir_autorizacion(&token, id_cajero, "DESCUENTO_POS", "REF-1001");
+    assert_eq!(res_valido.unwrap(), id_admin);
+
+    // Reutilización inmediata (segundo intento) debe ser rechazada (Single-Use)
+    let res_reuso = session.consumir_autorizacion(&token, id_cajero, "DESCUENTO_POS", "REF-1001");
+    assert!(res_reuso.is_err());
 }
 
 // =========================================================================
@@ -290,7 +398,7 @@ fn test_tc_log_08_recuperar_acceso_admin_renovacion_codigo() {
 }
 
 // =========================================================================
-// BLOQUE 8: Pruebas Específicas de Corrección de Hallazgos (TC-LOG-XX_v7)
+// BLOQUE 8: Pruebas V7.0 (Aislamiento de Roles y Revocación por Versión)
 // =========================================================================
 
 #[test]
@@ -302,22 +410,22 @@ fn test_tc_log_01_v7_invocacion_sin_sesion_activa_es_rechazada() {
 
 #[test]
 fn test_tc_log_03_v7_cambio_obligatorio_en_sesion_normal_es_rechazado() {
-    let conn = setup_inmemory_db_v7();
+    let mut conn = setup_inmemory_db_v7();
     let mut session = SessionState::new();
 
     let hash = AuthService::hash_password("ClaveBase123").unwrap();
     conn.execute(
-        "INSERT INTO usuarios (id_usuario, nombre_completo, username, password_hash, rol, debe_cambiar_clave) 
-         VALUES (2, 'Usuario Normal', 'usernormal', ?1, 'CAJERO', 0)",
+        "INSERT INTO usuarios (id_usuario, nombre_completo, username, password_hash, rol, debe_cambiar_clave, version) 
+         VALUES (2, 'Usuario Normal', 'usernormal', ?1, 'CAJERO', 0, 1)",
         [&hash],
     )
     .unwrap();
 
-    session.abrir_sesion(2, "usernormal".to_string(), "CAJERO".to_string(), false);
+    session.abrir_sesion(2, 1, "usernormal".to_string(), "CAJERO".to_string(), false);
     assert_eq!(session.estado_sesion, EstadoSesion::Normal);
 
     let res = AuthService::cambiar_clave_obligatoria(
-        &conn,
+        &mut conn,
         &mut session,
         2,
         CambiarClaveObligatoriaRequestDto {
@@ -335,8 +443,8 @@ fn test_tc_log_07_v7_verificacion_admin_activa_pausa_tras_5_fallos() {
 
     let hash_admin = AuthService::hash_password("AdminClaveValida123").unwrap();
     conn.execute(
-        "INSERT INTO usuarios (id_usuario, nombre_completo, username, password_hash, rol, activo, debe_cambiar_clave) 
-         VALUES (99, 'Admin Supervisor', 'adminsupervisor', ?1, 'ADMINISTRADOR', 1, 0)",
+        "INSERT INTO usuarios (id_usuario, nombre_completo, username, password_hash, rol, activo, debe_cambiar_clave, version) 
+         VALUES (99, 'Admin Supervisor', 'adminsupervisor', ?1, 'ADMINISTRADOR', 1, 0, 1)",
         [&hash_admin],
     )
     .unwrap();
@@ -384,30 +492,30 @@ fn test_tc_log_07_v7_verificacion_admin_activa_pausa_tras_5_fallos() {
 }
 
 #[test]
-fn test_tc_log_10_v7_cambio_de_rol_en_bd_revoca_sesion_anterior() {
+fn test_tc_log_10_v7_revocacion_inmediata_por_desalineacion_de_version() {
     let conn = setup_inmemory_db_v7();
     let mut session = SessionState::new();
 
     let hash = AuthService::hash_password("ClaveSecret123").unwrap();
     conn.execute(
-        "INSERT INTO usuarios (id_usuario, nombre_completo, username, password_hash, rol, activo) 
-         VALUES (50, 'Juan Perez', 'jperez', ?1, 'CAJERO', 1)",
+        "INSERT INTO usuarios (id_usuario, nombre_completo, username, password_hash, rol, activo, version) 
+         VALUES (50, 'Juan Perez', 'jperez', ?1, 'CAJERO', 1, 1)",
         [&hash],
     )
     .unwrap();
 
-    session.abrir_sesion(50, "jperez".to_string(), "CAJERO".to_string(), false);
-
-    let res_inicial = AuthService::obtener_usuario_sesion(&conn, &mut session, 50, "NORMAL");
-    assert!(res_inicial.is_ok());
+    session.abrir_sesion(50, 1, "jperez".to_string(), "CAJERO".to_string(), false);
+    assert!(session.validar_sesion_operativa(&conn).is_ok());
 
     conn.execute(
-        "UPDATE usuarios SET rol = 'MECANICO' WHERE id_usuario = 50",
+        "UPDATE usuarios SET version = version + 1 WHERE id_usuario = 50",
         [],
     )
     .unwrap();
 
-    let res_revocado = AuthService::obtener_usuario_sesion(&conn, &mut session, 50, "NORMAL");
-    assert!(res_revocado.is_err());
+    assert!(matches!(
+        session.validar_sesion_operativa(&conn),
+        Err(AppError::NoAutenticado)
+    ));
     assert_eq!(session.estado_sesion, EstadoSesion::SinSesion);
 }

@@ -1,4 +1,5 @@
 use crate::errors::AppError;
+use crate::services::auditoria_service::AuditoriaService;
 use rusqlite::Connection;
 use std::collections::HashMap;
 use std::time::{Duration, Instant};
@@ -23,6 +24,7 @@ impl EstadoSesion {
 #[derive(Debug, Clone)]
 pub struct ConfirmacionData {
     pub autorizante_id: i64,
+    pub solicitante_id: i64,
     pub accion: String,
     pub referencia: String,
     pub expiracion: Instant,
@@ -37,12 +39,12 @@ pub struct IntentoVerificacionAdmin {
 pub struct SessionState {
     pub session_id: Option<String>,
     pub usuario_id: Option<i64>,
+    pub usuario_version: Option<i64>,
     pub username: Option<String>,
     pub rol: Option<String>,
     pub estado_sesion: EstadoSesion,
     pub ultima_actividad: Instant,
     pub confirmaciones_pendientes: HashMap<String, ConfirmacionData>,
-    /// RB03: Límite independiente en memoria para verificaciones administrativas (5 fallos = 15 min pausa)
     pub verificaciones_admin_fallos: HashMap<i64, IntentoVerificacionAdmin>,
 }
 
@@ -51,6 +53,7 @@ impl Default for SessionState {
         Self {
             session_id: None,
             usuario_id: None,
+            usuario_version: None,
             username: None,
             rol: None,
             estado_sesion: EstadoSesion::SinSesion,
@@ -66,10 +69,10 @@ impl SessionState {
         Self::default()
     }
 
-    /// Abrir una nueva sesión e iniciar el timer de inactividad
     pub fn abrir_sesion(
         &mut self,
         usuario_id: i64,
+        usuario_version: i64,
         username: String,
         rol: String,
         es_cambio_obligatorio: bool,
@@ -77,6 +80,7 @@ impl SessionState {
         let session_id = format!("sess_{}", uuid::Uuid::new_v4().simple());
         self.session_id = Some(session_id.clone());
         self.usuario_id = Some(usuario_id);
+        self.usuario_version = Some(usuario_version);
         self.username = Some(username);
         self.rol = Some(rol);
         self.estado_sesion = if es_cambio_obligatorio {
@@ -90,24 +94,26 @@ impl SessionState {
         session_id
     }
 
-    /// Cerrar la sesión actual y limpiar la memoria de interfaz
+    pub fn actualizar_version_sesion(&mut self, nueva_version: i64) {
+        self.usuario_version = Some(nueva_version);
+    }
+
     pub fn cerrar_sesion(&mut self) {
         self.session_id = None;
         self.usuario_id = None;
+        self.usuario_version = None;
         self.username = None;
         self.rol = None;
         self.estado_sesion = EstadoSesion::SinSesion;
         self.confirmaciones_pendientes.clear();
     }
 
-    /// Destruye inmediatamente la sesión activa en memoria si corresponde al id_usuario modificado/desactivado
     pub fn invalidar_sesion_usuario(&mut self, id_usuario_modificado: i64) {
         if self.usuario_id == Some(id_usuario_modificado) {
             self.cerrar_sesion();
         }
     }
 
-    /// Transicionar de CAMBIO_OBLIGATORIO a NORMAL tras cambiar la clave
     pub fn habilitar_sesion_normal(&mut self) {
         if self.estado_sesion == EstadoSesion::CambioObligatorio {
             self.estado_sesion = EstadoSesion::Normal;
@@ -115,14 +121,12 @@ impl SessionState {
         }
     }
 
-    /// Renovar la última actividad del usuario (exclusivo para registrar_actividad)
     pub fn renovar_actividad(&mut self) {
         if self.estado_sesion != EstadoSesion::SinSesion {
             self.ultima_actividad = Instant::now();
         }
     }
 
-    /// Verificar si han transcurrido 15 minutos sin actividad humana (RB04)
     pub fn verificar_inactividad(&mut self) -> bool {
         if self.estado_sesion == EstadoSesion::SinSesion {
             return true;
@@ -136,31 +140,61 @@ impl SessionState {
         }
     }
 
-    /// Valida centralizadamente que exista una sesión activa en estado NORMAL
-    /// y verifica contra la BD que el usuario siga activo y conserve el rol original (H04).
-    pub fn validar_sesion_operativa(&mut self, conn: &Connection) -> Result<i64, AppError> {
-        if self.verificar_inactividad() {
+    pub fn verificar_inactividad_con_auditoria(&mut self, conn: Option<&Connection>) -> bool {
+        if self.estado_sesion == EstadoSesion::SinSesion {
+            return true;
+        }
+
+        if self.ultima_actividad.elapsed() >= Duration::from_secs(900) {
+            if let (Some(c), Some(id), Some(usr), Some(rol)) = (
+                conn,
+                self.usuario_id,
+                self.username.as_deref(),
+                self.rol.as_deref(),
+            ) {
+                let _ = AuditoriaService::registrar_evento_login(
+                    c,
+                    Some(id),
+                    Some(usr),
+                    Some(rol),
+                    "EXPIRACION_INACTIVIDAD",
+                    "OK",
+                    Some("Cierre automático por inactividad de 15 minutos"),
+                );
+            }
+            self.cerrar_sesion();
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn validar_sesion_vigente(
+        &mut self,
+        conn: &Connection,
+        permitir_limitado: bool,
+    ) -> Result<i64, AppError> {
+        if self.verificar_inactividad_con_auditoria(Some(conn)) {
             return Err(AppError::NoAutenticado);
         }
 
-        if self.estado_sesion == EstadoSesion::CambioObligatorio {
-            return Err(AppError::Validation(
-                "Debe cambiar su contraseña antes de realizar cualquier operación en el sistema."
-                    .to_string(),
-            ));
-        }
-
-        if self.estado_sesion != EstadoSesion::Normal {
-            return Err(AppError::NoAutenticado);
+        match self.estado_sesion {
+            EstadoSesion::SinSesion => return Err(AppError::NoAutenticado),
+            EstadoSesion::CambioObligatorio if !permitir_limitado => {
+                return Err(AppError::AccessDenied(
+                    "Debe cambiar su contraseña antes de realizar cualquier operación en el sistema."
+                        .to_string(),
+                ));
+            }
+            _ => {}
         }
 
         let usr_id = self.usuario_id.ok_or(AppError::NoAutenticado)?;
 
-        // Validación en BD y Revocación Dinámica por Desactivación o Cambio de Rol (H04 / TC-LOG-10_v7)
-        let (activo, rol_bd): (i32, String) = match conn.query_row(
-            "SELECT activo, rol FROM usuarios WHERE id_usuario = ?1",
+        let (activo, rol_bd, version_bd): (i32, String, i64) = match conn.query_row(
+            "SELECT activo, rol, version FROM usuarios WHERE id_usuario = ?1",
             [usr_id],
-            |r| Ok((r.get(0)?, r.get(1)?)),
+            |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
         ) {
             Ok(data) => data,
             Err(_) => {
@@ -170,8 +204,9 @@ impl SessionState {
         };
 
         let rol_memoria = self.rol.as_deref().unwrap_or("");
+        let version_memoria = self.usuario_version.unwrap_or(-1);
 
-        if activo == 0 || rol_bd != rol_memoria {
+        if activo == 0 || rol_bd != rol_memoria || version_bd != version_memoria {
             self.invalidar_sesion_usuario(usr_id);
             return Err(AppError::NoAutenticado);
         }
@@ -179,17 +214,25 @@ impl SessionState {
         Ok(usr_id)
     }
 
-    /// RB03: Comprobar si un administrador está pausado para autorizaciones en memoria
-    pub fn esta_verificacion_admin_pausada(&self, admin_id: i64) -> bool {
-        if let Some(intento) = self.verificaciones_admin_fallos.get(&admin_id) {
+    pub fn validar_sesion_operativa(&mut self, conn: &Connection) -> Result<i64, AppError> {
+        self.validar_sesion_vigente(conn, false)
+    }
+
+    pub fn esta_verificacion_admin_pausada(&mut self, admin_id: i64) -> bool {
+        if let Some(intento) = self.verificaciones_admin_fallos.get_mut(&admin_id) {
             if let Some(pausa) = intento.pausado_hasta {
-                return Instant::now() < pausa;
+                if Instant::now() < pausa {
+                    return true;
+                } else {
+                    intento.fallos = 0;
+                    intento.pausado_hasta = None;
+                    return false;
+                }
             }
         }
         false
     }
 
-    /// RB03: Registrar un fallo de verificación administrativa sin afectar la BD
     pub fn registrar_fallo_verificacion_admin(&mut self, admin_id: i64) -> bool {
         let entry =
             self.verificaciones_admin_fallos
@@ -202,22 +245,22 @@ impl SessionState {
         entry.fallos += 1;
         if entry.fallos >= 5 {
             entry.pausado_hasta = Some(Instant::now() + Duration::from_secs(900));
-            true // Se pausó por 15 min
+            true
         } else {
             false
         }
     }
 
-    /// RB03: Limpiar fallos de verificación administrativa tras un intento exitoso
     pub fn limpiar_fallos_verificacion_admin(&mut self, admin_id: i64) {
         self.verificaciones_admin_fallos.remove(&admin_id);
     }
 
-    /// Guardar una autorización temporal de 60 segundos
+    /// Guarda una autorización vinculando al autorizante con la sesión del cajero/solicitante
     pub fn guardar_autorizacion(
         &mut self,
         clave_token: String,
         autorizante_id: i64,
+        solicitante_id: i64,
         accion: String,
         referencia: String,
     ) {
@@ -226,6 +269,7 @@ impl SessionState {
             clave_token,
             ConfirmacionData {
                 autorizante_id,
+                solicitante_id,
                 accion,
                 referencia,
                 expiracion,
@@ -233,21 +277,41 @@ impl SessionState {
         );
     }
 
-    /// Consumir una autorización previa para uso único
+    /// Valida y consume de forma unívoca (single-use) un token de autorización en origen.
+    /// Exige coincidencia estricta de solicitante_id, acción y referencia.
     pub fn consumir_autorizacion(
         &mut self,
         clave_token: &str,
+        solicitante_id: i64,
         accion_esperada: &str,
         ref_esperada: &str,
-    ) -> bool {
-        if let Some(conf) = self.confirmaciones_pendientes.remove(clave_token) {
-            if conf.expiracion >= Instant::now()
-                && conf.accion == accion_esperada
-                && conf.referencia == ref_esperada
-            {
-                return true;
-            }
+    ) -> Result<i64, AppError> {
+        let conf = self
+            .confirmaciones_pendientes
+            .get(clave_token)
+            .ok_or_else(|| {
+                AppError::AccessDenied("Token de autorización inválido o ya utilizado.".to_string())
+            })?;
+
+        if conf.expiracion < Instant::now() {
+            self.confirmaciones_pendientes.remove(clave_token);
+            return Err(AppError::AccessDenied(
+                "El token de autorización ha expirado.".to_string(),
+            ));
         }
-        false
+        if conf.solicitante_id != solicitante_id {
+            return Err(AppError::AccessDenied(
+                "El token de autorización no fue emitido para la sesión del usuario actual."
+                    .to_string(),
+            ));
+        }
+        if conf.accion != accion_esperada || conf.referencia != ref_esperada {
+            return Err(AppError::AccessDenied(
+                "La acción o referencia no coincide con la autorización concedida.".to_string(),
+            ));
+        }
+
+        let conf_valida = self.confirmaciones_pendientes.remove(clave_token).unwrap();
+        Ok(conf_valida.autorizante_id)
     }
 }

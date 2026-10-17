@@ -25,8 +25,8 @@ pub struct AuditoriaDto {
 pub struct AuditoriaService;
 
 impl AuditoriaService {
-    /// Registra un evento de auditoría cumpliendo estrictamente con el esquema V5 de la tabla auditoria:
-    /// CHECKs aplicados por SQLite (0001_initial_schema_v5.sql):
+    /// Registra un evento de auditoría cumpliendo estrictamente con el esquema V7.0 de la tabla auditoria:
+    /// CHECKs aplicados por SQLite (0001_initial_schema_v7.sql):
     /// - actor: 'USUARIO', 'SISTEMA', 'NO_IDENTIFICADO'
     /// - modulo: 'LOGIN', 'DASHBOARD', 'FICHA_VEHICULAR', 'OT', 'INVENTARIO', 'POS', 'CAJA', 'BACKUP', 'ADMIN', 'REPORTES'
     /// - resultado: 'OK', 'DENEGADO', 'ERROR'
@@ -48,7 +48,6 @@ impl AuditoriaService {
     ) -> Result<(), AppError> {
         let id_op = format!("aud_{}", uuid::Uuid::new_v4().simple());
 
-        // Normalización para garantizar consistencia con los CHECK de la BD V5
         let es_actor_usuario = actor == "USUARIO"
             && id_usuario.is_some()
             && username_snapshot.is_some()
@@ -105,7 +104,6 @@ impl AuditoriaService {
         Ok(())
     }
 
-    /// Helper para auditoría de eventos del módulo LOGIN
     pub fn registrar_evento_login(
         conn: &Connection,
         id_usuario: Option<i64>,
@@ -137,7 +135,6 @@ impl AuditoriaService {
         )
     }
 
-    /// 1.5 (H08): Registro explícito de cierre de sesión en la tabla auditoria
     pub fn registrar_cierre_sesion(
         conn: &Connection,
         id_usuario: i64,
@@ -155,7 +152,7 @@ impl AuditoriaService {
             "CERRAR_SESION",
             Some("usuarios"),
             Some(&id_usuario.to_string()),
-            Some("Cierre voluntario o expiración de sesión"),
+            Some("Cierre voluntario de sesión"),
             "OK",
         )
     }

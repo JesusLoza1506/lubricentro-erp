@@ -26,15 +26,25 @@ export const Sidebar: React.FC<SidebarProps> = ({
   setModuloActual,
   onAbrirCambioClave,
 }) => {
-  const { usuario, estadoSesion, tienePermiso, cerrarSesion, hayCambiosSinGuardar } = useAuth();
-  const [mostrarConfirmacionCierre, setMostrarConfirmacionCierre] = useState<boolean>(false);
+  const {
+    usuario,
+    ambienteActual,
+    estadoSesion,
+    tienePermiso,
+    cerrarSesion,
+    hayCambiosSinGuardar,
+    setHayCambiosSinGuardar,
+  } = useAuth();
 
-  // Ocultamiento estricto si no hay sesión activa o si se exige cambio de clave
+  const [mostrarConfirmacion, setMostrarConfirmacion] = useState<boolean>(false);
+  const [destinoPendiente, setDestinoPendiente] = useState<string | null>(null);
+
   if (estadoSesion !== 'NORMAL' || !usuario) {
     return null;
   }
 
-  // Catálogo oficial de los 9 módulos según la especificación V5.0
+  const esProdBD = ambienteActual.toUpperCase() === 'PRODUCCION';
+
   const menuItems = [
     {
       id: 'dashboard',
@@ -105,12 +115,47 @@ export const Sidebar: React.FC<SidebarProps> = ({
     (item) => item.siempreVisible || tienePermiso(item.moduloKey, 'ver')
   );
 
+  const handleNavegarModulo = (nuevoModulo: string) => {
+    if (nuevoModulo === moduloActual) return;
+
+    if (hayCambiosSinGuardar) {
+      setDestinoPendiente(nuevoModulo);
+      setMostrarConfirmacion(true);
+    } else {
+      setModuloActual(nuevoModulo);
+    }
+  };
+
+  const handleAbrirCambioClaveModal = () => {
+    if (hayCambiosSinGuardar) {
+      setDestinoPendiente('MODAL_CAMBIO_CLAVE');
+      setMostrarConfirmacion(true);
+    } else if (onAbrirCambioClave) {
+      onAbrirCambioClave();
+    }
+  };
+
   const handleIntentarCerrarSesion = () => {
     if (hayCambiosSinGuardar) {
-      setMostrarConfirmacionCierre(true);
+      setDestinoPendiente('LOGOUT');
+      setMostrarConfirmacion(true);
     } else {
       cerrarSesion();
     }
+  };
+
+  const confirmarAccionNavegacion = () => {
+    setHayCambiosSinGuardar(false);
+    setMostrarConfirmacion(false);
+
+    if (destinoPendiente === 'LOGOUT') {
+      cerrarSesion();
+    } else if (destinoPendiente === 'MODAL_CAMBIO_CLAVE') {
+      if (onAbrirCambioClave) onAbrirCambioClave();
+    } else if (destinoPendiente) {
+      setModuloActual(destinoPendiente);
+    }
+    setDestinoPendiente(null);
   };
 
   return (
@@ -129,7 +174,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
         }}
       >
         <div>
-          {/* Header Marca */}
           <div
             style={{
               display: 'flex',
@@ -152,17 +196,33 @@ export const Sidebar: React.FC<SidebarProps> = ({
             >
               <Shield size={20} color="#FFFFFF" />
             </div>
-            <div>
-              <h1 style={{ fontSize: '15px', fontWeight: '800', color: '#F8FAFC', margin: 0 }}>
-                Lubricentro Gloria
-              </h1>
+            <div style={{ flex: 1 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <h1 style={{ fontSize: '15px', fontWeight: '800', color: '#F8FAFC', margin: 0 }}>
+                  Lubricentro Gloria
+                </h1>
+                <span
+                  style={{
+                    fontSize: '9px',
+                    fontWeight: '800',
+                    padding: '2px 5px',
+                    borderRadius: '4px',
+                    backgroundColor: !esProdBD
+                      ? 'rgba(234, 179, 8, 0.2)'
+                      : 'rgba(34, 197, 94, 0.2)',
+                    color: !esProdBD ? '#FDE047' : '#86EFAC',
+                    border: `1px solid ${!esProdBD ? 'rgba(234, 179, 8, 0.4)' : 'rgba(34, 197, 94, 0.4)'}`,
+                  }}
+                >
+                  {ambienteActual.toUpperCase()}
+                </span>
+              </div>
               <span style={{ fontSize: '11px', color: '#38BDF8', fontWeight: '600' }}>
-                ERP Desktop v5.0
+                ERP Desktop v7.0
               </span>
             </div>
           </div>
 
-          {/* Opciones de Navegación */}
           <nav style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
             {opcionesPermitidas.map((item) => {
               const Icon = item.icon;
@@ -170,7 +230,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               return (
                 <button
                   key={item.id}
-                  onClick={() => setModuloActual(item.id)}
+                  onClick={() => handleNavegarModulo(item.id)}
                   style={{
                     display: 'flex',
                     alignItems: 'center',
@@ -185,6 +245,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     cursor: 'pointer',
                     textAlign: 'left',
                     transition: 'all 0.2s ease',
+                    outline: 'none',
+                  }}
+                  onFocus={(e) => {
+                    e.currentTarget.style.boxShadow = '0 0 0 2px #38BDF8';
+                  }}
+                  onBlur={(e) => {
+                    e.currentTarget.style.boxShadow = 'none';
                   }}
                 >
                   <Icon size={18} color={esActivo ? '#FFFFFF' : '#94A3B8'} />
@@ -195,7 +262,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </nav>
         </div>
 
-        {/* Footer Usuario Logueado */}
         <div
           style={{
             borderTop: '1px solid #334155',
@@ -233,10 +299,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
               </div>
             </div>
 
-            {/* H05: Botón para detonar el Cambio Voluntario de Contraseña */}
             {onAbrirCambioClave && (
               <button
-                onClick={onAbrirCambioClave}
+                onClick={handleAbrirCambioClaveModal}
                 style={{
                   display: 'flex',
                   alignItems: 'center',
@@ -251,6 +316,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   fontSize: '11px',
                   fontWeight: '600',
                   transition: 'all 0.2s ease',
+                  outline: 'none',
+                }}
+                onFocus={(e) => {
+                  e.currentTarget.style.boxShadow = '0 0 0 2px #38BDF8';
+                }}
+                onBlur={(e) => {
+                  e.currentTarget.style.boxShadow = 'none';
                 }}
               >
                 <KeyRound size={13} />
@@ -273,6 +345,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
               cursor: 'pointer',
               fontSize: '13px',
               fontWeight: '600',
+              outline: 'none',
+            }}
+            onFocus={(e) => {
+              e.currentTarget.style.boxShadow = '0 0 0 2px #EF4444';
+            }}
+            onBlur={(e) => {
+              e.currentTarget.style.boxShadow = 'none';
             }}
           >
             <LogOut size={16} />
@@ -281,17 +360,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </div>
       </aside>
 
-      {/* H07: Modal de Confirmación de Salida cuando hay cambios no guardados */}
       <ConfirmModal
-        abierto={mostrarConfirmacionCierre}
+        abierto={mostrarConfirmacion}
         titulo="Cambios Sin Guardar"
-        mensaje="Tienes información o un formulario editado sin guardar. Si cierras sesión ahora, perderás todos los cambios realizados."
-        textoConfirmar="Sí, Cerrar Sesión"
-        onConfirmar={() => {
-          setMostrarConfirmacionCierre(false);
-          cerrarSesion();
+        mensaje="Tienes información o un formulario editado sin guardar. Si navegas fuera o cierras sesión, perderás todos los datos ingresados."
+        textoConfirmar="Sí, Descartar Cambios"
+        onConfirmar={confirmarAccionNavegacion}
+        onCancelar={() => {
+          setMostrarConfirmacion(false);
+          setDestinoPendiente(null);
         }}
-        onCancelar={() => setMostrarConfirmacionCierre(false)}
       />
     </>
   );

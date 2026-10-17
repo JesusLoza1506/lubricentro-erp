@@ -23,9 +23,10 @@ interface AuthContextType {
   isCheckingSession: boolean;
   isLoggingIn: boolean;
   appVersion: string;
+  ambienteActual: string;
   mensajeInactividad: string | null;
-  hayCambiosSinGuardar: boolean; // H07
-  setHayCambiosSinGuardar: (dirty: boolean) => void; // H07
+  hayCambiosSinGuardar: boolean;
+  setHayCambiosSinGuardar: (dirty: boolean) => void;
   limpiarMensajeInactividad: () => void;
   iniciarSesion: (user: string, pass: string) => Promise<UsuarioSesion>;
   cerrarSesion: () => Promise<void>;
@@ -43,10 +44,17 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [isCheckingSession, setIsCheckingSession] = useState<boolean>(true);
   const [isLoggingIn, setIsLoggingIn] = useState<boolean>(false);
   const [appVersion, setAppVersion] = useState<string>('7.0.0');
+  const [ambienteActual, setAmbienteActual] = useState<string>('PRODUCCION');
   const [mensajeInactividad, setMensajeInactividad] = useState<string | null>(null);
-  const [hayCambiosSinGuardar, setHayCambiosSinGuardar] = useState<boolean>(false); // H07
+  const [hayCambiosSinGuardar, setHayCambiosSinGuardar] = useState<boolean>(false);
 
   const ultimoRegistroRef = useRef<number>(0);
+  const sessionInstanceIdRef = useRef<number>(0);
+
+  const incrementarInstanciaSesion = () => {
+    sessionInstanceIdRef.current += 1;
+    return sessionInstanceIdRef.current;
+  };
 
   useEffect(() => {
     apiObtenerVersionApp()
@@ -57,9 +65,13 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const limpiarMensajeInactividad = () => setMensajeInactividad(null);
 
   const verificarSesion = useCallback(async () => {
+    const localInstanceId = sessionInstanceIdRef.current;
     setIsCheckingSession(true);
     try {
       const sesionActiva = await apiObtenerSesion();
+
+      if (localInstanceId !== sessionInstanceIdRef.current) return;
+
       setUsuario({
         id_usuario: sesionActiva.id_usuario,
         username: sesionActiva.username,
@@ -69,13 +81,18 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         debe_cambiar_clave: sesionActiva.estado_sesion === 'CAMBIO_OBLIGATORIO',
         estado_sesion: sesionActiva.estado_sesion as EstadoSesionEnum,
         permisos: sesionActiva.permisos,
+        ambiente_actual: sesionActiva.ambiente_actual || 'PRODUCCION',
       });
+      setAmbienteActual(sesionActiva.ambiente_actual || 'PRODUCCION');
       setEstadoSesion(sesionActiva.estado_sesion as EstadoSesionEnum);
     } catch {
+      if (localInstanceId !== sessionInstanceIdRef.current) return;
       setUsuario(null);
       setEstadoSesion('SIN_SESION');
     } finally {
-      setIsCheckingSession(false);
+      if (localInstanceId === sessionInstanceIdRef.current) {
+        setIsCheckingSession(false);
+      }
     }
   }, []);
 
@@ -83,7 +100,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     verificarSesion();
   }, [verificarSesion]);
 
-  // Listener de actividad humana para mantener viva la sesión de 15 min en Rust (RB04)
   useEffect(() => {
     if (estadoSesion === 'SIN_SESION') return;
 
@@ -91,7 +107,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       const ahora = Date.now();
       if (ahora - ultimoRegistroRef.current > 30000) {
         ultimoRegistroRef.current = ahora;
+        const localInstanceId = sessionInstanceIdRef.current;
         apiRegistrarActividad().catch(() => {
+          if (localInstanceId !== sessionInstanceIdRef.current) return;
+          incrementarInstanciaSesion();
           setUsuario(null);
           setEstadoSesion('SIN_SESION');
           setMensajeInactividad('Sesión finalizada por inactividad');
@@ -112,14 +131,16 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     };
   }, [estadoSesion]);
 
-  // Polling de verificación del estado de sesión en Backend
   useEffect(() => {
     if (estadoSesion === 'SIN_SESION') return;
 
     const interval = setInterval(async () => {
+      const localInstanceId = sessionInstanceIdRef.current;
       try {
         await apiObtenerSesion();
       } catch {
+        if (localInstanceId !== sessionInstanceIdRef.current) return;
+        incrementarInstanciaSesion();
         setUsuario(null);
         setEstadoSesion('SIN_SESION');
         setMensajeInactividad('Sesión finalizada por inactividad');
@@ -134,32 +155,46 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       throw new Error('La contraseña no puede exceder los 128 caracteres.');
     }
 
+    const localInstanceId = incrementarInstanciaSesion();
     setIsLoggingIn(true);
     setMensajeInactividad(null);
     try {
       const datos = await apiLoginUsuario({ username: user, password: pass });
+
+      if (localInstanceId !== sessionInstanceIdRef.current) {
+        throw new Error('Operación cancelada por cambio de instancia de sesión.');
+      }
+
       setUsuario(datos);
+      setAmbienteActual(datos.ambiente_actual || 'PRODUCCION');
       setEstadoSesion(datos.estado_sesion as EstadoSesionEnum);
+      setHayCambiosSinGuardar(false);
       ultimoRegistroRef.current = Date.now();
       return datos;
     } catch (error) {
-      setUsuario(null);
-      setEstadoSesion('SIN_SESION');
+      if (localInstanceId === sessionInstanceIdRef.current) {
+        setUsuario(null);
+        setEstadoSesion('SIN_SESION');
+      }
       throw error;
     } finally {
-      setIsLoggingIn(false);
+      if (localInstanceId === sessionInstanceIdRef.current) {
+        setIsLoggingIn(false);
+      }
     }
   };
 
   const cerrarSesion = async () => {
+    incrementarInstanciaSesion();
     try {
       await apiCerrarSesion();
     } catch {
-      // Ignorar errores de red/salida
+      // Ignorar errores de red al salir
     } finally {
       setUsuario(null);
       setEstadoSesion('SIN_SESION');
-      setHayCambiosSinGuardar(false); // H07: Reset de cambios no guardados
+      setHayCambiosSinGuardar(false);
+      setMensajeInactividad(null);
     }
   };
 
@@ -220,6 +255,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         isCheckingSession,
         isLoggingIn,
         appVersion,
+        ambienteActual,
         mensajeInactividad,
         hayCambiosSinGuardar,
         setHayCambiosSinGuardar,

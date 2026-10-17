@@ -34,15 +34,18 @@ export const AutorizarDescuentoModal: React.FC<Props> = ({
     setProcesando(true);
     try {
       const token = await apiAutorizarDescuento({
-        username_admin: usernameAdmin,
+        username_admin: usernameAdmin.trim(),
         password_admin: passwordAdmin,
         referencia_venta: referenciaVenta,
         descuento_bp: descuentoBp,
       });
 
+      // Purgado de contraseña del estado React tras el éxito
+      setPasswordAdmin('');
       onAutorizado(token);
       onClose();
     } catch (err: any) {
+      setPasswordAdmin('');
       setErrorMsg(err.message || 'Credenciales de autorizante inválidas o sin permisos.');
     } finally {
       setProcesando(false);
@@ -64,6 +67,9 @@ export const AutorizarDescuentoModal: React.FC<Props> = ({
         justifyContent: 'center',
         zIndex: 9999,
       }}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="modal-autorizar-descuento-title"
     >
       <div
         style={{
@@ -99,7 +105,10 @@ export const AutorizarDescuentoModal: React.FC<Props> = ({
               <Percent size={24} />
             </div>
             <div>
-              <h3 style={{ margin: 0, fontSize: '17px', fontWeight: '700' }}>
+              <h3
+                id="modal-autorizar-descuento-title"
+                style={{ margin: 0, fontSize: '17px', fontWeight: '700' }}
+              >
                 Autorizar Descuento
               </h3>
               <p style={{ margin: 0, fontSize: '12px', color: '#94A3B8' }}>
@@ -110,11 +119,15 @@ export const AutorizarDescuentoModal: React.FC<Props> = ({
 
           <button
             onClick={onClose}
+            aria-label="Cerrar modal"
             style={{
               background: 'none',
               border: 'none',
               color: '#64748B',
               cursor: 'pointer',
+              borderRadius: '6px',
+              outline: '2px solid transparent',
+              outlineOffset: '2px',
             }}
           >
             <X size={20} />
@@ -189,20 +202,28 @@ export const AutorizarDescuentoModal: React.FC<Props> = ({
         <form onSubmit={handleSubmit}>
           <div style={{ marginBottom: '14px' }}>
             <label
+              htmlFor="auth-admin-username"
               style={{
                 display: 'block',
                 fontSize: '12px',
                 fontWeight: '600',
                 color: '#94A3B8',
                 marginBottom: '6px',
+                cursor: 'pointer',
               }}
             >
               Usuario Administrador
             </label>
             <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-              <User size={18} color="#64748B" style={{ position: 'absolute', left: '14px' }} />
+              <User
+                size={18}
+                color="#64748B"
+                style={{ position: 'absolute', left: '14px', pointerEvents: 'none' }}
+              />
               <input
+                id="auth-admin-username"
                 type="text"
+                disabled={procesando}
                 value={usernameAdmin}
                 onChange={(e) => setUsernameAdmin(e.target.value)}
                 placeholder="Ej. admin"
@@ -214,32 +235,43 @@ export const AutorizarDescuentoModal: React.FC<Props> = ({
                   borderRadius: '10px',
                   color: '#F8FAFC',
                   fontSize: '14px',
-                  outline: 'none',
+                  outline: '2px solid transparent',
+                  outlineOffset: '2px',
                   boxSizing: 'border-box',
                 }}
+                autoComplete="username"
               />
             </div>
           </div>
 
           <div style={{ marginBottom: '20px' }}>
             <label
+              htmlFor="auth-admin-password"
               style={{
                 display: 'block',
                 fontSize: '12px',
                 fontWeight: '600',
                 color: '#94A3B8',
                 marginBottom: '6px',
+                cursor: 'pointer',
               }}
             >
               Contraseña de Administrador
             </label>
             <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-              <Lock size={18} color="#64748B" style={{ position: 'absolute', left: '14px' }} />
+              <Lock
+                size={18}
+                color="#64748B"
+                style={{ position: 'absolute', left: '14px', pointerEvents: 'none' }}
+              />
               <input
+                id="auth-admin-password"
                 type="password"
+                disabled={procesando}
                 value={passwordAdmin}
                 onChange={(e) => setPasswordAdmin(e.target.value)}
                 placeholder="••••••••"
+                maxLength={128}
                 style={{
                   width: '100%',
                   padding: '12px 14px 12px 42px',
@@ -248,9 +280,11 @@ export const AutorizarDescuentoModal: React.FC<Props> = ({
                   borderRadius: '10px',
                   color: '#F8FAFC',
                   fontSize: '14px',
-                  outline: 'none',
+                  outline: '2px solid transparent',
+                  outlineOffset: '2px',
                   boxSizing: 'border-box',
                 }}
+                autoComplete="current-password"
               />
             </div>
           </div>
@@ -258,6 +292,7 @@ export const AutorizarDescuentoModal: React.FC<Props> = ({
           <div style={{ display: 'flex', gap: '10px' }}>
             <button
               type="button"
+              disabled={procesando}
               onClick={onClose}
               style={{
                 flex: 1,
@@ -269,6 +304,8 @@ export const AutorizarDescuentoModal: React.FC<Props> = ({
                 fontSize: '14px',
                 fontWeight: '500',
                 cursor: 'pointer',
+                outline: '2px solid transparent',
+                outlineOffset: '2px',
               }}
             >
               Cancelar
@@ -291,6 +328,8 @@ export const AutorizarDescuentoModal: React.FC<Props> = ({
                 alignItems: 'center',
                 justifyContent: 'center',
                 gap: '8px',
+                outline: '2px solid transparent',
+                outlineOffset: '2px',
               }}
             >
               <UserCheck size={16} />

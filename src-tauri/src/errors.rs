@@ -10,9 +10,11 @@ pub enum AppError {
     NotFound(String),
     NoAutenticado,
     PermisoDenegado,
+    DbLock,
+    SessionActive,
 }
 
-/// Mapea los errores técnicos de SQLite a mensajes amigables para el usuario final (2.4.2)
+/// Mapea los errores técnicos de SQLite a mensajes amigables y seguros para el usuario final
 fn mapear_error_sqlite(err: &rusqlite::Error) -> String {
     match err {
         rusqlite::Error::SqliteFailure(_sqlite_err, Some(msg)) => {
@@ -27,7 +29,7 @@ fn mapear_error_sqlite(err: &rusqlite::Error) -> String {
             {
                 "La base de datos se encuentra ocupada procesando otra transacción. Por favor, reintente en unos segundos.".to_string()
             } else {
-                format!("Error en el almacenamiento de datos: {}", msg)
+                "Error en el almacenamiento de datos de la aplicación.".to_string()
             }
         }
         rusqlite::Error::SqliteFailure(_, None) => {
@@ -36,7 +38,7 @@ fn mapear_error_sqlite(err: &rusqlite::Error) -> String {
         rusqlite::Error::QueryReturnedNoRows => {
             "No se encontró el registro solicitado en la base de datos.".to_string()
         }
-        _ => format!("Error de Base de Datos: {}", err),
+        _ => "Ocurrió un error interno al procesar la solicitud.".to_string(),
     }
 }
 
@@ -52,6 +54,14 @@ impl fmt::Display for AppError {
             AppError::PermisoDenegado => write!(
                 f,
                 "No tienes permisos suficientes para realizar esta operación."
+            ),
+            AppError::DbLock => write!(
+                f,
+                "Fallo al sincronizar con el recurso o la base de datos. Intente nuevamente."
+            ),
+            AppError::SessionActive => write!(
+                f,
+                "Ya existe una sesión activa en el sistema. Cierre la sesión actual antes de ingresar."
             ),
         }
     }

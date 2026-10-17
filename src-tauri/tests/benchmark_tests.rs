@@ -11,7 +11,7 @@ fn benchmark_exhaustivo_p50_p95_50k_vehiculos() {
     let conn = Connection::open_in_memory().unwrap();
     conn.execute_batch("PRAGMA foreign_keys = ON;").unwrap();
 
-    // Carga de la migración V5 real del proyecto
+    // Carga de la migración V7 real del proyecto
     let initial_schema = include_str!("../migrations/0001_initial_schema_v7.sql");
     conn.execute_batch(initial_schema).unwrap();
 
@@ -23,7 +23,7 @@ fn benchmark_exhaustivo_p50_p95_50k_vehiculos() {
     )
     .unwrap();
 
-    println!("Iniciando inserción masiva de 50,000 registros para benchmark V5...");
+    println!("Iniciando inserción masiva de 50,000 registros para benchmark V7...");
     let start_seed = Instant::now();
 
     let mut placas_guardadas = Vec::with_capacity(50000);
@@ -36,9 +36,10 @@ fn benchmark_exhaustivo_p50_p95_50k_vehiculos() {
         let placa = format!("{}{}{}{:03}", c1, c2, c3, num);
         placas_guardadas.push(placa.clone());
 
+        // CORRECCIÓN: Se omite la columna 'activo' ya que no existe en clientes (V7)
         conn.execute(
-            "INSERT INTO clientes (tipo_documento, numero_documento, nombre_razon_social, activo)
-             VALUES ('DNI', ?1, ?2, 1)",
+            "INSERT INTO clientes (tipo_documento, numero_documento, nombre_razon_social)
+             VALUES ('DNI', ?1, ?2)",
             params![
                 format!("{:08}", i % 100000000),
                 format!("Cliente Empresa {}", i)
@@ -64,9 +65,9 @@ fn benchmark_exhaustivo_p50_p95_50k_vehiculos() {
         conn.execute(
             "INSERT INTO ordenes_trabajo (
                 id_operacion, codigo_ot, id_vehiculo, id_cliente_atendido,
-                placa_snapshot, cliente_snapshot, id_creador, id_zanja_prevista,
+                placa_snapshot, cliente_snapshot, id_creador,
                 estado, kilometraje_ingreso
-            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, 1, 1, 'EN_ESPERA', 35000)",
+            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, 1, 'EN_ESPERA', 35000)",
             params![
                 id_op_ot,
                 codigo_ot,

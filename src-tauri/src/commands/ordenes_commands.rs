@@ -64,9 +64,10 @@ pub fn crear_orden_trabajo_cmd(
         AppError::Validation("Fallo al obtener estado de la base de datos".to_string())
     })?;
 
-    let _user_id = verificar_permiso_sesion(&mut session, &conn, &["ADMINISTRADOR", "CAJERO"])?;
+    // Extraer user_id real del creador
+    let user_id = verificar_permiso_sesion(&mut session, &conn, &["ADMINISTRADOR", "CAJERO"])?;
 
-    OrdenesService::crear_orden_trabajo(&mut conn, payload)
+    OrdenesService::crear_orden_trabajo(&mut conn, payload, user_id)
 }
 
 #[tauri::command]
@@ -149,27 +150,23 @@ pub fn listar_mecanicos_cmd(
         &["ADMINISTRADOR", "CAJERO", "MECANICO"],
     )?;
 
-    let mut stmt = conn
-        .prepare(
-            "SELECT id_usuario, nombre_completo 
-             FROM usuarios 
-             WHERE UPPER(rol) = 'MECANICO' AND activo = 1 
-             ORDER BY nombre_completo ASC",
-        )
-        .map_err(|e| AppError::Validation(e.to_string()))?;
+    let mut stmt = conn.prepare(
+        "SELECT id_usuario, nombre_completo 
+         FROM usuarios 
+         WHERE UPPER(rol) = 'MECANICO' AND activo = 1 
+         ORDER BY nombre_completo ASC",
+    )?;
 
-    let rows = stmt
-        .query_map([], |row| {
-            Ok(MecanicoResumenDto {
-                id_usuario: row.get(0)?,
-                nombre_completo: row.get(1)?,
-            })
+    let rows = stmt.query_map([], |row| {
+        Ok(MecanicoResumenDto {
+            id_usuario: row.get(0)?,
+            nombre_completo: row.get(1)?,
         })
-        .map_err(|e| AppError::Validation(e.to_string()))?;
+    })?;
 
     let mut lista = Vec::new();
     for r in rows {
-        lista.push(r.map_err(|e| AppError::Validation(e.to_string()))?);
+        lista.push(r?);
     }
 
     Ok(lista)

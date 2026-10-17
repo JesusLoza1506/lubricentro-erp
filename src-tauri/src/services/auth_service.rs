@@ -63,17 +63,15 @@ impl AuthService {
         )
     }
 
-    /// 3.1.1: Normalizar código de recuperación eliminando guiones y todos los espacios en blanco intermedios
     pub fn normalizar_codigo(codigo: &str) -> String {
         codigo.replace(['-', ' '], "").trim().to_uppercase()
     }
 
-    /// 3.1.3: Medición de caracteres Unicode (password.chars().count())
     pub fn validar_politica_password(password: &str, username: &str) -> Result<(), AppError> {
         let len = password.chars().count();
-        if !(8..=128).contains(&len) {
+        if !(7..=128).contains(&len) {
             return Err(AppError::Validation(
-                "La contraseña debe tener entre 8 y 128 caracteres.".to_string(),
+                "La contraseña debe tener entre 7 y 128 caracteres.".to_string(),
             ));
         }
 
@@ -86,7 +84,7 @@ impl AuthService {
             ));
         }
 
-        if password.to_lowercase() == username.to_lowercase() {
+        if !username.is_empty() && password.to_lowercase() == username.to_lowercase() {
             return Err(AppError::Validation(
                 "La contraseña no puede ser igual al nombre de usuario.".to_string(),
             ));
@@ -124,15 +122,6 @@ impl AuthService {
         conn: &mut Connection,
         req: InstalacionInicialRequestDto,
     ) -> Result<InstalacionInicialResponseDto, AppError> {
-        let count_usuarios: i64 =
-            conn.query_row("SELECT COUNT(*) FROM usuarios", [], |row| row.get(0))?;
-
-        if count_usuarios > 0 {
-            return Err(AppError::Validation(
-                "La instalación inicial ya fue realizada.".to_string(),
-            ));
-        }
-
         let clean_nombre = Self::normalizar_nombre_completo(&req.nombre_completo)?;
         let clean_username = Self::normalizar_username(&req.username)?;
         Self::validar_politica_password(&req.password, &clean_username)?;
@@ -164,10 +153,8 @@ impl AuthService {
             params![codigo_hash],
         )?;
 
-        tx.commit()?;
-
         AuditoriaService::registrar_evento_login(
-            conn,
+            &tx,
             Some(id_usuario),
             Some(&clean_username),
             Some("ADMINISTRADOR"),
@@ -176,6 +163,8 @@ impl AuthService {
             Some("Primer arranque del sistema"),
         )?;
 
+        tx.commit()?;
+
         Ok(InstalacionInicialResponseDto {
             id_usuario,
             username: clean_username,
@@ -183,12 +172,15 @@ impl AuthService {
         })
     }
 
-    pub fn login(conn: &Connection, req: LoginRequestDto) -> Result<LoginResponseDto, AppError> {
+    pub fn login(
+        conn: &Connection,
+        req: LoginRequestDto,
+    ) -> Result<(LoginResponseDto, i64), AppError> {
         let clean_username = req.username.trim().to_lowercase();
 
         let mut stmt = conn.prepare(
             "SELECT id_usuario, nombre_completo, username, password_hash, rol, activo,
-                    debe_cambiar_clave, intentos_fallidos, bloqueado_hasta
+                    debe_cambiar_clave, intentos_fallidos, bloqueado_hasta, version
              FROM usuarios
              WHERE username = ?1",
         )?;
@@ -205,6 +197,7 @@ impl AuthService {
             let debe_cambiar_clave: bool = row.get::<_, i32>(6)? == 1;
             let mut intentos_fallidos: i32 = row.get(7)?;
             let bloqueado_hasta: Option<String> = row.get(8)?;
+            let usuario_version: i64 = row.get(9)?;
 
             if !activo {
                 AuditoriaService::registrar_evento_login(
@@ -307,16 +300,20 @@ impl AuthService {
                 Some("Inicio de sesión exitoso"),
             )?;
 
-            Ok(LoginResponseDto {
-                id_usuario,
-                nombre_completo,
-                username,
-                rol,
-                activo,
-                debe_cambiar_clave,
-                estado_sesion,
-                permisos,
-            })
+            Ok((
+                LoginResponseDto {
+                    id_usuario,
+                    nombre_completo,
+                    username,
+                    rol,
+                    activo,
+                    debe_cambiar_clave,
+                    estado_sesion,
+                    permisos,
+                    ambiente_actual: "PRODUCCION".to_string(),
+                },
+                usuario_version,
+            ))
         } else {
             let _ = Self::verify_password(&req.password, DUMMY_ARGON2_HASH);
             AuditoriaService::registrar_evento_login(
@@ -338,16 +335,17 @@ impl AuthService {
         id_usuario: i64,
         estado_memoria: &str,
     ) -> Result<SesionResumenDto, AppError> {
-        let (username, nombre_completo, rol, activo, debe_cambiar_clave): (
+        let (username, nombre_completo, rol, activo, debe_cambiar_clave, version_bd): (
             String,
             String,
             String,
             i32,
             i32,
+            i64,
         ) = match conn.query_row(
-            "SELECT username, nombre_completo, rol, activo, debe_cambiar_clave FROM usuarios WHERE id_usuario = ?1",
+            "SELECT username, nombre_completo, rol, activo, debe_cambiar_clave, version FROM usuarios WHERE id_usuario = ?1",
             [id_usuario],
-            |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?, r.get(4)?)),
+            |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?, r.get(4)?, r.get(5)?)),
         ) {
             Ok(res) => res,
             Err(_) => {
@@ -357,7 +355,12 @@ impl AuthService {
         };
 
         let rol_memoria = session.rol.as_deref().unwrap_or("");
-        if activo == 0 || (!rol_memoria.is_empty() && rol_memoria != rol) {
+        let version_memoria = session.usuario_version.unwrap_or(-1);
+
+        if activo == 0
+            || (!rol_memoria.is_empty() && rol_memoria != rol)
+            || version_bd != version_memoria
+        {
             session.invalidar_sesion_usuario(id_usuario);
             return Err(AppError::NoAutenticado);
         }
@@ -376,6 +379,7 @@ impl AuthService {
             rol,
             estado_sesion,
             permisos,
+            ambiente_actual: "PRODUCCION".to_string(),
         })
     }
 
@@ -383,7 +387,7 @@ impl AuthService {
         conn: &mut Connection,
         req: RecuperarAccesoAdminRequestDto,
     ) -> Result<InstalacionInicialResponseDto, AppError> {
-        let (fallos_rec, bloq_rec): (i32, Option<String>) = conn.query_row(
+        let (mut fallos_rec, bloq_rec): (i32, Option<String>) = conn.query_row(
             "SELECT recuperacion_fallos, recuperacion_bloqueada_hasta FROM configuracion WHERE id_config = 1",
             [],
             |r| Ok((r.get(0)?, r.get(1)?)),
@@ -401,11 +405,11 @@ impl AuthService {
                     "No se pudo recuperar el acceso con los datos ingresados.".to_string(),
                 ));
             } else {
-                // 3.1.2: Al vencer el bloqueo, reiniciar contador de fallos a 0 en la BD
                 conn.execute(
                     "UPDATE configuracion SET recuperacion_fallos = 0, recuperacion_bloqueada_hasta = NULL WHERE id_config = 1",
                     [],
                 )?;
+                fallos_rec = 0;
             }
         }
 
@@ -503,10 +507,8 @@ impl AuthService {
             params![nuevo_codigo_hash],
         )?;
 
-        tx.commit()?;
-
         AuditoriaService::registrar_evento_login(
-            conn,
+            &tx,
             Some(id_usuario),
             Some(&clean_username),
             Some("ADMINISTRADOR"),
@@ -514,6 +516,8 @@ impl AuthService {
             "OK",
             Some("Acceso restablecido exitosamente mediante código de recuperación"),
         )?;
+
+        tx.commit()?;
 
         Ok(InstalacionInicialResponseDto {
             id_usuario,
@@ -523,11 +527,16 @@ impl AuthService {
     }
 
     pub fn cambiar_clave_obligatoria(
-        conn: &Connection,
+        conn: &mut Connection,
         session: &mut SessionState,
         id_usuario: i64,
         req: CambiarClaveObligatoriaRequestDto,
     ) -> Result<(), AppError> {
+        let usr_id_valido = session.validar_sesion_vigente(conn, true)?;
+        if usr_id_valido != id_usuario {
+            return Err(AppError::NoAutenticado);
+        }
+
         let (username, password_hash, rol, debe_cambiar_clave): (String, String, String, i32) = conn
             .query_row(
                 "SELECT username, password_hash, rol, debe_cambiar_clave FROM usuarios WHERE id_usuario = ?1 AND activo = 1",
@@ -552,7 +561,9 @@ impl AuthService {
 
         let nueva_hash = Self::hash_password(&req.nueva_password)?;
 
-        conn.execute(
+        let tx = conn.transaction()?;
+
+        tx.execute(
             "UPDATE usuarios 
              SET password_hash = ?1, debe_cambiar_clave = 0, intentos_fallidos = 0, bloqueado_hasta = NULL,
                  fecha_cambio_clave = datetime('now', '-5 hours'), version = version + 1
@@ -560,11 +571,14 @@ impl AuthService {
             params![nueva_hash, id_usuario],
         )?;
 
-        session.confirmaciones_pendientes.clear();
-        session.habilitar_sesion_normal();
+        let nueva_version: i64 = tx.query_row(
+            "SELECT version FROM usuarios WHERE id_usuario = ?1",
+            [id_usuario],
+            |r| r.get(0),
+        )?;
 
         AuditoriaService::registrar_evento_login(
-            conn,
+            &tx,
             Some(id_usuario),
             Some(&username),
             Some(&rol),
@@ -573,15 +587,26 @@ impl AuthService {
             Some("Cambio obligatorio de contraseña completado exitosamente"),
         )?;
 
+        tx.commit()?;
+
+        session.confirmaciones_pendientes.clear();
+        session.actualizar_version_sesion(nueva_version);
+        session.habilitar_sesion_normal();
+
         Ok(())
     }
 
     pub fn cambiar_clave_voluntaria(
-        conn: &Connection,
-        _session: &mut SessionState,
+        conn: &mut Connection,
+        session: &mut SessionState,
         id_usuario: i64,
         req: CambiarClaveVoluntariaRequestDto,
     ) -> Result<(), AppError> {
+        let usr_id_valido = session.validar_sesion_operativa(conn)?;
+        if usr_id_valido != id_usuario {
+            return Err(AppError::NoAutenticado);
+        }
+
         let (username, password_hash, rol): (String, String, String) = conn.query_row(
             "SELECT username, password_hash, rol FROM usuarios WHERE id_usuario = ?1 AND activo = 1",
             [id_usuario],
@@ -604,7 +629,9 @@ impl AuthService {
 
         let nueva_hash = Self::hash_password(&req.nueva_password)?;
 
-        conn.execute(
+        let tx = conn.transaction()?;
+
+        tx.execute(
             "UPDATE usuarios 
              SET password_hash = ?1, debe_cambiar_clave = 0,
                  fecha_cambio_clave = datetime('now', '-5 hours'), version = version + 1
@@ -612,8 +639,14 @@ impl AuthService {
             params![nueva_hash, id_usuario],
         )?;
 
+        let nueva_version: i64 = tx.query_row(
+            "SELECT version FROM usuarios WHERE id_usuario = ?1",
+            [id_usuario],
+            |r| r.get(0),
+        )?;
+
         AuditoriaService::registrar_evento_login(
-            conn,
+            &tx,
             Some(id_usuario),
             Some(&username),
             Some(&rol),
@@ -621,6 +654,10 @@ impl AuthService {
             "OK",
             Some("Actualización voluntaria de contraseña completada con éxito"),
         )?;
+
+        tx.commit()?;
+
+        session.actualizar_version_sesion(nueva_version);
 
         Ok(())
     }

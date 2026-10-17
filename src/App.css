@@ -26,6 +26,21 @@ body,
   -moz-osx-font-smoothing: grayscale;
 }
 
+/* Indicadores de foco accesible visibles para navegación por teclado */
+*:focus-visible {
+  outline: 2px solid #2563eb !important;
+  outline-offset: 2px !important;
+}
+
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+a:focus-visible {
+  outline: 2px solid #2563eb !important;
+  outline-offset: 2px !important;
+}
+
 /* Eliminar barras de scroll globales molestas */
 ::-webkit-scrollbar {
   width: 6px;

@@ -14,7 +14,7 @@ fn verificar_permiso_sesion(
     session: &mut SessionState,
     conn: &Connection,
     roles_permitidos: &[&str],
-) -> Result<i64, AppError> {
+) -> Result<(i64, String), AppError> {
     let id_usuario = session.validar_sesion_operativa(conn)?;
     let rol = session.rol.as_deref().unwrap_or("").to_uppercase();
 
@@ -25,7 +25,7 @@ fn verificar_permiso_sesion(
         )));
     }
 
-    Ok(id_usuario)
+    Ok((id_usuario, rol))
 }
 
 #[tauri::command]
@@ -61,13 +61,13 @@ pub fn buscar_cliente_por_doc_cmd(
         AppError::Validation("Fallo al obtener estado de la base de datos".to_string())
     })?;
 
-    verificar_permiso_sesion(
+    let (_, rol) = verificar_permiso_sesion(
         &mut session,
         &conn,
         &["ADMINISTRADOR", "CAJERO", "MECANICO"],
     )?;
 
-    ClienteService::buscar_cliente_por_documento(&conn, &doc)
+    ClienteService::buscar_cliente_por_documento(&conn, &doc, Some(&rol))
 }
 
 #[tauri::command]
@@ -84,7 +84,7 @@ pub fn registrar_vehiculo_cmd(
         AppError::Validation("Fallo al obtener estado de la base de datos".to_string())
     })?;
 
-    let id_u = verificar_permiso_sesion(&mut session, &conn, &["ADMINISTRADOR", "CAJERO"])?;
+    let (id_u, _) = verificar_permiso_sesion(&mut session, &conn, &["ADMINISTRADOR", "CAJERO"])?;
 
     let tx = conn
         .transaction()
@@ -110,7 +110,7 @@ pub fn actualizar_vehiculo_cmd(
         AppError::Validation("Fallo al obtener estado de la base de datos".to_string())
     })?;
 
-    let id_u = verificar_permiso_sesion(&mut session, &conn, &["ADMINISTRADOR", "CAJERO"])?;
+    let (id_u, _) = verificar_permiso_sesion(&mut session, &conn, &["ADMINISTRADOR", "CAJERO"])?;
 
     let tx = conn
         .transaction()
@@ -136,13 +136,13 @@ pub fn obtener_vehiculo_por_placa_cmd(
         AppError::Validation("Fallo al obtener estado de la base de datos".to_string())
     })?;
 
-    verificar_permiso_sesion(
+    let (_, rol) = verificar_permiso_sesion(
         &mut session,
         &conn,
         &["ADMINISTRADOR", "CAJERO", "MECANICO"],
     )?;
 
-    ClienteService::obtener_vehiculo_por_placa(&conn, &placa)
+    ClienteService::obtener_vehiculo_por_placa(&conn, &placa, Some(&rol))
 }
 
 #[tauri::command]
@@ -158,7 +158,7 @@ pub fn obtener_todos_vehiculos_cmd(
         AppError::Validation("Fallo al obtener estado de la base de datos".to_string())
     })?;
 
-    verificar_permiso_sesion(
+    let (_, rol) = verificar_permiso_sesion(
         &mut session,
         &conn,
         &["ADMINISTRADOR", "CAJERO", "MECANICO"],
@@ -187,14 +187,22 @@ pub fn obtener_todos_vehiculos_cmd(
         )
         .map_err(|e| AppError::Validation(e.to_string()))?;
 
+    let es_mecanico = rol == "MECANICO";
+
     let rows = stmt
         .query_map([], |row| {
             let id_cliente: Option<i64> = row.get(6)?;
             let nombre_cliente: Option<String> = row.get(8)?;
             let tipo_doc: Option<String> = row.get(9)?;
             let num_doc: Option<String> = row.get(10)?;
-            let direccion: Option<String> = row.get(11)?;
-            let telefono: Option<String> = row.get(12)?;
+            let mut direccion: Option<String> = row.get(11)?;
+            let mut telefono: Option<String> = row.get(12)?;
+
+            // Filtrar datos privados si es MECANICO
+            if es_mecanico {
+                telefono = None;
+                direccion = None;
+            }
 
             let cliente_struct = if id_cliente.is_some() {
                 Some(crate::dto::vehiculo_dto::ClienteResumenDto {
@@ -219,7 +227,7 @@ pub fn obtener_todos_vehiculos_cmd(
                 id_cliente: id_cliente.unwrap_or(0),
                 activo: row.get::<_, i32>(7)?,
                 cliente: cliente_struct,
-                nombre_cliente: nombre_cliente.clone(),
+                nombre_cliente,
                 telefono_cliente: telefono,
                 tipo_documento_cliente: tipo_doc,
                 documento_cliente: num_doc,
@@ -250,13 +258,13 @@ pub fn obtener_ficha_vehicular_completa_cmd(
         AppError::Validation("Fallo al obtener estado de la base de datos".to_string())
     })?;
 
-    verificar_permiso_sesion(
+    let (_, rol) = verificar_permiso_sesion(
         &mut session,
         &conn,
         &["ADMINISTRADOR", "CAJERO", "MECANICO"],
     )?;
 
-    ClienteService::obtener_ficha_vehicular_completa(&conn, &placa)
+    ClienteService::obtener_ficha_vehicular_completa(&conn, &placa, Some(&rol))
 }
 
 #[tauri::command]
@@ -273,7 +281,7 @@ pub fn eliminar_vehiculo_cmd(
         AppError::Validation("Fallo al obtener estado de la base de datos".to_string())
     })?;
 
-    let id_u = verificar_permiso_sesion(&mut session, &conn, &["ADMINISTRADOR"])?;
+    let (id_u, _) = verificar_permiso_sesion(&mut session, &conn, &["ADMINISTRADOR"])?;
 
     ClienteService::eliminar_vehiculo(&conn, &placa, Some(id_u))
 }

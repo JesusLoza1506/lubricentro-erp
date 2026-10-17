@@ -17,6 +17,7 @@ pub struct LoginResponseDto {
     pub debe_cambiar_clave: bool,
     pub estado_sesion: String, // "NORMAL" o "CAMBIO_OBLIGATORIO"
     pub permisos: Vec<PermisoDto>,
+    pub ambiente_actual: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -76,6 +77,7 @@ pub struct SesionResumenDto {
     pub rol: String,
     pub estado_sesion: String,
     pub permisos: Vec<PermisoDto>,
+    pub ambiente_actual: String,
 }
 
 #[derive(Debug, Serialize, Deserialize)]

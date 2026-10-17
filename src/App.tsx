@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { LoginPage } from './pages/auth/LoginPage';
 import { Sidebar } from './components/Sidebar';
@@ -9,14 +9,20 @@ import { OrdenesPage } from './pages/ordenes/OrdenesPage';
 import { CambioClaveModal } from './components/CambioClaveModal';
 
 const MainApp: React.FC = () => {
-  const { usuario, estadoSesion, cargando, tienePermiso } = useAuth();
+  const { usuario, estadoSesion, cargando, tienePermiso, setHayCambiosSinGuardar } = useAuth();
   const [moduloActual, setModuloActual] = useState<string>('dashboard');
   const [placaSeleccionada, setPlacaSeleccionada] = useState<string>('');
-
-  // H05: Estado local para controlar la visibilidad del modal de cambio voluntario de clave
   const [mostrarCambioClaveModal, setMostrarCambioClaveModal] = useState<boolean>(false);
 
-  // 1. Pantalla de carga mientras se sincroniza el estado de la sesión con Rust
+  useEffect(() => {
+    if (!usuario || estadoSesion === 'SIN_SESION') {
+      setModuloActual('dashboard');
+      setPlacaSeleccionada('');
+      setMostrarCambioClaveModal(false);
+      setHayCambiosSinGuardar(false);
+    }
+  }, [usuario?.id_usuario, estadoSesion, setHayCambiosSinGuardar]);
+
   if (cargando) {
     return (
       <div
@@ -38,7 +44,6 @@ const MainApp: React.FC = () => {
     );
   }
 
-  // 2. Redirección automática si no hay sesión O si se exige cambio de contraseña
   if (estadoSesion === 'SIN_SESION' || estadoSesion === 'CAMBIO_OBLIGATORIO' || !usuario) {
     return <LoginPage />;
   }
@@ -112,7 +117,6 @@ const MainApp: React.FC = () => {
         {renderModulo()}
       </main>
 
-      {/* H05: Renderizado del modal de Cambio Voluntario */}
       {mostrarCambioClaveModal && (
         <CambioClaveModal onClose={() => setMostrarCambioClaveModal(false)} />
       )}

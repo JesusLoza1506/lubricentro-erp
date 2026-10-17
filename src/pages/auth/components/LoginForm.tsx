@@ -48,7 +48,9 @@ export const LoginForm: React.FC<LoginFormProps> = ({
 
       <form onSubmit={onSubmit}>
         <div style={{ marginBottom: '18px' }}>
-          <label style={s.label}>Usuario</label>
+          <label htmlFor="login-username" style={s.label}>
+            Usuario
+          </label>
           <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
             <User
               size={18}
@@ -56,6 +58,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({
               style={{ position: 'absolute', left: '14px', pointerEvents: 'none' }}
             />
             <input
+              id="login-username"
               ref={usuarioInputRef}
               type="text"
               disabled={isLoggingIn}
@@ -63,12 +66,15 @@ export const LoginForm: React.FC<LoginFormProps> = ({
               onChange={(e) => setUsuarioInput(e.target.value)}
               placeholder="Ej. admin"
               style={s.inputWithIcon}
+              autoComplete="username"
             />
           </div>
         </div>
 
         <div style={{ marginBottom: '22px' }}>
-          <label style={s.label}>Contraseña</label>
+          <label htmlFor="login-password" style={s.label}>
+            Contraseña
+          </label>
           <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
             <Lock
               size={18}
@@ -76,6 +82,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({
               style={{ position: 'absolute', left: '14px', pointerEvents: 'none' }}
             />
             <input
+              id="login-password"
               type={mostrarPassword ? 'text' : 'password'}
               disabled={isLoggingIn}
               value={passwordInput}
@@ -83,6 +90,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({
               placeholder="••••••••"
               maxLength={128}
               style={s.inputWithIcon}
+              autoComplete="current-password"
             />
             <button
               type="button"
@@ -90,6 +98,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({
               onClick={() => setMostrarPassword(!mostrarPassword)}
               style={s.toggleEyeBtn}
               title={mostrarPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+              aria-label={mostrarPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
             >
               {mostrarPassword ? <EyeOff size={18} /> : <Eye size={18} />}
             </button>
@@ -134,6 +143,8 @@ export const LoginForm: React.FC<LoginFormProps> = ({
             fontSize: '13px',
             cursor: isLoggingIn ? 'not-allowed' : 'pointer',
             fontWeight: '500',
+            outline: '2px solid transparent',
+            outlineOffset: '2px',
           }}
         >
           ¿Olvidaste la clave de Administrador?

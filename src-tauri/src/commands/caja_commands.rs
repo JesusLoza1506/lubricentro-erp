@@ -20,6 +20,7 @@ pub fn abrir_caja_cmd(
         AppError::Validation("Fallo al obtener estado de la base de datos".to_string())
     })?;
 
+    // Impera la sesión: sobreescribir id_usuario con el id de la sesión validada
     let user_id = session.validar_sesion_operativa(&conn)?;
     payload.id_usuario = user_id;
 
@@ -40,7 +41,8 @@ pub fn cerrar_caja_cmd(
         AppError::Validation("Fallo al obtener estado de la base de datos".to_string())
     })?;
 
-    let _user_id = session.validar_sesion_operativa(&conn)?;
+    // Validar que la sesión esté operativamente activa e inyectar el ID real del cajero/usuario
+    let user_id = session.validar_sesion_operativa(&conn)?;
 
-    CajaService::cerrar_caja(&conn, payload)
+    CajaService::cerrar_caja(&conn, payload, user_id)
 }

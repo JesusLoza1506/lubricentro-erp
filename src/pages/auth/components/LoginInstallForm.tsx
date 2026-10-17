@@ -60,45 +60,60 @@ export const LoginInstallForm: React.FC<LoginInstallFormProps> = ({
       {!codigoGenerado ? (
         <form onSubmit={onSubmit}>
           <div style={{ marginBottom: '14px' }}>
-            <label style={s.label}>Nombre Completo</label>
+            <label htmlFor="inst-nombre" style={s.label}>
+              Nombre Completo
+            </label>
             <input
+              id="inst-nombre"
               type="text"
               disabled={procesando}
               value={instNombre}
               onChange={(e) => setInstNombre(e.target.value)}
               placeholder="Ej. Administrador Principal"
               style={s.inputBox}
+              autoComplete="name"
             />
           </div>
 
           <div style={{ marginBottom: '14px' }}>
-            <label style={s.label}>Nombre de Usuario</label>
+            <label htmlFor="inst-username" style={s.label}>
+              Nombre de Usuario
+            </label>
             <input
+              id="inst-username"
               type="text"
               disabled={procesando}
               value={instUsername}
               onChange={(e) => setInstUsername(e.target.value)}
               placeholder="Ej. admin"
               style={s.inputBox}
+              autoComplete="username"
             />
           </div>
 
           <div style={{ marginBottom: '14px' }}>
-            <label style={s.label}>Contraseña</label>
+            <label htmlFor="inst-password" style={s.label}>
+              Contraseña
+            </label>
             <input
+              id="inst-password"
               type="password"
               disabled={procesando}
               value={instPassword}
               onChange={(e) => setInstPassword(e.target.value)}
-              placeholder="Mínimo 8 caracteres (letras y números)"
+              placeholder="7 a 128 caracteres (letras y números)"
               maxLength={128}
               style={s.inputBox}
+              autoComplete="new-password"
             />
           </div>
 
           <div style={{ marginBottom: '20px' }}>
-            <label style={s.label}>Confirmar Contraseña</label>
+            <label htmlFor="inst-confirm-password" style={s.label}>
+              Confirmar Contraseña
+            </label>
             <input
+              id="inst-confirm-password"
               type="password"
               disabled={procesando}
               value={instConfirmPassword}
@@ -106,6 +121,7 @@ export const LoginInstallForm: React.FC<LoginInstallFormProps> = ({
               placeholder="Repite la contraseña"
               maxLength={128}
               style={s.inputBox}
+              autoComplete="new-password"
             />
           </div>
 
@@ -132,7 +148,9 @@ export const LoginInstallForm: React.FC<LoginInstallFormProps> = ({
             recuperar el acceso de Administrador en el futuro.
           </p>
 
-          <div style={s.codeBox}>{codigoGenerado}</div>
+          <div style={s.codeBox} tabIndex={0} aria-label="Código de recuperación generado">
+            {codigoGenerado}
+          </div>
 
           <button
             type="button"

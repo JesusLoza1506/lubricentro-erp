@@ -22,6 +22,7 @@ export const LoginPage: React.FC = () => {
     iniciarSesion,
     isLoggingIn,
     appVersion,
+    ambienteActual,
     estadoSesion,
     cerrarSesion,
     completarCambioObligatorio,
@@ -63,6 +64,9 @@ export const LoginPage: React.FC = () => {
   const [exitoMsg, setExitoMsg] = useState<string | null>(null);
   const [procesando, setProcesando] = useState(false);
 
+  const esProdBD = ambienteActual.toUpperCase() === 'PRODUCCION';
+
+  // Purgado de secretos al cambiar cualquier modo/vista de pantalla
   const cambiarModo = (nuevoModo: ModoPantalla) => {
     setErrorMsg(null);
     setExitoMsg(null);
@@ -136,10 +140,14 @@ export const LoginPage: React.FC = () => {
 
     try {
       const datos = await iniciarSesion(userClean, passwordInput);
+      // Purgar inmediatamente la contraseña tras el intento de autenticación exitoso
+      setPasswordInput('');
       if (datos.estado_sesion === 'CAMBIO_OBLIGATORIO') {
         setModo('CAMBIO_OBLIGATORIO');
       }
     } catch (err: any) {
+      // Purgar secreto en caso de fallos de credenciales
+      setPasswordInput('');
       const mensaje = typeof err === 'string' ? err : err?.message || 'Credenciales inválidas.';
       setErrorMsg(mensaje);
     }
@@ -150,7 +158,7 @@ export const LoginPage: React.FC = () => {
     setErrorMsg(null);
     setExitoMsg(null);
 
-    if (!nuevaClaveOblig.trim() || !confirmClaveOblig.trim()) {
+    if (!nuevaClaveOblig || !confirmClaveOblig) {
       setErrorMsg('Todos los campos son obligatorios.');
       return;
     }
@@ -160,13 +168,14 @@ export const LoginPage: React.FC = () => {
       return;
     }
 
-    if (nuevaClaveOblig.length < 8 || nuevaClaveOblig.length > 128) {
-      setErrorMsg('La nueva contraseña debe tener entre 8 y 128 caracteres.');
+    const len = [...nuevaClaveOblig].length;
+    if (len < 7 || len > 128) {
+      setErrorMsg('La nueva contraseña debe tener entre 7 y 128 caracteres.');
       return;
     }
 
-    const tieneLetra = /[a-zA-Z]/.test(nuevaClaveOblig);
-    const tieneNumero = /[0-9]/.test(nuevaClaveOblig);
+    const tieneLetra = /\p{L}/u.test(nuevaClaveOblig);
+    const tieneNumero = /\d/.test(nuevaClaveOblig);
     if (!tieneLetra || !tieneNumero) {
       setErrorMsg('La nueva contraseña debe incluir al menos una letra y un número.');
       return;
@@ -175,8 +184,13 @@ export const LoginPage: React.FC = () => {
     setProcesando(true);
     try {
       await apiCambiarClaveObligatoria({ nueva_password: nuevaClaveOblig });
+      // Purgar variables sensibles del estado
+      setNuevaClaveOblig('');
+      setConfirmClaveOblig('');
       completarCambioObligatorio();
     } catch (err: any) {
+      setNuevaClaveOblig('');
+      setConfirmClaveOblig('');
       const mensaje =
         typeof err === 'string' ? err : err?.message || 'Error al actualizar la contraseña.';
       setErrorMsg(mensaje);
@@ -190,12 +204,7 @@ export const LoginPage: React.FC = () => {
     setErrorMsg(null);
     setExitoMsg(null);
 
-    if (
-      !instNombre.trim() ||
-      !instUsername.trim() ||
-      !instPassword.trim() ||
-      !instConfirmPassword.trim()
-    ) {
+    if (!instNombre.trim() || !instUsername.trim() || !instPassword || !instConfirmPassword) {
       setErrorMsg('Todos los campos son obligatorios.');
       return;
     }
@@ -205,13 +214,14 @@ export const LoginPage: React.FC = () => {
       return;
     }
 
-    if (instPassword.length < 8 || instPassword.length > 128) {
-      setErrorMsg('La contraseña debe tener entre 8 y 128 caracteres.');
+    const len = [...instPassword].length;
+    if (len < 7 || len > 128) {
+      setErrorMsg('La contraseña debe tener entre 7 y 128 caracteres.');
       return;
     }
 
-    const tieneLetra = /[a-zA-Z]/.test(instPassword);
-    const tieneNumero = /[0-9]/.test(instPassword);
+    const tieneLetra = /\p{L}/u.test(instPassword);
+    const tieneNumero = /\d/.test(instPassword);
     if (!tieneLetra || !tieneNumero) {
       setErrorMsg('La contraseña debe incluir al menos una letra y un número.');
       return;
@@ -224,9 +234,14 @@ export const LoginPage: React.FC = () => {
         username: instUsername.trim(),
         password: instPassword,
       });
+      // Purgar secretos tras respuesta
+      setInstPassword('');
+      setInstConfirmPassword('');
       setCodigoGenerado(res.codigo_recuperacion);
       setExitoMsg('Instalación realizada con éxito. Guarda bien tu código de recuperación.');
     } catch (err: any) {
+      setInstPassword('');
+      setInstConfirmPassword('');
       const mensaje =
         typeof err === 'string' ? err : err?.message || 'Error al realizar la instalación inicial.';
       setErrorMsg(mensaje);
@@ -246,18 +261,26 @@ export const LoginPage: React.FC = () => {
     setErrorMsg(null);
     setExitoMsg(null);
 
-    if (
-      !recUsername.trim() ||
-      !recCodigo.trim() ||
-      !recNuevaPassword.trim() ||
-      !recConfirmNuevaPassword.trim()
-    ) {
+    if (!recUsername.trim() || !recCodigo.trim() || !recNuevaPassword || !recConfirmNuevaPassword) {
       setErrorMsg('Todos los campos son obligatorios.');
       return;
     }
 
     if (recNuevaPassword !== recConfirmNuevaPassword) {
       setErrorMsg('La confirmación de la nueva contraseña no coincide.');
+      return;
+    }
+
+    const len = [...recNuevaPassword].length;
+    if (len < 7 || len > 128) {
+      setErrorMsg('La nueva contraseña debe tener entre 7 y 128 caracteres.');
+      return;
+    }
+
+    const tieneLetra = /\p{L}/u.test(recNuevaPassword);
+    const tieneNumero = /\d/.test(recNuevaPassword);
+    if (!tieneLetra || !tieneNumero) {
+      setErrorMsg('La nueva contraseña debe incluir al menos una letra y un número.');
       return;
     }
 
@@ -268,11 +291,17 @@ export const LoginPage: React.FC = () => {
         codigo_recuperacion: recCodigo.trim(),
         nueva_password: recNuevaPassword,
       });
+      // Purgar datos de contraseña ingresados
+      setRecNuevaPassword('');
+      setRecConfirmNuevaPassword('');
+      setRecCodigo('');
       setNuevoCodigoTrasRecuperar(res.codigo_recuperacion);
       setExitoMsg(
         'Acceso restablecido exitosamente. Tu nuevo código de recuperación ha sido generado.'
       );
     } catch (err: any) {
+      setRecNuevaPassword('');
+      setRecConfirmNuevaPassword('');
       const mensaje =
         typeof err === 'string'
           ? err
@@ -289,6 +318,28 @@ export const LoginPage: React.FC = () => {
 
       <div style={s.rightPanel}>
         <div style={s.card}>
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'flex-end',
+              marginBottom: '10px',
+            }}
+          >
+            <span
+              style={{
+                fontSize: '10px',
+                fontWeight: '700',
+                padding: '2px 8px',
+                borderRadius: '6px',
+                backgroundColor: !esProdBD ? 'rgba(234, 179, 8, 0.15)' : 'rgba(34, 197, 94, 0.15)',
+                color: !esProdBD ? '#FDE047' : '#86EFAC',
+                border: `1px solid ${!esProdBD ? 'rgba(234, 179, 8, 0.3)' : 'rgba(34, 197, 94, 0.3)'}`,
+              }}
+            >
+              ENTORNO: {ambienteActual.toUpperCase()}
+            </span>
+          </div>
+
           {mensajeInactividad && (
             <div
               style={{

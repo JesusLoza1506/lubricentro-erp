@@ -109,13 +109,49 @@ Las operaciones locales autorizadas están previstas para funcionar sin conexió
 
 **Descripción:**
 
+Controla el acceso a Lubricentro Gloria mediante cuentas individuales y mantiene la sesión del trabajador. Identifica su rol para habilitar los módulos y las acciones que le corresponden. Incluye la configuración del primer administrador y los flujos de cambio y recuperación de contraseña.
+
 **Funciones principales:**
+
+- **Inicio de sesión:** ingreso con usuario y contraseña, validación de credenciales y acceso al Dashboard correspondiente al rol.
+- **Primera instalación:** creación del primer administrador cuando la base no contiene cuentas y entrega de su código de recuperación.
+- **Acceso por rol:** menú y operaciones disponibles según el perfil Administrador, Mecánico o Cajero, con validaciones en el backend.
+- **Cambio de contraseña:** actualización voluntaria de la clave y cambio obligatorio al ingresar con una contraseña temporal; en este último caso se solicita la nueva clave y su confirmación.
+- **Recuperación de acceso:** recuperación administrativa mediante el código vigente y atención de las cuentas de trabajadores por un administrador autorizado, sin registro público de usuarios.
+- **Protección frente a intentos fallidos:** bloqueo temporal de Login durante 15 minutos tras cinco fallos consecutivos de una cuenta existente, con mensajes de validación y control de disponibilidad del acceso.
+- **Control de sesión:** una sesión activa por aplicación y vencimiento tras 15 minutos de inactividad; las tareas automáticas no cuentan como actividad del usuario.
+- **Cierre de sesión:** salida desde el menú, con confirmación si existe una captura modificada sin guardar; salir no cierra automáticamente la caja ni cancela trabajos registrados.
 
 **Acceso:**
 
+| Usuario                     | Alcance                                                                                                                                                |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Administrador**           | Inicio y cierre de su sesión, cambio de contraseña y recuperación administrativa con código. La gestión de otras cuentas corresponde a Administración. |
+| **Mecánico**                | Inicio y cierre de su sesión, cambio de contraseña y acceso a los módulos permitidos por su rol.                                                       |
+| **Cajero**                  | Inicio y cierre de su sesión, cambio de contraseña y acceso a los módulos permitidos por su rol.                                                       |
+| **Instalación sin cuentas** | Creación exclusiva del primer administrador; el formulario inicial deja de estar disponible cuando ya existen cuentas.                                 |
+
+Las cuentas deben estar activas y cumplir las condiciones de acceso. No se habilita el trabajo habitual hasta completar un cambio obligatorio de contraseña. La protección de contraseñas utiliza hashes Argon2id; las claves no se muestran ni se guardan como texto legible.
+
 **Captura de pantalla:**
 
+_Espacio reservado para incorporar las capturas del módulo._
+
+| Vista                             | Captura         |
+| --------------------------------- | --------------- |
+| Inicio de sesión                  | Por incorporar. |
+| Creación del primer administrador | Por incorporar. |
+| Cambio de contraseña              | Por incorporar. |
+| Recuperación de acceso            | Por incorporar. |
+
+![Pantalla de inicio de sesión](docs/images/01-login.png)
+![Recuperación de acceso](docs/images/01-login-recuperacion.png)
+
 **Estado:**
+
+![Avance del módulo Login y Sesión](https://img.shields.io/badge/Avance_estimado-90%25-0F766E?style=flat-square)
+
+**Desarrollo completado aproximadamente al 90 %.** El módulo se encuentra en fase de ajustes finales, pendiente de mejoras menores y validaciones complementarias antes de su cierre definitivo. Este porcentaje expresa una estimación del avance de implementación, no la cobertura de pruebas.
 
 ---
 

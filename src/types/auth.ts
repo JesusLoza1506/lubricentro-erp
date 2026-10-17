@@ -17,6 +17,7 @@ export interface UsuarioSesion {
   debe_cambiar_clave: boolean;
   estado_sesion: EstadoSesionEnum;
   permisos: PermisoModulo[];
+  ambiente_actual?: string;
 }
 
 export interface SesionResumenDto {
@@ -26,6 +27,7 @@ export interface SesionResumenDto {
   rol: string;
   estado_sesion: EstadoSesionEnum;
   permisos: PermisoModulo[];
+  ambiente_actual?: string;
 }
 
 export interface LoginPayload {

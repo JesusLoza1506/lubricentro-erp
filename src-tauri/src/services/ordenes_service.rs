@@ -149,6 +149,7 @@ impl OrdenesService {
     pub fn crear_orden_trabajo(
         conn: &mut Connection,
         req: CrearOrdenTrabajoDto,
+        id_creador: i64, // Inyección de identidad real
     ) -> Result<OrdenTrabajoHistorialDto, AppError> {
         let placa = req.placa.trim().to_uppercase();
 
@@ -219,7 +220,7 @@ impl OrdenesService {
             "INSERT INTO ordenes_trabajo (
                 id_operacion, codigo_ot, id_vehiculo, id_cliente_atendido, placa_snapshot, cliente_snapshot,
                 id_creador, id_mecanico, id_zanja_prevista, estado, kilometraje_ingreso, pedido_cliente, tipo_aceite, fecha_ingreso
-            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, 1, ?7, ?8, 'EN_ESPERA', ?9, ?10, ?11, datetime('now', '-5 hours'))",
+            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, 'EN_ESPERA', ?10, ?11, ?12, datetime('now', '-5 hours'))",
             params![
                 id_operacion,
                 codigo_ot,
@@ -227,6 +228,7 @@ impl OrdenesService {
                 id_cliente_atendido,
                 placa,
                 cliente_snapshot,
+                id_creador, // Remplazado literal 1 por el id real
                 req.id_mecanico,
                 req.zanja,
                 req.kilometraje_ingreso,
@@ -485,7 +487,7 @@ impl OrdenesService {
                 (ds.precio_unitario_cent / 100.0) AS precio_unitario,
                 ((ds.cantidad * ds.precio_unitario_cent) / 100.0) AS subtotal
              FROM detalle_ot_servicios ds
-             WHERE ds.id_ot = ?1 AND ds.vigente = 1",
+             WHERE ds.id_ot = ?1",
         )?;
 
         let iter_serv = stmt_serv.query_map([id_ot], |row| {
@@ -827,7 +829,7 @@ impl OrdenesService {
         }
 
         conn.execute(
-            "UPDATE detalle_ot_servicios SET vigente = 0 WHERE id_detalle = ?1 AND id_ot = ?2",
+            "DELETE FROM detalle_ot_servicios WHERE id_detalle = ?1 AND id_ot = ?2",
             params![id_detalle, id_ot],
         )?;
 

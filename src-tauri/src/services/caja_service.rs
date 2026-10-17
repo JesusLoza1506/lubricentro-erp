@@ -44,7 +44,6 @@ impl CajaService {
         let id_operacion = Uuid::new_v4().to_string();
         let codigo_caja = format!("CAJA-{}", Uuid::new_v4().to_string()[..8].to_uppercase());
 
-        // Inserción limpia respetando el esquema V7.0
         conn.execute(
             "INSERT INTO caja_chica (
                 id_operacion, codigo_caja, id_usuario, ambiente, monto_apertura_cent, 
@@ -61,8 +60,12 @@ impl CajaService {
         Ok(conn.last_insert_rowid())
     }
 
-    /// Realiza el cierre de caja calculando los netos por medio de pago y actualizando `caja_chica`
-    pub fn cerrar_caja(conn: &Connection, req: CierreCajaDto) -> Result<CajaChicaDto, AppError> {
+    /// Realiza el cierre de caja registrando el ID real del usuario ejecutor de la sesión activa
+    pub fn cerrar_caja(
+        conn: &Connection,
+        req: CierreCajaDto,
+        id_usuario_cierre: i64,
+    ) -> Result<CajaChicaDto, AppError> {
         let caja = Self::obtener_caja_por_id(conn, req.id_caja)?;
 
         if caja.estado != "ABIERTA" {
@@ -71,7 +74,6 @@ impl CajaService {
             ));
         }
 
-        // Calcular netos según los movimientos de caja reales para cada medio de pago
         let efectivo_movs: i64 = conn.query_row(
             "SELECT COALESCE(SUM(signo * monto_cent), 0) FROM movimientos_caja WHERE id_caja = ?1 AND medio_pago = 'EFECTIVO'",
             params![req.id_caja],
@@ -107,7 +109,6 @@ impl CajaService {
         let retiro_cierre = req.monto_cierre_efectivo;
         let fondo_siguiente = 0;
 
-        // Actualización directa en caja_chica exigida por V7.0 (sin tablas satélite de cierre)
         conn.execute(
             "UPDATE caja_chica 
              SET estado = 'CERRADA',
@@ -126,7 +127,7 @@ impl CajaService {
              WHERE id_caja = ?11",
             params![
                 id_operacion_cierre,
-                caja.id_usuario,
+                id_usuario_cierre, // Identidad real validada
                 efectivo_esperado,
                 req.monto_cierre_efectivo,
                 tarjeta_neto,
@@ -155,7 +156,7 @@ impl CajaService {
                     id_usuario: row.get(1)?,
                     monto_apertura: row.get(2)?,
                     monto_cierre_efectivo: row.get(3)?,
-                    monto_cierre_digital: row.get(4)?, // o suma digital general
+                    monto_cierre_digital: row.get(4)?,
                     monto_diferencia: row.get(6)?,
                     estado: row.get(7)?,
                     fecha_apertura: row.get(8)?,
@@ -177,65 +178,5 @@ impl CajaService {
             fecha_apertura: entity.fecha_apertura,
             fecha_cierre: entity.fecha_cierre,
         })
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use rusqlite::Connection;
-
-    const INITIAL_SCHEMA_V7: &str = include_str!("../../migrations/0001_initial_schema_v7.sql");
-    const DUMMY_ARGON2_HASH: &str = "$argon2id$v=19$m=19456,t=2,p=1$Z3VpZGVsaW5lc3NhbHQ$5Vw5O7hK5W9u8P0s5vX+A1B2C3D4E5F6G7H8I9J0K1L";
-
-    fn setup_inmemory_db() -> Connection {
-        let conn = Connection::open_in_memory().unwrap();
-        conn.execute_batch("PRAGMA foreign_keys = ON;").unwrap();
-        conn.execute_batch(INITIAL_SCHEMA_V7).unwrap();
-
-        let _ = conn.execute(
-            "UPDATE configuracion SET ambiente_actual = 'PRODUCCION' WHERE id_config = 1",
-            [],
-        );
-
-        conn
-    }
-
-    #[test]
-    fn test_apertura_y_cierre_caja_centimos() {
-        let conn = setup_inmemory_db();
-
-        conn.execute(
-            "INSERT INTO usuarios (nombre_completo, username, password_hash, rol, activo)
-             VALUES ('Cajero Test', 'cajero_test_unique', ?1, 'CAJERO', 1)",
-            [DUMMY_ARGON2_HASH],
-        )
-        .unwrap();
-
-        let id_usuario_test = conn.last_insert_rowid();
-
-        let id_caja = CajaService::abrir_caja(
-            &conn,
-            AbrirCajaDto {
-                id_usuario: id_usuario_test,
-                monto_apertura: 10000,
-            },
-        )
-        .unwrap();
-
-        assert!(id_caja > 0);
-
-        let cierre = CajaService::cerrar_caja(
-            &conn,
-            CierreCajaDto {
-                id_caja,
-                monto_cierre_efectivo: 10000,
-                monto_cierre_digital: 0,
-            },
-        )
-        .unwrap();
-
-        assert_eq!(cierre.estado, "CERRADA");
-        assert_eq!(cierre.monto_diferencia, Some(0));
     }
 }

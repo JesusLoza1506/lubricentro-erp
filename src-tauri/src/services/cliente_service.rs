@@ -146,6 +146,7 @@ impl ClienteService {
     pub fn buscar_cliente_por_documento(
         conn: &Connection,
         documento: &str,
+        rol_ejecutor: Option<&str>,
     ) -> Result<ClienteDto, AppError> {
         let doc_clean = documento.trim();
         let mut stmt = conn.prepare(
@@ -173,7 +174,17 @@ impl ClienteService {
                 ))
             })?;
 
-        Ok(ClienteDto::from(entity))
+        let mut dto = ClienteDto::from(entity);
+
+        // Ocultar teléfonos y direcciones privadas si el ejecutor es MECANICO
+        if let Some(r) = rol_ejecutor {
+            if r.to_uppercase() == "MECANICO" {
+                dto.telefono = None;
+                dto.direccion = None;
+            }
+        }
+
+        Ok(dto)
     }
 
     pub fn registrar_vehiculo(
@@ -482,6 +493,7 @@ impl ClienteService {
     pub fn obtener_vehiculo_por_placa(
         conn: &Connection,
         placa: &str,
+        rol_ejecutor: Option<&str>,
     ) -> Result<VehiculoCompletoDto, AppError> {
         let placa_clean = placa.trim().to_uppercase();
         let mut stmt = conn.prepare(
@@ -493,7 +505,7 @@ impl ClienteService {
              WHERE v.placa = ?1 AND v.activo = 1",
         )?;
 
-        let result = stmt
+        let mut dto = stmt
             .query_row([&placa_clean], |row| {
                 let id_cliente: i64 = row.get(1)?;
                 let tipo_doc: Option<String> = row.get(8)?;
@@ -535,14 +547,27 @@ impl ClienteService {
                 ))
             })?;
 
-        Ok(result)
+        // Filtrar datos sensibles si el ejecutor es MECANICO
+        if let Some(r) = rol_ejecutor {
+            if r.to_uppercase() == "MECANICO" {
+                dto.telefono_cliente = None;
+                dto.direccion_cliente = None;
+                if let Some(ref mut c) = dto.cliente {
+                    c.telefono = None;
+                    c.direccion = None;
+                }
+            }
+        }
+
+        Ok(dto)
     }
 
     pub fn obtener_ficha_vehicular_completa(
         conn: &Connection,
         placa: &str,
+        rol_ejecutor: Option<&str>,
     ) -> Result<FichaVehicularCompletaDto, AppError> {
-        let vehiculo = Self::obtener_vehiculo_por_placa(conn, placa)?;
+        let vehiculo = Self::obtener_vehiculo_por_placa(conn, placa, rol_ejecutor)?;
         let historial = OrdenesService::obtener_historial_por_placa(conn, placa)?;
 
         Ok(FichaVehicularCompletaDto {

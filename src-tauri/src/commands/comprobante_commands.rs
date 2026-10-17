@@ -10,7 +10,7 @@ use tauri::State;
 pub fn emitir_comprobante_cmd(
     db_state: State<'_, Mutex<Connection>>,
     session_state: State<'_, Mutex<SessionState>>,
-    payload: EmitirComprobanteDto,
+    mut payload: EmitirComprobanteDto,
 ) -> Result<ComprobanteDto, AppError> {
     let mut session = session_state
         .lock()
@@ -20,7 +20,9 @@ pub fn emitir_comprobante_cmd(
         AppError::Validation("Fallo al obtener estado de la base de datos".to_string())
     })?;
 
-    let _id_usuario = session.validar_sesion_operativa(&conn)?;
+    // Impera la sesión: Extracción estricta del ID del cajero/usuario real
+    let id_usuario_ejecutor = session.validar_sesion_operativa(&conn)?;
+    payload.id_cajero = id_usuario_ejecutor;
 
     ComprobanteService::emitir_comprobante(&conn, payload)
 }

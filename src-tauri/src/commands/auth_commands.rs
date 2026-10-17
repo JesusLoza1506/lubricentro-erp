@@ -12,11 +12,18 @@ use rusqlite::Connection;
 use std::sync::Mutex;
 use tauri::State;
 
+fn obtener_ambiente_actual(conn: &Connection) -> String {
+    conn.query_row(
+        "SELECT ambiente_actual FROM configuracion LIMIT 1",
+        [],
+        |row| row.get(0),
+    )
+    .unwrap_or_else(|_| "PRODUCCION".to_string())
+}
+
 #[tauri::command]
 pub fn requiere_instalacion(db_state: State<'_, Mutex<Connection>>) -> Result<bool, AppError> {
-    let conn = db_state.lock().map_err(|_| {
-        AppError::Validation("Fallo al obtener estado de la base de datos".to_string())
-    })?;
+    let conn = db_state.lock().map_err(|_| AppError::DbLock)?;
 
     let count: i64 = conn.query_row("SELECT COUNT(*) FROM usuarios", [], |row| row.get(0))?;
     Ok(count == 0)
@@ -28,29 +35,25 @@ pub fn login_usuario(
     session_state: State<'_, Mutex<SessionState>>,
     req: LoginRequestDto,
 ) -> Result<LoginResponseDto, AppError> {
-    let mut session = session_state
-        .lock()
-        .map_err(|_| AppError::Validation("Fallo al obtener estado de sesión".to_string()))?;
+    let mut session = session_state.lock().map_err(|_| AppError::DbLock)?;
 
-    if !session.verificar_inactividad() {
-        return Err(AppError::Validation(
-            "Ya existe una sesión activa en el sistema. Cierre la sesión actual antes de ingresar."
-                .to_string(),
-        ));
+    let conn = db_state.lock().map_err(|_| AppError::DbLock)?;
+
+    if !session.verificar_inactividad_con_auditoria(Some(&conn)) {
+        return Err(AppError::SessionActive);
     }
 
-    let conn = db_state.lock().map_err(|_| {
-        AppError::Validation("Fallo al obtener estado de la base de datos".to_string())
-    })?;
-
-    let res = AuthService::login(&conn, req)?;
+    let (mut res, usuario_version) = AuthService::login(&conn, req)?;
 
     session.abrir_sesion(
         res.id_usuario,
+        usuario_version,
         res.username.clone(),
         res.rol.clone(),
         res.debe_cambiar_clave,
     );
+
+    res.ambiente_actual = obtener_ambiente_actual(&conn);
 
     Ok(res)
 }
@@ -60,9 +63,7 @@ pub fn instalacion_inicial(
     db_state: State<'_, Mutex<Connection>>,
     req: InstalacionInicialRequestDto,
 ) -> Result<InstalacionInicialResponseDto, AppError> {
-    let mut conn = db_state.lock().map_err(|_| {
-        AppError::Validation("Fallo al obtener estado de la base de datos".to_string())
-    })?;
+    let mut conn = db_state.lock().map_err(|_| AppError::DbLock)?;
 
     AuthService::instalacion_inicial(&mut conn, req)
 }
@@ -75,9 +76,7 @@ pub fn recuperar_acceso_admin(
 ) -> Result<InstalacionInicialResponseDto, AppError> {
     let mut session = session_state.lock().ok();
 
-    let mut conn = db_state.lock().map_err(|_| {
-        AppError::Validation("Fallo al obtener estado de la base de datos".to_string())
-    })?;
+    let mut conn = db_state.lock().map_err(|_| AppError::DbLock)?;
 
     let res = AuthService::recuperar_acceso_admin(&mut conn, req)?;
 
@@ -93,22 +92,22 @@ pub fn obtener_sesion(
     db_state: State<'_, Mutex<Connection>>,
     session_state: State<'_, Mutex<SessionState>>,
 ) -> Result<SesionResumenDto, AppError> {
-    let mut session = session_state
-        .lock()
-        .map_err(|_| AppError::Validation("Fallo al obtener estado de sesión".to_string()))?;
+    let mut session = session_state.lock().map_err(|_| AppError::DbLock)?;
 
-    if session.verificar_inactividad() {
+    let conn = db_state.lock().map_err(|_| AppError::DbLock)?;
+
+    if session.verificar_inactividad_con_auditoria(Some(&conn)) {
         return Err(AppError::NoAutenticado);
     }
 
     let id_usuario = session.usuario_id.ok_or(AppError::NoAutenticado)?;
     let estado_str = session.estado_sesion.as_str().to_string();
 
-    let conn = db_state.lock().map_err(|_| {
-        AppError::Validation("Fallo al obtener estado de la base de datos".to_string())
-    })?;
+    let mut res =
+        AuthService::obtener_usuario_sesion(&conn, &mut session, id_usuario, &estado_str)?;
+    res.ambiente_actual = obtener_ambiente_actual(&conn);
 
-    AuthService::obtener_usuario_sesion(&conn, &mut session, id_usuario, &estado_str)
+    Ok(res)
 }
 
 #[tauri::command]
@@ -117,28 +116,24 @@ pub fn cambiar_clave_obligatoria(
     session_state: State<'_, Mutex<SessionState>>,
     req: CambiarClaveObligatoriaRequestDto,
 ) -> Result<(), AppError> {
-    let mut session = session_state
-        .lock()
-        .map_err(|_| AppError::Validation("Fallo al obtener estado de sesión".to_string()))?;
+    let mut session = session_state.lock().map_err(|_| AppError::DbLock)?;
 
-    if session.verificar_inactividad() {
+    let conn = db_state.lock().map_err(|_| AppError::DbLock)?;
+
+    if session.verificar_inactividad_con_auditoria(Some(&conn)) {
         return Err(AppError::NoAutenticado);
     }
 
-    // H02: Validar que la sesión esté explícitamente retenida en estado de cambio obligatorio
     if session.estado_sesion != crate::services::session_manager::EstadoSesion::CambioObligatorio {
-        return Err(AppError::Validation(
-            "Acceso denegado: El cambio obligatorio de clave solo está permitido para sesiones en flujo de cambio de clave.".to_string(),
+        return Err(AppError::AccessDenied(
+            "El cambio obligatorio de clave solo está permitido para sesiones en flujo de cambio de clave.".to_string(),
         ));
     }
 
     let id_usuario = session.usuario_id.ok_or(AppError::NoAutenticado)?;
 
-    let conn = db_state.lock().map_err(|_| {
-        AppError::Validation("Fallo al obtener estado de la base de datos".to_string())
-    })?;
-
-    AuthService::cambiar_clave_obligatoria(&conn, &mut session, id_usuario, req)?;
+    let mut conn_mut = conn;
+    AuthService::cambiar_clave_obligatoria(&mut conn_mut, &mut session, id_usuario, req)?;
 
     Ok(())
 }
@@ -149,32 +144,32 @@ pub fn cambiar_clave_voluntaria(
     session_state: State<'_, Mutex<SessionState>>,
     req: CambiarClaveVoluntariaRequestDto,
 ) -> Result<(), AppError> {
-    let mut session = session_state
-        .lock()
-        .map_err(|_| AppError::Validation("Fallo al obtener estado de sesión".to_string()))?;
+    let mut session = session_state.lock().map_err(|_| AppError::DbLock)?;
 
-    if session.verificar_inactividad() {
+    let conn = db_state.lock().map_err(|_| AppError::DbLock)?;
+
+    if session.verificar_inactividad_con_auditoria(Some(&conn)) {
         return Err(AppError::NoAutenticado);
     }
 
     let id_usuario = session.usuario_id.ok_or(AppError::NoAutenticado)?;
 
-    let conn = db_state.lock().map_err(|_| {
-        AppError::Validation("Fallo al obtener estado de la base de datos".to_string())
-    })?;
-
-    AuthService::cambiar_clave_voluntaria(&conn, &mut session, id_usuario, req)?;
+    let mut conn_mut = conn;
+    AuthService::cambiar_clave_voluntaria(&mut conn_mut, &mut session, id_usuario, req)?;
 
     Ok(())
 }
 
 #[tauri::command]
-pub fn registrar_actividad(session_state: State<'_, Mutex<SessionState>>) -> Result<(), AppError> {
-    let mut session = session_state
-        .lock()
-        .map_err(|_| AppError::Validation("Fallo al obtener estado de sesión".to_string()))?;
+pub fn registrar_actividad(
+    db_state: State<'_, Mutex<Connection>>,
+    session_state: State<'_, Mutex<SessionState>>,
+) -> Result<(), AppError> {
+    let mut session = session_state.lock().map_err(|_| AppError::DbLock)?;
 
-    if session.verificar_inactividad() {
+    let conn = db_state.lock().map_err(|_| AppError::DbLock)?;
+
+    if session.verificar_inactividad_con_auditoria(Some(&conn)) {
         return Err(AppError::NoAutenticado);
     }
 
@@ -187,9 +182,7 @@ pub fn cerrar_sesion(
     db_state: State<'_, Mutex<Connection>>,
     session_state: State<'_, Mutex<SessionState>>,
 ) -> Result<(), AppError> {
-    let mut session = session_state
-        .lock()
-        .map_err(|_| AppError::Validation("Fallo al obtener estado de sesión".to_string()))?;
+    let mut session = session_state.lock().map_err(|_| AppError::DbLock)?;
 
     if let (Some(id), Some(usr), Some(rol)) = (
         session.usuario_id,
@@ -211,13 +204,9 @@ pub fn reautenticar(
     session_state: State<'_, Mutex<SessionState>>,
     req: ReautenticarRequestDto,
 ) -> Result<String, AppError> {
-    let mut session = session_state
-        .lock()
-        .map_err(|_| AppError::Validation("Fallo al obtener estado de sesión".to_string()))?;
+    let mut session = session_state.lock().map_err(|_| AppError::DbLock)?;
 
-    let conn = db_state.lock().map_err(|_| {
-        AppError::Validation("Fallo al obtener estado de la base de datos".to_string())
-    })?;
+    let conn = db_state.lock().map_err(|_| AppError::DbLock)?;
 
     let id_usuario = session.validar_sesion_operativa(&conn)?;
 
@@ -238,7 +227,7 @@ pub fn reautenticar(
     ).map_err(|_| AppError::NoAutenticado)?;
 
     if debe_cambiar_clave == 1 {
-        return Err(AppError::Validation(
+        return Err(AppError::AccessDenied(
             "Debe cambiar su contraseña antes de realizar esta operación.".to_string(),
         ));
     }
@@ -274,7 +263,13 @@ pub fn reautenticar(
     session.limpiar_fallos_verificacion_admin(id_usuario);
 
     let token = format!("auth_{}", uuid::Uuid::new_v4().simple());
-    session.guardar_autorizacion(token.clone(), id_usuario, req.accion, req.referencia);
+    session.guardar_autorizacion(
+        token.clone(),
+        id_usuario,
+        id_usuario,
+        req.accion,
+        req.referencia,
+    );
 
     Ok(token)
 }
@@ -285,24 +280,41 @@ pub fn autorizar_descuento(
     session_state: State<'_, Mutex<SessionState>>,
     req: AutorizarDescuentoRequestDto,
 ) -> Result<String, AppError> {
-    let mut session = session_state
-        .lock()
-        .map_err(|_| AppError::Validation("Fallo al obtener estado de sesión".to_string()))?;
+    let mut session = session_state.lock().map_err(|_| AppError::DbLock)?;
 
-    let conn = db_state.lock().map_err(|_| {
-        AppError::Validation("Fallo al obtener estado de la base de datos".to_string())
-    })?;
+    let conn = db_state.lock().map_err(|_| AppError::DbLock)?;
 
-    let _ = session.validar_sesion_operativa(&conn)?;
+    let id_cajero = session.validar_sesion_operativa(&conn)?;
 
     let id_admin = AuthService::autorizar_descuento(&conn, &mut session, req.clone())?;
 
     let token = format!("desc_{}", uuid::Uuid::new_v4().simple());
+
+    // Vincula autorizante_id (admin) con solicitante_id (cajero)
     session.guardar_autorizacion(
         token.clone(),
         id_admin,
+        id_cajero,
         "DESCUENTO_POS".to_string(),
-        req.referencia_venta,
+        req.referencia_venta.clone(),
+    );
+
+    // Registro de auditoría transaccional
+    let username_cajero = session.username.as_deref();
+    let rol_cajero = session.rol.as_deref();
+    let _ = AuditoriaService::registrar_v5(
+        &conn,
+        Some(id_cajero),
+        "USUARIO",
+        username_cajero,
+        rol_cajero,
+        Some(id_admin),
+        "POS",
+        "AUTORIZAR_DESCUENTO",
+        Some("ventas"),
+        Some(&req.referencia_venta),
+        Some(&format!("Descuento de {} bp autorizado", req.descuento_bp)),
+        "OK",
     );
 
     Ok(token)

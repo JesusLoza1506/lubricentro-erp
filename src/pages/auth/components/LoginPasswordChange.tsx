@@ -21,6 +21,13 @@ export const LoginPasswordChange: React.FC<LoginPasswordChangeProps> = ({
   onSubmit,
   onCerrarSesion,
 }) => {
+  const handleCerrarSesionLimpio = () => {
+    // Purga de campos al cancelar/cerrar sesión
+    setNuevaClaveOblig('');
+    setConfirmClaveOblig('');
+    onCerrarSesion();
+  };
+
   return (
     <>
       <div style={{ marginBottom: '24px' }}>
@@ -41,21 +48,28 @@ export const LoginPasswordChange: React.FC<LoginPasswordChangeProps> = ({
 
       <form onSubmit={onSubmit}>
         <div style={{ marginBottom: '14px' }}>
-          <label style={s.label}>Nueva Contraseña</label>
+          <label htmlFor="oblig-nueva-password" style={s.label}>
+            Nueva Contraseña
+          </label>
           <input
+            id="oblig-nueva-password"
             type="password"
             disabled={procesando}
             value={nuevaClaveOblig}
             onChange={(e) => setNuevaClaveOblig(e.target.value)}
-            placeholder="Mínimo 8 caracteres (letras y números)"
+            placeholder="7 a 128 caracteres (letras y números)"
             maxLength={128}
             style={s.inputBox}
+            autoComplete="new-password"
           />
         </div>
 
         <div style={{ marginBottom: '20px' }}>
-          <label style={s.label}>Confirmar Nueva Contraseña</label>
+          <label htmlFor="oblig-confirm-password" style={s.label}>
+            Confirmar Nueva Contraseña
+          </label>
           <input
+            id="oblig-confirm-password"
             type="password"
             disabled={procesando}
             value={confirmClaveOblig}
@@ -63,6 +77,7 @@ export const LoginPasswordChange: React.FC<LoginPasswordChangeProps> = ({
             placeholder="Repite la nueva contraseña"
             maxLength={128}
             style={s.inputBox}
+            autoComplete="new-password"
           />
         </div>
 
@@ -73,7 +88,7 @@ export const LoginPasswordChange: React.FC<LoginPasswordChangeProps> = ({
         <button
           type="button"
           disabled={procesando}
-          onClick={onCerrarSesion}
+          onClick={handleCerrarSesionLimpio}
           style={{
             ...s.secondaryButton,
             display: 'flex',

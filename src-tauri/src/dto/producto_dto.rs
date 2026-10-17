@@ -143,6 +143,6 @@ mod tests {
         assert!(!json_salida.contains("margen"));
         assert_eq!(dto.precio_venta, 2800);
         assert_eq!(dto.nombre, "Aceite Mobil Super 3000");
-        assert_eq!(dto.es_critico, false);
+        assert!(!dto.es_critico);
     }
 }
