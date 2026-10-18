@@ -245,13 +245,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     cursor: 'pointer',
                     textAlign: 'left',
                     transition: 'all 0.2s ease',
-                    outline: 'none',
-                  }}
-                  onFocus={(e) => {
-                    e.currentTarget.style.boxShadow = '0 0 0 2px #38BDF8';
-                  }}
-                  onBlur={(e) => {
-                    e.currentTarget.style.boxShadow = 'none';
                   }}
                 >
                   <Icon size={18} color={esActivo ? '#FFFFFF' : '#94A3B8'} />
@@ -316,13 +309,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   fontSize: '11px',
                   fontWeight: '600',
                   transition: 'all 0.2s ease',
-                  outline: 'none',
-                }}
-                onFocus={(e) => {
-                  e.currentTarget.style.boxShadow = '0 0 0 2px #38BDF8';
-                }}
-                onBlur={(e) => {
-                  e.currentTarget.style.boxShadow = 'none';
                 }}
               >
                 <KeyRound size={13} />
@@ -345,13 +331,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
               cursor: 'pointer',
               fontSize: '13px',
               fontWeight: '600',
-              outline: 'none',
-            }}
-            onFocus={(e) => {
-              e.currentTarget.style.boxShadow = '0 0 0 2px #EF4444';
-            }}
-            onBlur={(e) => {
-              e.currentTarget.style.boxShadow = 'none';
             }}
           >
             <LogOut size={16} />

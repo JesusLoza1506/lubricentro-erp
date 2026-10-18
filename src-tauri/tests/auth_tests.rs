@@ -1,6 +1,7 @@
 use rusqlite::Connection;
 use std::time::{Duration, Instant};
 
+use lubricentro_erp_lib::dto::comprobante_dto::EmitirComprobanteDto;
 use lubricentro_erp_lib::dto::usuario_dto::{
     AutorizarDescuentoRequestDto, CambiarClaveObligatoriaRequestDto,
     CambiarClaveVoluntariaRequestDto, InstalacionInicialRequestDto, LoginRequestDto,
@@ -8,6 +9,7 @@ use lubricentro_erp_lib::dto::usuario_dto::{
 };
 use lubricentro_erp_lib::errors::AppError;
 use lubricentro_erp_lib::services::auth_service::AuthService;
+use lubricentro_erp_lib::services::comprobante_service::ComprobanteService;
 use lubricentro_erp_lib::services::session_manager::{
     EstadoSesion, IntentoVerificacionAdmin, SessionState,
 };
@@ -15,17 +17,11 @@ use lubricentro_erp_lib::services::session_manager::{
 /// Carga en tiempo de compilación el esquema SQL oficial V7 desde el archivo de migración físico
 const INITIAL_SCHEMA_V7: &str = include_str!("../migrations/0001_initial_schema_v7.sql");
 
-/// Inicializa una base de datos SQLite en memoria ejecutando directamente la migración oficial V7.0
 fn setup_inmemory_db_v7() -> Connection {
     let conn = Connection::open_in_memory().unwrap();
-
-    // Activar soporte de claves foráneas
     conn.execute_batch("PRAGMA foreign_keys = ON;").unwrap();
-
-    // Ejecutar el script DDL de la migración oficial
     conn.execute_batch(INITIAL_SCHEMA_V7).unwrap();
 
-    // Garantizar que la fila inicial de configuración esté presente para las pruebas
     let count_config: i64 = conn
         .query_row("SELECT COUNT(*) FROM configuracion", [], |r| r.get(0))
         .unwrap_or(0);
@@ -39,7 +35,7 @@ fn setup_inmemory_db_v7() -> Connection {
 }
 
 // =========================================================================
-// BLOQUE 1: Argon2id y Hash Señuelo (TC-LOG-01 y TC-LOG-02)
+// BLOQUE 1: Argon2id, Hash Señuelo y Validaciones Frontera
 // =========================================================================
 
 #[test]
@@ -57,6 +53,29 @@ fn test_tc_log_02_dummy_hash_timing_attack_protection() {
     let dummy_hash = "$argon2id$v=19$m=19456,t=2,p=1$Z3VpZGVsaW5lc3NhbHQ$5Vw5O7hK5W9u8P0s5vX+A1B2C3D4E5F6G7H8I9J0K1L";
     let resultado = AuthService::verify_password("CualquierPassword", dummy_hash);
     assert!(!resultado);
+}
+
+#[test]
+fn test_fronteras_politica_password_7_8_128_129() {
+    let uname = "testuser";
+
+    // 7 caracteres (Inválido)
+    let p7 = "Aa12345";
+    assert!(AuthService::validar_politica_password(p7, uname).is_err());
+
+    // 8 caracteres (Válido)
+    let p8 = "Aa123456";
+    assert!(AuthService::validar_politica_password(p8, uname).is_ok());
+
+    // 128 caracteres (Válido)
+    let p128 = format!("Aa1{}", "x".repeat(125));
+    assert_eq!(p128.chars().count(), 128);
+    assert!(AuthService::validar_politica_password(&p128, uname).is_ok());
+
+    // 129 caracteres (Inválido)
+    let p129 = format!("Aa1{}", "x".repeat(126));
+    assert_eq!(p129.chars().count(), 129);
+    assert!(AuthService::validar_politica_password(&p129, uname).is_err());
 }
 
 // =========================================================================
@@ -240,7 +259,6 @@ fn test_tc_log_05_b_rechazar_sesion_temporal_anterior_a_restablecimiento() {
 
     session.abrir_sesion(10, 1, "tempuser".to_string(), "CAJERO".to_string(), true);
 
-    // Se restablece la cuenta externamente incrementando 'version' a 2 en la BD
     conn.execute(
         "UPDATE usuarios SET version = version + 1 WHERE id_usuario = 10",
         [],
@@ -261,7 +279,7 @@ fn test_tc_log_05_b_rechazar_sesion_temporal_anterior_a_restablecimiento() {
 }
 
 // =========================================================================
-// BLOQUE 5: Verificaciones Administrativas e Pausas (RB03 / RB08)
+// BLOQUE 5: Verificaciones Administrativas y Pausas (RB03 / RB08)
 // =========================================================================
 
 #[test]
@@ -302,11 +320,12 @@ fn test_tc_log_06_b_reiniciar_pausa_admin_al_vencer() {
 }
 
 // =========================================================================
-// BLOQUE 6: Inactividad y Autorización Vincular en Origen (RF-LOG-06 / RB04 / Punto 10)
+// BLOQUE 6: Inactividad, Autorización Vincular y Operaciones Ficticias
 // =========================================================================
 
 #[test]
 fn test_tc_log_07_inactividad_15_minutos_y_vinculacion_origen_single_use() {
+    let conn = setup_inmemory_db_v7();
     let mut session = SessionState::new();
     let id_cajero = 10;
     let id_admin = 1;
@@ -320,7 +339,8 @@ fn test_tc_log_07_inactividad_15_minutos_y_vinculacion_origen_single_use() {
     );
 
     session.ultima_actividad = Instant::now() - Duration::from_secs(901);
-    assert!(session.verificar_inactividad());
+
+    assert!(session.verificar_inactividad_con_auditoria(Some(&conn)));
     assert_eq!(session.estado_sesion, EstadoSesion::SinSesion);
 
     session.abrir_sesion(
@@ -332,7 +352,6 @@ fn test_tc_log_07_inactividad_15_minutos_y_vinculacion_origen_single_use() {
     );
     let token = "desc_token_123".to_string();
 
-    // Guardar token vinculando autorizante (1) con solicitante (id_cajero = 10)
     session.guardar_autorizacion(
         token.clone(),
         id_admin,
@@ -341,17 +360,101 @@ fn test_tc_log_07_inactividad_15_minutos_y_vinculacion_origen_single_use() {
         "REF-1001".to_string(),
     );
 
-    // Intentar consumir desde otro usuario/solicitante debe ser rechazado
     let res_impostor = session.consumir_autorizacion(&token, 999, "DESCUENTO_POS", "REF-1001");
     assert!(res_impostor.is_err());
 
-    // Consumo legítimo por parte del cajero titular
     let res_valido = session.consumir_autorizacion(&token, id_cajero, "DESCUENTO_POS", "REF-1001");
     assert_eq!(res_valido.unwrap(), id_admin);
 
-    // Reutilización inmediata (segundo intento) debe ser rechazada (Single-Use)
     let res_reuso = session.consumir_autorizacion(&token, id_cajero, "DESCUENTO_POS", "REF-1001");
     assert!(res_reuso.is_err());
+}
+
+#[test]
+fn test_operacion_ficticia_autorizada_con_tokens() {
+    let mut session = SessionState::new();
+    let id_cajero = 15;
+    let id_admin = 2;
+
+    session.abrir_sesion(
+        id_cajero,
+        1,
+        "cajero_ficticio".to_string(),
+        "CAJERO".to_string(),
+        false,
+    );
+
+    let token = "token_ficticio_abc".to_string();
+    let accion = "ANULAR_ITEM_FICTICIO".to_string();
+    let ref_operacion = "ITEM-9988".to_string();
+
+    session.guardar_autorizacion(
+        token.clone(),
+        id_admin,
+        id_cajero,
+        accion.clone(),
+        ref_operacion.clone(),
+    );
+
+    // 1. Fallo por alteración de referencia
+    assert!(session
+        .consumir_autorizacion(&token, id_cajero, &accion, "ITEM-ALTERADO")
+        .is_err());
+
+    // 2. Consumo exitoso con datos correctos
+    let id_aut = session
+        .consumir_autorizacion(&token, id_cajero, &accion, &ref_operacion)
+        .unwrap();
+    assert_eq!(id_aut, id_admin);
+
+    // 3. Fallo por re-uso de token
+    assert!(session
+        .consumir_autorizacion(&token, id_cajero, &accion, &ref_operacion)
+        .is_err());
+}
+
+#[test]
+fn test_exigencia_turno_propio_administrador() {
+    let conn = setup_inmemory_db_v7();
+    let hash = AuthService::hash_password("AdminPass123").unwrap();
+
+    conn.execute(
+        "INSERT INTO usuarios (id_usuario, nombre_completo, username, password_hash, rol, activo) VALUES (1, 'Admin Exec', 'admin_exec', ?1, 'ADMINISTRADOR', 1)",
+        [&hash],
+    ).unwrap();
+
+    conn.execute(
+        "INSERT INTO usuarios (id_usuario, nombre_completo, username, password_hash, rol, activo) VALUES (2, 'Cajero Titular', 'cajero_titular', ?1, 'CAJERO', 1)",
+        [&hash],
+    ).unwrap();
+
+    conn.execute(
+        "INSERT INTO caja_chica (id_caja, id_operacion, codigo_caja, id_usuario, ambiente, monto_apertura_cent, estado) VALUES (1, 'op1', 'CAJA-01', 2, 'PRODUCCION', 10000, 'ABIERTA')",
+        [],
+    ).unwrap();
+
+    let payload = EmitirComprobanteDto {
+        id_caja: 1,
+        id_cajero: 1,
+        id_cliente: 1,
+        id_ot: Some(101),
+        tipo_comprobante: "BOLETA".to_string(),
+        id_serie: Some(1),
+        monto_subtotal: 1000,
+        monto_igv: 180,
+        monto_total: 1180,
+        monto_pago: 2000,
+        medio_pago: "EFECTIVO".to_string(),
+    };
+
+    let res = ComprobanteService::emitir_comprobante(&conn, payload);
+
+    assert!(res.is_err());
+    if let Err(AppError::AccessDenied(msg)) = res {
+        assert!(msg.contains("No tiene un turno de caja propio abierto"));
+    } else {
+        panic!("Se esperaba AppError::AccessDenied por falta de turno propio.");
+    }
 }
 
 // =========================================================================

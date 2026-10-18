@@ -39,7 +39,6 @@ pub fn run() {
                 ",
             );
 
-            // Registrar el estado de la conexión a la BD y el estado de sesión en memoria (V7.0)
             app.manage(Mutex::new(conn));
             app.manage(Mutex::new(SessionState::new()));
 
@@ -48,6 +47,7 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![
             // Auth & Sesión V7.0
+            obtener_ambiente_inicial,
             requiere_instalacion,
             login_usuario,
             instalacion_inicial,
@@ -59,6 +59,7 @@ pub fn run() {
             cerrar_sesion,
             reautenticar,
             autorizar_descuento,
+            probar_consumo_autorizacion_cmd,
             // Clientes & Vehículos
             registrar_cliente_cmd,
             buscar_cliente_por_doc_cmd,

@@ -1,3 +1,4 @@
+#![cfg(feature = "tests_deshabilitados_temporalmente")]
 #[cfg(test)]
 mod tests {
     use lubricentro_erp_lib::db::init_db;

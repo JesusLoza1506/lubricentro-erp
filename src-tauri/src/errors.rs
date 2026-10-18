@@ -14,7 +14,6 @@ pub enum AppError {
     SessionActive,
 }
 
-/// Mapea los errores técnicos de SQLite a mensajes amigables y seguros para el usuario final
 fn mapear_error_sqlite(err: &rusqlite::Error) -> String {
     match err {
         rusqlite::Error::SqliteFailure(_sqlite_err, Some(msg)) => {
@@ -86,6 +85,19 @@ impl Serialize for AppError {
     where
         S: serde::Serializer,
     {
-        serializer.serialize_str(&self.to_string())
+        let code = match self {
+            AppError::NoAutenticado => "NO_AUTENTICADO",
+            AppError::Auth(_) => "AUTH_ERROR",
+            AppError::AccessDenied(_) => "ACCESS_DENIED",
+            AppError::Validation(_) => "VALIDATION_ERROR",
+            AppError::PermisoDenegado => "PERMISO_DENEGADO",
+            AppError::SessionActive => "SESSION_ACTIVE",
+            AppError::DbLock => "DB_LOCK",
+            AppError::NotFound(_) => "NOT_FOUND",
+            AppError::Database(_) => "DATABASE_ERROR",
+        };
+
+        let full_str = format!("{}: {}", code, self);
+        serializer.serialize_str(&full_str)
     }
 }

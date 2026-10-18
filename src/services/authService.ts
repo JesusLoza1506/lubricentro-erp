@@ -14,8 +14,23 @@ import {
 } from '../types/auth';
 
 /**
- * Obtener versión real de la aplicación
+ * Mapeador central de errores para convertir errores provenientes de Tauri en una estructura comprensible.
+ * Refinado R7 (Punto 1 y 7): Detección por códigos numéricos/estructurados (e.g. NO_AUTENTICADO).
  */
+export const esErrorNoAutenticado = (err: unknown): boolean => {
+  if (!err) return false;
+  const msg = typeof err === 'string' ? err : (err as any)?.message || JSON.stringify(err);
+  return (
+    msg.startsWith('NO_AUTENTICADO') ||
+    msg.includes('NO_AUTENTICADO') ||
+    msg.includes('NoAutenticado') ||
+    msg.includes('Debes iniciar sesión') ||
+    msg.includes('sin sesión') ||
+    msg.includes('Sesión no válida') ||
+    msg.includes('invalidada')
+  );
+};
+
 export const apiObtenerVersionApp = async (): Promise<string> => {
   try {
     return await getVersion();
@@ -24,23 +39,18 @@ export const apiObtenerVersionApp = async (): Promise<string> => {
   }
 };
 
-/**
- * 0. Verificar si el sistema requiere instalación inicial (requiere_instalacion)
- */
+export const apiObtenerAmbienteInicial = async (): Promise<string> => {
+  return await invoke<string>('obtener_ambiente_inicial');
+};
+
 export const apiVerificarInstalacion = async (): Promise<boolean> => {
   return await invoke<boolean>('requiere_instalacion');
 };
 
-/**
- * 1. Autenticar usuario y abrir sesión en Rust (login_usuario)
- */
 export const apiLoginUsuario = async (payload: LoginPayload): Promise<UsuarioSesion> => {
   return await invoke<UsuarioSesion>('login_usuario', { req: payload });
 };
 
-/**
- * 2. Primer arranque / Instalación inicial (instalacion_inicial)
- */
 export const apiInstalacionInicial = async (
   payload: InstalacionPayload
 ): Promise<InstalacionResponseDto> => {
@@ -49,9 +59,6 @@ export const apiInstalacionInicial = async (
   });
 };
 
-/**
- * 3. Recuperar acceso de Administrador con código de instalación (recuperar_acceso_admin)
- */
 export const apiRecuperarAccesoAdmin = async (
   payload: RecuperarPayload
 ): Promise<InstalacionResponseDto> => {
@@ -60,55 +67,34 @@ export const apiRecuperarAccesoAdmin = async (
   });
 };
 
-/**
- * 4. Obtener estado de la sesión activa en memoria (obtener_sesion)
- */
 export const apiObtenerSesion = async (): Promise<SesionResumenDto> => {
   return await invoke<SesionResumenDto>('obtener_sesion');
 };
 
-/**
- * 5.a. Cambiar contraseña obligatoria (RF-LOG-03): Solo exige nueva clave y confirmación
- */
 export const apiCambiarClaveObligatoria = async (
   payload: CambiarClaveObligatoriaPayload
 ): Promise<void> => {
   await invoke<void>('cambiar_clave_obligatoria', { req: payload });
 };
 
-/**
- * 5.b. Cambiar contraseña voluntaria (RF-LOG-04): Exige clave actual, nueva y confirmación
- */
 export const apiCambiarClaveVoluntaria = async (
   payload: CambiarClaveVoluntariaPayload
 ): Promise<void> => {
   await invoke<void>('cambiar_clave_voluntaria', { req: payload });
 };
 
-/**
- * 6. Registrar interacción humana para mantener viva la sesión (registrar_actividad)
- */
-export const apiRegistrarActividad = async (): Promise<void> => {
-  await invoke<void>('registrar_actividad');
+export const apiRegistrarActividad = async (deltaMs?: number): Promise<void> => {
+  await invoke<void>('registrar_actividad', { deltaMs: deltaMs ?? null });
 };
 
-/**
- * 7. Cerrar sesión activa en Rust (cerrar_sesion)
- */
 export const apiCerrarSesion = async (): Promise<void> => {
   await invoke<void>('cerrar_sesion');
 };
 
-/**
- * 8. Reautenticar al usuario actual para operaciones sensibles (reautenticar)
- */
 export const apiReautenticar = async (payload: ReautenticarPayload): Promise<string> => {
   return await invoke<string>('reautenticar', { req: payload });
 };
 
-/**
- * 9. Autorizar un descuento de venta por un Administrador (autorizar_descuento)
- */
 export const apiAutorizarDescuento = async (
   payload: AutorizarDescuentoPayload
 ): Promise<string> => {

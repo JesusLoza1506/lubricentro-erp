@@ -133,20 +133,19 @@ export const LoginPage: React.FC = () => {
       return;
     }
 
-    if (passwordInput.length > 128) {
+    // Conteo exacto Unicode (Punto 6 R7)
+    if ([...passwordInput].length > 128) {
       setErrorMsg('La contraseña no puede exceder los 128 caracteres.');
       return;
     }
 
     try {
       const datos = await iniciarSesion(userClean, passwordInput);
-      // Purgar inmediatamente la contraseña tras el intento de autenticación exitoso
       setPasswordInput('');
       if (datos.estado_sesion === 'CAMBIO_OBLIGATORIO') {
         setModo('CAMBIO_OBLIGATORIO');
       }
     } catch (err: any) {
-      // Purgar secreto en caso de fallos de credenciales
       setPasswordInput('');
       const mensaje = typeof err === 'string' ? err : err?.message || 'Credenciales inválidas.';
       setErrorMsg(mensaje);
@@ -169,8 +168,8 @@ export const LoginPage: React.FC = () => {
     }
 
     const len = [...nuevaClaveOblig].length;
-    if (len < 7 || len > 128) {
-      setErrorMsg('La nueva contraseña debe tener entre 7 y 128 caracteres.');
+    if (len < 8 || len > 128) {
+      setErrorMsg('La nueva contraseña debe tener entre 8 y 128 caracteres.');
       return;
     }
 
@@ -184,7 +183,6 @@ export const LoginPage: React.FC = () => {
     setProcesando(true);
     try {
       await apiCambiarClaveObligatoria({ nueva_password: nuevaClaveOblig });
-      // Purgar variables sensibles del estado
       setNuevaClaveOblig('');
       setConfirmClaveOblig('');
       completarCambioObligatorio();
@@ -215,8 +213,8 @@ export const LoginPage: React.FC = () => {
     }
 
     const len = [...instPassword].length;
-    if (len < 7 || len > 128) {
-      setErrorMsg('La contraseña debe tener entre 7 y 128 caracteres.');
+    if (len < 8 || len > 128) {
+      setErrorMsg('La contraseña debe tener entre 8 y 128 caracteres.');
       return;
     }
 
@@ -234,7 +232,6 @@ export const LoginPage: React.FC = () => {
         username: instUsername.trim(),
         password: instPassword,
       });
-      // Purgar secretos tras respuesta
       setInstPassword('');
       setInstConfirmPassword('');
       setCodigoGenerado(res.codigo_recuperacion);
@@ -272,8 +269,8 @@ export const LoginPage: React.FC = () => {
     }
 
     const len = [...recNuevaPassword].length;
-    if (len < 7 || len > 128) {
-      setErrorMsg('La nueva contraseña debe tener entre 7 y 128 caracteres.');
+    if (len < 8 || len > 128) {
+      setErrorMsg('La nueva contraseña debe tener entre 8 y 128 caracteres.');
       return;
     }
 
@@ -291,7 +288,6 @@ export const LoginPage: React.FC = () => {
         codigo_recuperacion: recCodigo.trim(),
         nueva_password: recNuevaPassword,
       });
-      // Purgar datos de contraseña ingresados
       setRecNuevaPassword('');
       setRecConfirmNuevaPassword('');
       setRecCodigo('');

@@ -14,6 +14,8 @@ import {
   apiObtenerSesion,
   apiRegistrarActividad,
   apiObtenerVersionApp,
+  apiObtenerAmbienteInicial,
+  esErrorNoAutenticado,
 } from '../services/authService';
 
 interface AuthContextType {
@@ -44,11 +46,12 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [isCheckingSession, setIsCheckingSession] = useState<boolean>(true);
   const [isLoggingIn, setIsLoggingIn] = useState<boolean>(false);
   const [appVersion, setAppVersion] = useState<string>('7.0.0');
-  const [ambienteActual, setAmbienteActual] = useState<string>('PRODUCCION');
+  const [ambienteActual, setAmbienteActual] = useState<string>('CARGANDO...');
   const [mensajeInactividad, setMensajeInactividad] = useState<string | null>(null);
   const [hayCambiosSinGuardar, setHayCambiosSinGuardar] = useState<boolean>(false);
 
   const ultimoRegistroRef = useRef<number>(0);
+  const ultimaInteraccionHumanaRef = useRef<number>(0);
   const sessionInstanceIdRef = useRef<number>(0);
 
   const incrementarInstanciaSesion = () => {
@@ -72,6 +75,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
       if (localInstanceId !== sessionInstanceIdRef.current) return;
 
+      const env = sesionActiva.ambiente_actual || 'DESCONOCIDO';
       setUsuario({
         id_usuario: sesionActiva.id_usuario,
         username: sesionActiva.username,
@@ -81,14 +85,31 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         debe_cambiar_clave: sesionActiva.estado_sesion === 'CAMBIO_OBLIGATORIO',
         estado_sesion: sesionActiva.estado_sesion as EstadoSesionEnum,
         permisos: sesionActiva.permisos,
-        ambiente_actual: sesionActiva.ambiente_actual || 'PRODUCCION',
+        ambiente_actual: env,
       });
-      setAmbienteActual(sesionActiva.ambiente_actual || 'PRODUCCION');
+      setAmbienteActual(env);
       setEstadoSesion(sesionActiva.estado_sesion as EstadoSesionEnum);
-    } catch {
+      const ahora = Date.now();
+      ultimoRegistroRef.current = ahora;
+      ultimaInteraccionHumanaRef.current = ahora;
+    } catch (err: unknown) {
       if (localInstanceId !== sessionInstanceIdRef.current) return;
-      setUsuario(null);
-      setEstadoSesion('SIN_SESION');
+
+      if (esErrorNoAutenticado(err)) {
+        setUsuario(null);
+        setEstadoSesion('SIN_SESION');
+
+        try {
+          const envPreLogin = await apiObtenerAmbienteInicial();
+          if (localInstanceId === sessionInstanceIdRef.current) {
+            setAmbienteActual(envPreLogin);
+          }
+        } catch {
+          if (localInstanceId === sessionInstanceIdRef.current) {
+            setAmbienteActual('ERROR_CONEXION');
+          }
+        }
+      }
     } finally {
       if (localInstanceId === sessionInstanceIdRef.current) {
         setIsCheckingSession(false);
@@ -100,50 +121,78 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     verificarSesion();
   }, [verificarSesion]);
 
+  // Manejo de eventos de interacción humana con reporte de delta real (Punto 1 R7)
   useEffect(() => {
     if (estadoSesion === 'SIN_SESION') return;
 
-    const manejarActividadHumana = () => {
+    const capturarInteraccionHumana = () => {
       const ahora = Date.now();
+      ultimaInteraccionHumanaRef.current = ahora;
+
       if (ahora - ultimoRegistroRef.current > 30000) {
+        // Delta transcurrido desde el último ping registrado
+        const deltaMs = Math.max(0, ahora - ultimoRegistroRef.current);
         ultimoRegistroRef.current = ahora;
         const localInstanceId = sessionInstanceIdRef.current;
-        apiRegistrarActividad().catch(() => {
+
+        apiRegistrarActividad(deltaMs).catch((err: unknown) => {
           if (localInstanceId !== sessionInstanceIdRef.current) return;
-          incrementarInstanciaSesion();
-          setUsuario(null);
-          setEstadoSesion('SIN_SESION');
-          setMensajeInactividad('Sesión finalizada por inactividad');
+          if (esErrorNoAutenticado(err)) {
+            incrementarInstanciaSesion();
+            setUsuario(null);
+            setEstadoSesion('SIN_SESION');
+            setMensajeInactividad('Sesión finalizada por inactividad o expiración.');
+          }
         });
       }
     };
 
-    window.addEventListener('keydown', manejarActividadHumana);
-    window.addEventListener('mousemove', manejarActividadHumana);
-    window.addEventListener('mousedown', manejarActividadHumana);
-    window.addEventListener('touchstart', manejarActividadHumana);
+    window.addEventListener('keydown', capturarInteraccionHumana);
+    window.addEventListener('mousemove', capturarInteraccionHumana);
+    window.addEventListener('mousedown', capturarInteraccionHumana);
+    window.addEventListener('touchstart', capturarInteraccionHumana);
 
     return () => {
-      window.removeEventListener('keydown', manejarActividadHumana);
-      window.removeEventListener('mousemove', manejarActividadHumana);
-      window.removeEventListener('mousedown', manejarActividadHumana);
-      window.removeEventListener('touchstart', manejarActividadHumana);
+      window.removeEventListener('keydown', capturarInteraccionHumana);
+      window.removeEventListener('mousemove', capturarInteraccionHumana);
+      window.removeEventListener('mousedown', capturarInteraccionHumana);
+      window.removeEventListener('touchstart', capturarInteraccionHumana);
     };
   }, [estadoSesion]);
 
+  // Polling de sincronización segura (Punto 9 R7): NO altera ultimoRegistroRef para no fingir actividad
   useEffect(() => {
     if (estadoSesion === 'SIN_SESION') return;
 
     const interval = setInterval(async () => {
       const localInstanceId = sessionInstanceIdRef.current;
       try {
-        await apiObtenerSesion();
-      } catch {
+        const sesionActiva = await apiObtenerSesion();
         if (localInstanceId !== sessionInstanceIdRef.current) return;
-        incrementarInstanciaSesion();
-        setUsuario(null);
-        setEstadoSesion('SIN_SESION');
-        setMensajeInactividad('Sesión finalizada por inactividad');
+
+        const env = sesionActiva.ambiente_actual || 'DESCONOCIDO';
+        setAmbienteActual(env);
+        setEstadoSesion(sesionActiva.estado_sesion as EstadoSesionEnum);
+        setUsuario((prev) => {
+          if (!prev) return null;
+          return {
+            ...prev,
+            nombre_completo: sesionActiva.nombre_completo,
+            rol: sesionActiva.rol,
+            permisos: sesionActiva.permisos,
+            estado_sesion: sesionActiva.estado_sesion as EstadoSesionEnum,
+            ambiente_actual: env,
+          };
+        });
+      } catch (err: unknown) {
+        if (localInstanceId !== sessionInstanceIdRef.current) return;
+
+        if (esErrorNoAutenticado(err)) {
+          incrementarInstanciaSesion();
+          setUsuario(null);
+          setEstadoSesion('SIN_SESION');
+          setMensajeInactividad('Sesión finalizada por inactividad o revocación.');
+        }
       }
     }, 10000);
 
@@ -151,7 +200,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   }, [estadoSesion]);
 
   const iniciarSesion = async (user: string, pass: string): Promise<UsuarioSesion> => {
-    if (pass.length > 128) {
+    if ([...pass].length > 128) {
       throw new Error('La contraseña no puede exceder los 128 caracteres.');
     }
 
@@ -165,11 +214,14 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         throw new Error('Operación cancelada por cambio de instancia de sesión.');
       }
 
+      const env = datos.ambiente_actual || 'DESCONOCIDO';
       setUsuario(datos);
-      setAmbienteActual(datos.ambiente_actual || 'PRODUCCION');
+      setAmbienteActual(env);
       setEstadoSesion(datos.estado_sesion as EstadoSesionEnum);
       setHayCambiosSinGuardar(false);
-      ultimoRegistroRef.current = Date.now();
+      const ahora = Date.now();
+      ultimoRegistroRef.current = ahora;
+      ultimaInteraccionHumanaRef.current = ahora;
       return datos;
     } catch (error) {
       if (localInstanceId === sessionInstanceIdRef.current) {
@@ -189,12 +241,18 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     try {
       await apiCerrarSesion();
     } catch {
-      // Ignorar errores de red al salir
+      // Ignorar errores al cerrar sesión
     } finally {
       setUsuario(null);
       setEstadoSesion('SIN_SESION');
       setHayCambiosSinGuardar(false);
       setMensajeInactividad(null);
+      try {
+        const envPreLogin = await apiObtenerAmbienteInicial();
+        setAmbienteActual(envPreLogin);
+      } catch {
+        setAmbienteActual('ERROR_CONEXION');
+      }
     }
   };
 

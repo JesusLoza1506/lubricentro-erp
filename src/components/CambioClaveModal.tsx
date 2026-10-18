@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { apiCambiarClaveVoluntaria } from '../services/authService';
 import { ShieldAlert, Check, X, KeyRound } from 'lucide-react';
@@ -24,6 +24,8 @@ const ItemCheck: React.FC<{ ok: boolean; text: string }> = ({ ok, text }) => (
 
 export const CambioClaveModal: React.FC<Props> = ({ onClose }) => {
   const { usuario, setHayCambiosSinGuardar } = useAuth();
+  const modalRef = useRef<HTMLDivElement>(null);
+  const previousFocusRef = useRef<HTMLElement | null>(null);
 
   const [passwordActual, setPasswordActual] = useState('');
   const [nuevaPassword, setNuevaPassword] = useState('');
@@ -34,10 +36,54 @@ export const CambioClaveModal: React.FC<Props> = ({ onClose }) => {
   const [mostrarConfirmacionCierre, setMostrarConfirmacionCierre] = useState(false);
 
   useEffect(() => {
+    previousFocusRef.current = document.activeElement as HTMLElement;
+
+    const timer = setTimeout(() => {
+      const inputActual = document.getElementById('modal-password-actual');
+      if (inputActual) inputActual.focus();
+    }, 50);
+
     return () => {
+      clearTimeout(timer);
       setHayCambiosSinGuardar(false);
+      if (previousFocusRef.current) {
+        previousFocusRef.current.focus();
+      }
     };
   }, [setHayCambiosSinGuardar]);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (mostrarConfirmacionCierre) return;
+
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        handleIntentarCerrar();
+        return;
+      }
+
+      if (e.key === 'Tab' && modalRef.current) {
+        const focusables = modalRef.current.querySelectorAll<HTMLElement>(
+          'button:not([disabled]), input:not([disabled]), [tabindex]:not([tabindex="-1"])'
+        );
+        if (focusables.length === 0) return;
+
+        const firstElement = focusables[0];
+        const lastElement = focusables[focusables.length - 1];
+
+        if (e.shiftKey && document.activeElement === firstElement) {
+          e.preventDefault();
+          lastElement.focus();
+        } else if (!e.shiftKey && document.activeElement === lastElement) {
+          e.preventDefault();
+          firstElement.focus();
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [mostrarConfirmacionCierre, passwordActual, nuevaPassword, confirmarPassword]);
 
   const handleInputChange = (
     setter: React.Dispatch<React.SetStateAction<string>>,
@@ -47,8 +93,9 @@ export const CambioClaveModal: React.FC<Props> = ({ onClose }) => {
     setHayCambiosSinGuardar(true);
   };
 
+  // Conteo exacto Unicode (Punto 6 R7)
   const len = [...nuevaPassword].length;
-  const lenOk = len >= 7 && len <= 128;
+  const lenOk = len >= 8 && len <= 128;
   const tieneLetra = /\p{L}/u.test(nuevaPassword);
   const tieneNumero = /\d/.test(nuevaPassword);
   const noEsUsername = usuario?.username
@@ -121,13 +168,14 @@ export const CambioClaveModal: React.FC<Props> = ({ onClose }) => {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          zIndex: 9999,
+          zIndex: 9000,
         }}
         role="dialog"
         aria-modal="true"
         aria-labelledby="modal-cambio-clave-title"
       >
         <div
+          ref={modalRef}
           style={{
             width: '100%',
             maxWidth: '450px',
@@ -182,8 +230,6 @@ export const CambioClaveModal: React.FC<Props> = ({ onClose }) => {
                 color: '#64748B',
                 cursor: 'pointer',
                 borderRadius: '6px',
-                outline: '2px solid transparent',
-                outlineOffset: '2px',
               }}
             >
               <X size={20} />
@@ -240,8 +286,6 @@ export const CambioClaveModal: React.FC<Props> = ({ onClose }) => {
                   borderRadius: '10px',
                   color: '#F8FAFC',
                   fontSize: '14px',
-                  outline: '2px solid transparent',
-                  outlineOffset: '2px',
                   boxSizing: 'border-box',
                 }}
                 autoComplete="current-password"
@@ -278,8 +322,6 @@ export const CambioClaveModal: React.FC<Props> = ({ onClose }) => {
                   borderRadius: '10px',
                   color: '#F8FAFC',
                   fontSize: '14px',
-                  outline: '2px solid transparent',
-                  outlineOffset: '2px',
                   boxSizing: 'border-box',
                 }}
                 autoComplete="new-password"
@@ -316,8 +358,6 @@ export const CambioClaveModal: React.FC<Props> = ({ onClose }) => {
                   borderRadius: '10px',
                   color: '#F8FAFC',
                   fontSize: '14px',
-                  outline: '2px solid transparent',
-                  outlineOffset: '2px',
                   boxSizing: 'border-box',
                 }}
                 autoComplete="new-password"
@@ -343,7 +383,7 @@ export const CambioClaveModal: React.FC<Props> = ({ onClose }) => {
                 Requisitos de Seguridad V7:
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-                <ItemCheck ok={lenOk} text="7-128 caracteres" />
+                <ItemCheck ok={lenOk} text="8-128 caracteres" />
                 <ItemCheck ok={tieneLetra} text="Al menos 1 letra" />
                 <ItemCheck ok={tieneNumero} text="Al menos 1 número" />
                 <ItemCheck ok={noEsUsername} text="Distinta de usuario" />
@@ -365,8 +405,6 @@ export const CambioClaveModal: React.FC<Props> = ({ onClose }) => {
                 fontSize: '14px',
                 fontWeight: '600',
                 cursor: todoValido && !procesando ? 'pointer' : 'not-allowed',
-                outline: '2px solid transparent',
-                outlineOffset: '2px',
               }}
             >
               {procesando ? 'Guardando...' : 'Actualizar Contraseña'}
@@ -387,8 +425,6 @@ export const CambioClaveModal: React.FC<Props> = ({ onClose }) => {
                 fontWeight: '500',
                 cursor: 'pointer',
                 marginTop: '10px',
-                outline: '2px solid transparent',
-                outlineOffset: '2px',
               }}
             >
               Cancelar

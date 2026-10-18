@@ -24,7 +24,7 @@ impl CajaService {
             .map_err(|_| AppError::NotFound("Usuario no encontrado o inactivo.".to_string()))?;
 
         if rol != "CAJERO" && rol != "ADMINISTRADOR" {
-            return Err(AppError::Validation(
+            return Err(AppError::AccessDenied(
                 "El usuario no tiene permisos para abrir caja.".to_string(),
             ));
         }
@@ -60,7 +60,7 @@ impl CajaService {
         Ok(conn.last_insert_rowid())
     }
 
-    /// Realiza el cierre de caja registrando el ID real del usuario ejecutor de la sesión activa
+    /// Realiza el cierre de caja exigiéndole titularidad directa de la caja
     pub fn cerrar_caja(
         conn: &Connection,
         req: CierreCajaDto,
@@ -71,6 +71,13 @@ impl CajaService {
         if caja.estado != "ABIERTA" {
             return Err(AppError::Validation(
                 "La caja especificada ya se encuentra cerrada.".to_string(),
+            ));
+        }
+
+        if caja.id_usuario != id_usuario_cierre {
+            return Err(AppError::AccessDenied(
+                "No tiene autorización para cerrar una caja chica perteneciente a otro usuario."
+                    .to_string(),
             ));
         }
 
@@ -127,7 +134,7 @@ impl CajaService {
              WHERE id_caja = ?11",
             params![
                 id_operacion_cierre,
-                id_usuario_cierre, // Identidad real validada
+                id_usuario_cierre,
                 efectivo_esperado,
                 req.monto_cierre_efectivo,
                 tarjeta_neto,

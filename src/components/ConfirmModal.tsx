@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { AlertTriangle, LogOut, Trash2, X } from 'lucide-react';
 
 interface ConfirmModalProps {
@@ -24,6 +24,62 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
   onCancelar,
   cargando = false,
 }) => {
+  const modalRef = useRef<HTMLDivElement>(null);
+  const previousFocusRef = useRef<HTMLElement | null>(null);
+
+  useEffect(() => {
+    if (abierto) {
+      previousFocusRef.current = document.activeElement as HTMLElement;
+
+      const timer = setTimeout(() => {
+        if (modalRef.current) {
+          const btnCancelar = modalRef.current.querySelector<HTMLElement>('button');
+          if (btnCancelar) btnCancelar.focus();
+        }
+      }, 50);
+
+      return () => {
+        clearTimeout(timer);
+        if (previousFocusRef.current) {
+          previousFocusRef.current.focus();
+        }
+      };
+    }
+  }, [abierto]);
+
+  useEffect(() => {
+    if (!abierto) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        onCancelar();
+        return;
+      }
+
+      if (e.key === 'Tab' && modalRef.current) {
+        const focusables = modalRef.current.querySelectorAll<HTMLElement>(
+          'button:not([disabled]), [tabindex]:not([tabindex="-1"])'
+        );
+        if (focusables.length === 0) return;
+
+        const firstElement = focusables[0];
+        const lastElement = focusables[focusables.length - 1];
+
+        if (e.shiftKey && document.activeElement === firstElement) {
+          e.preventDefault();
+          lastElement.focus();
+        } else if (!e.shiftKey && document.activeElement === lastElement) {
+          e.preventDefault();
+          firstElement.focus();
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [abierto, onCancelar]);
+
   if (!abierto) return null;
 
   const esCierreSesion = textoConfirmar.toLowerCase().includes('sesión');
@@ -41,10 +97,14 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
         display: 'flex',
         justifyContent: 'center',
         alignItems: 'center',
-        zIndex: 1500,
+        zIndex: 10000,
       }}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="modal-confirm-title"
     >
       <div
+        ref={modalRef}
         style={{
           width: '460px',
           backgroundColor: '#0F172A',
@@ -72,7 +132,10 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
             <AlertTriangle size={28} color="#EF4444" />
           </div>
           <div style={{ flex: 1 }}>
-            <h3 style={{ fontSize: '18px', fontWeight: '800', color: '#F8FAFC', margin: 0 }}>
+            <h3
+              id="modal-confirm-title"
+              style={{ fontSize: '18px', fontWeight: '800', color: '#F8FAFC', margin: 0 }}
+            >
               {titulo}
             </h3>
             <span style={{ fontSize: '12px', color: '#FCA5A5', fontWeight: '600' }}>
@@ -81,6 +144,8 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
           </div>
           <button
             onClick={onCancelar}
+            disabled={cargando}
+            aria-label="Cerrar confirmación"
             style={{ background: 'none', border: 'none', color: '#64748B', cursor: 'pointer' }}
           >
             <X size={20} />

@@ -9,16 +9,32 @@ use crate::services::auditoria_service::AuditoriaService;
 use crate::services::auth_service::AuthService;
 use crate::services::session_manager::SessionState;
 use rusqlite::Connection;
+use serde::Deserialize;
 use std::sync::Mutex;
 use tauri::State;
 
-fn obtener_ambiente_actual(conn: &Connection) -> String {
+#[derive(Debug, Deserialize)]
+pub struct ProbarConsumoAutorizacionDto {
+    pub token: String,
+    pub accion_esperada: String,
+    pub referencia_esperada: String,
+}
+
+fn obtener_ambiente_actual_strict(conn: &Connection) -> Result<String, AppError> {
     conn.query_row(
         "SELECT ambiente_actual FROM configuracion LIMIT 1",
         [],
         |row| row.get(0),
     )
-    .unwrap_or_else(|_| "PRODUCCION".to_string())
+    .map_err(AppError::Database)
+}
+
+#[tauri::command]
+pub fn obtener_ambiente_inicial(
+    db_state: State<'_, Mutex<Connection>>,
+) -> Result<String, AppError> {
+    let conn = db_state.lock().map_err(|_| AppError::DbLock)?;
+    obtener_ambiente_actual_strict(&conn)
 }
 
 #[tauri::command]
@@ -36,15 +52,20 @@ pub fn login_usuario(
     req: LoginRequestDto,
 ) -> Result<LoginResponseDto, AppError> {
     let mut session = session_state.lock().map_err(|_| AppError::DbLock)?;
-
     let conn = db_state.lock().map_err(|_| AppError::DbLock)?;
 
     if !session.verificar_inactividad_con_auditoria(Some(&conn)) {
         return Err(AppError::SessionActive);
     }
 
-    let (mut res, usuario_version) = AuthService::login(&conn, req)?;
+    // 1. CORRECCIÓN R7 (Punto 5): Consultar ambiente ANTES de invocar AuthService::login
+    let ambiente = obtener_ambiente_actual_strict(&conn)?;
 
+    // 2. Autenticar credenciales y registrar auditoría solo si el ambiente responde
+    let (mut res, usuario_version) = AuthService::login(&conn, req)?;
+    res.ambiente_actual = ambiente;
+
+    // 3. Abrir la sesión en memoria una vez que la operación entera ha sido exitosa
     session.abrir_sesion(
         res.id_usuario,
         usuario_version,
@@ -52,8 +73,6 @@ pub fn login_usuario(
         res.rol.clone(),
         res.debe_cambiar_clave,
     );
-
-    res.ambiente_actual = obtener_ambiente_actual(&conn);
 
     Ok(res)
 }
@@ -105,7 +124,7 @@ pub fn obtener_sesion(
 
     let mut res =
         AuthService::obtener_usuario_sesion(&conn, &mut session, id_usuario, &estado_str)?;
-    res.ambiente_actual = obtener_ambiente_actual(&conn);
+    res.ambiente_actual = obtener_ambiente_actual_strict(&conn)?;
 
     Ok(res)
 }
@@ -164,6 +183,7 @@ pub fn cambiar_clave_voluntaria(
 pub fn registrar_actividad(
     db_state: State<'_, Mutex<Connection>>,
     session_state: State<'_, Mutex<SessionState>>,
+    delta_ms: Option<u64>,
 ) -> Result<(), AppError> {
     let mut session = session_state.lock().map_err(|_| AppError::DbLock)?;
 
@@ -173,7 +193,11 @@ pub fn registrar_actividad(
         return Err(AppError::NoAutenticado);
     }
 
-    session.renovar_actividad();
+    if let Some(ms) = delta_ms {
+        session.renovar_actividad_con_delta(ms);
+    } else {
+        session.renovar_actividad();
+    }
     Ok(())
 }
 
@@ -190,7 +214,12 @@ pub fn cerrar_sesion(
         session.rol.clone(),
     ) {
         if let Ok(conn) = db_state.lock() {
-            let _ = AuditoriaService::registrar_cierre_sesion(&conn, id, &usr, &rol);
+            if let Err(e) = AuditoriaService::registrar_cierre_sesion(&conn, id, &usr, &rol) {
+                tracing::error!(
+                    "Fallo de trazabilidad al registrar auditoria de logout: {:?}",
+                    e
+                );
+            }
         }
     }
 
@@ -290,7 +319,6 @@ pub fn autorizar_descuento(
 
     let token = format!("desc_{}", uuid::Uuid::new_v4().simple());
 
-    // Vincula autorizante_id (admin) con solicitante_id (cajero)
     session.guardar_autorizacion(
         token.clone(),
         id_admin,
@@ -299,10 +327,9 @@ pub fn autorizar_descuento(
         req.referencia_venta.clone(),
     );
 
-    // Registro de auditoría transaccional
     let username_cajero = session.username.as_deref();
     let rol_cajero = session.rol.as_deref();
-    let _ = AuditoriaService::registrar_v5(
+    if let Err(e) = AuditoriaService::registrar_v5(
         &conn,
         Some(id_cajero),
         "USUARIO",
@@ -315,7 +342,33 @@ pub fn autorizar_descuento(
         Some(&req.referencia_venta),
         Some(&format!("Descuento de {} bp autorizado", req.descuento_bp)),
         "OK",
-    );
+    ) {
+        tracing::error!(
+            "Fallo de trazabilidad al registrar auditoria de autorizacion: {:?}",
+            e
+        );
+    }
 
     Ok(token)
+}
+
+#[tauri::command]
+pub fn probar_consumo_autorizacion_cmd(
+    db_state: State<'_, Mutex<Connection>>,
+    session_state: State<'_, Mutex<SessionState>>,
+    req: ProbarConsumoAutorizacionDto,
+) -> Result<i64, AppError> {
+    let mut session = session_state.lock().map_err(|_| AppError::DbLock)?;
+    let conn = db_state.lock().map_err(|_| AppError::DbLock)?;
+
+    let id_solicitante = session.validar_sesion_operativa(&conn)?;
+
+    let id_autorizante = session.consumir_autorizacion(
+        &req.token,
+        id_solicitante,
+        &req.accion_esperada,
+        &req.referencia_esperada,
+    )?;
+
+    Ok(id_autorizante)
 }

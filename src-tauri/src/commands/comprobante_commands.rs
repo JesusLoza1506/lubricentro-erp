@@ -20,7 +20,10 @@ pub fn emitir_comprobante_cmd(
         AppError::Validation("Fallo al obtener estado de la base de datos".to_string())
     })?;
 
-    // Impera la sesión: Extracción estricta del ID del cajero/usuario real
+    if session.verificar_inactividad_con_auditoria(Some(&conn)) {
+        return Err(AppError::NoAutenticado);
+    }
+
     let id_usuario_ejecutor = session.validar_sesion_operativa(&conn)?;
     payload.id_cajero = id_usuario_ejecutor;
 

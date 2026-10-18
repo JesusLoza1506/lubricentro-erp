@@ -1,5 +1,7 @@
 export type EstadoSesionEnum = 'SIN_SESION' | 'CAMBIO_OBLIGATORIO' | 'NORMAL';
 
+export type EstadoAmbiente = 'CARGANDO' | 'CONFIRMADO' | 'ERROR';
+
 export interface PermisoModulo {
   modulo: string;
   puede_ver: boolean;
@@ -53,16 +55,10 @@ export interface RecuperarPayload {
   nueva_password: string;
 }
 
-/**
- * Payload para Cambio Obligatorio de Contraseña (RF-LOG-03)
- */
 export interface CambiarClaveObligatoriaPayload {
   nueva_password: string;
 }
 
-/**
- * Payload para Cambio Voluntario de Contraseña (RF-LOG-04)
- */
 export interface CambiarClaveVoluntariaPayload {
   password_actual: string;
   nueva_password: string;

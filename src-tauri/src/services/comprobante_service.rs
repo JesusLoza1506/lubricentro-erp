@@ -8,6 +8,7 @@ pub struct ComprobanteService;
 
 impl ComprobanteService {
     /// Emite un comprobante, actualiza la serie/correlativo y registra el pago
+    /// Exige estrictamente que la caja abierta pertenezca al usuario ejecutor (incluso si es Administrador)
     pub fn emitir_comprobante(
         conn: &Connection,
         req: EmitirComprobanteDto,
@@ -15,6 +16,28 @@ impl ComprobanteService {
         if req.monto_total != req.monto_subtotal + req.monto_igv {
             return Err(AppError::Validation(
                 "El monto total debe ser exactamente la suma del subtotal y el IGV.".to_string(),
+            ));
+        }
+
+        let (estado_caja, id_usuario_caja): (String, i64) = conn
+            .query_row(
+                "SELECT estado, id_usuario FROM caja_chica WHERE id_caja = ?1",
+                [req.id_caja],
+                |r| Ok((r.get(0)?, r.get(1)?)),
+            )
+            .map_err(|_| AppError::NotFound("La caja chica especificada no existe.".to_string()))?;
+
+        if estado_caja != "ABIERTA" {
+            return Err(AppError::Validation(
+                "No se pueden procesar cobros ni emitir comprobantes en una caja chica cerrada."
+                    .to_string(),
+            ));
+        }
+
+        // VALIDACIÓN ESTRICUTA DE TURNO PROPIO: Tanto Cajero como Administrador requieren ser titulares de la caja abierta
+        if id_usuario_caja != req.id_cajero {
+            return Err(AppError::AccessDenied(
+                "No tiene un turno de caja propio abierto. Debe abrir su propia caja para registrar cobros.".to_string(),
             ));
         }
 

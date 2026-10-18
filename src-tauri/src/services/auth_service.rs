@@ -69,9 +69,9 @@ impl AuthService {
 
     pub fn validar_politica_password(password: &str, username: &str) -> Result<(), AppError> {
         let len = password.chars().count();
-        if !(7..=128).contains(&len) {
+        if !(8..=128).contains(&len) {
             return Err(AppError::Validation(
-                "La contraseña debe tener entre 7 y 128 caracteres.".to_string(),
+                "La contraseña debe tener entre 8 y 128 caracteres.".to_string(),
             ));
         }
 
@@ -95,7 +95,9 @@ impl AuthService {
 
     pub fn normalizar_username(username: &str) -> Result<String, AppError> {
         let clean = username.trim().to_lowercase();
-        if clean.len() < 3 || clean.len() > 30 {
+        let char_count = clean.chars().count();
+
+        if !(3..=30).contains(&char_count) {
             return Err(AppError::Validation(
                 "El nombre de usuario debe tener entre 3 y 30 caracteres.".to_string(),
             ));
@@ -110,7 +112,9 @@ impl AuthService {
 
     pub fn normalizar_nombre_completo(nombre: &str) -> Result<String, AppError> {
         let clean = nombre.trim();
-        if clean.len() < 3 || clean.len() > 100 {
+        let char_count = clean.chars().count();
+
+        if !(3..=100).contains(&char_count) {
             return Err(AppError::Validation(
                 "El nombre completo debe tener entre 3 y 100 caracteres.".to_string(),
             ));
@@ -176,7 +180,12 @@ impl AuthService {
         conn: &Connection,
         req: LoginRequestDto,
     ) -> Result<(LoginResponseDto, i64), AppError> {
-        let clean_username = req.username.trim().to_lowercase();
+        let clean_username = Self::normalizar_username(&req.username)?;
+        if req.password.chars().count() > 128 {
+            return Err(AppError::Validation(
+                "La contraseña excede el máximo permitido de 128 caracteres.".to_string(),
+            ));
+        }
 
         let mut stmt = conn.prepare(
             "SELECT id_usuario, nombre_completo, username, password_hash, rol, activo,
@@ -310,7 +319,7 @@ impl AuthService {
                     debe_cambiar_clave,
                     estado_sesion,
                     permisos,
-                    ambiente_actual: "PRODUCCION".to_string(),
+                    ambiente_actual: "".to_string(), // Asignado en auth_commands tras validar BD
                 },
                 usuario_version,
             ))
@@ -379,7 +388,7 @@ impl AuthService {
             rol,
             estado_sesion,
             permisos,
-            ambiente_actual: "PRODUCCION".to_string(),
+            ambiente_actual: "".to_string(),
         })
     }
 
@@ -413,7 +422,7 @@ impl AuthService {
             }
         }
 
-        let clean_username = req.username.trim().to_lowercase();
+        let clean_username = Self::normalizar_username(&req.username)?;
         let codigo_norm = Self::normalizar_codigo(&req.codigo_recuperacion);
 
         let (rec_hash_opt,): (Option<String>,) = conn.query_row(
@@ -667,7 +676,7 @@ impl AuthService {
         session: &mut SessionState,
         req: AutorizarDescuentoRequestDto,
     ) -> Result<i64, AppError> {
-        let clean_admin = req.username_admin.trim().to_lowercase();
+        let clean_admin = Self::normalizar_username(&req.username_admin)?;
 
         let (id_admin, password_hash, rol, activo, debe_cambiar_clave, bloqueado_hasta): (
             i64,

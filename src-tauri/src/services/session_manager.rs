@@ -127,6 +127,15 @@ impl SessionState {
         }
     }
 
+    pub fn renovar_actividad_con_delta(&mut self, delta_ms: u64) {
+        if self.estado_sesion != EstadoSesion::SinSesion {
+            let ahora = Instant::now();
+            let retraso = Duration::from_millis(delta_ms);
+            // Deduce el desfasaje del reporte sin permitir underflow de Instant
+            self.ultima_actividad = ahora.checked_sub(retraso).unwrap_or(ahora);
+        }
+    }
+
     pub fn verificar_inactividad(&mut self) -> bool {
         if self.estado_sesion == EstadoSesion::SinSesion {
             return true;
@@ -152,7 +161,7 @@ impl SessionState {
                 self.username.as_deref(),
                 self.rol.as_deref(),
             ) {
-                let _ = AuditoriaService::registrar_evento_login(
+                if let Err(e) = AuditoriaService::registrar_evento_login(
                     c,
                     Some(id),
                     Some(usr),
@@ -160,7 +169,12 @@ impl SessionState {
                     "EXPIRACION_INACTIVIDAD",
                     "OK",
                     Some("Cierre automático por inactividad de 15 minutos"),
-                );
+                ) {
+                    tracing::error!(
+                        "Fallo de trazabilidad al registrar auditoria de expiracion: {:?}",
+                        e
+                    );
+                }
             }
             self.cerrar_sesion();
             true
@@ -255,7 +269,6 @@ impl SessionState {
         self.verificaciones_admin_fallos.remove(&admin_id);
     }
 
-    /// Guarda una autorización vinculando al autorizante con la sesión del cajero/solicitante
     pub fn guardar_autorizacion(
         &mut self,
         clave_token: String,
@@ -277,8 +290,6 @@ impl SessionState {
         );
     }
 
-    /// Valida y consume de forma unívoca (single-use) un token de autorización en origen.
-    /// Exige coincidencia estricta de solicitante_id, acción y referencia.
     pub fn consumir_autorizacion(
         &mut self,
         clave_token: &str,
@@ -311,7 +322,12 @@ impl SessionState {
             ));
         }
 
-        let conf_valida = self.confirmaciones_pendientes.remove(clave_token).unwrap();
+        let conf_valida = self
+            .confirmaciones_pendientes
+            .remove(clave_token)
+            .ok_or_else(|| {
+                AppError::AccessDenied("Token de autorización inválido o ya utilizado.".to_string())
+            })?;
         Ok(conf_valida.autorizante_id)
     }
 }

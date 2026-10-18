@@ -16,50 +16,17 @@
 ![Plataforma](https://img.shields.io/badge/Plataforma-Windows_11-2563EB?style=flat-square)
 ![Módulos](https://img.shields.io/badge/Alcance-10_m%C3%B3dulos-0F766E?style=flat-square)
 
-[Presentación](#presentacion) · [Módulos](#modulos) · [Instalación](#instalacion) · [Pruebas](#pruebas)
+[Progreso](#estado) · [Login](#modulo-login-y-sesion) · [Instalación](#instalacion) · [Documentación](#documentacion)
 
 </div>
 
----
-
-## 📑 Contenido
-
-1. [Presentación del proyecto](#presentacion)
-2. [Vista general del sistema](#vista-general)
-3. [Módulos del software](#modulos)
-   - [3.1. Login y Sesión](#modulo-login-y-sesion)
-   - [3.2. Inicio Dashboard](#modulo-inicio-dashboard)
-   - [3.3. Ficha Vehicular e Historial](#modulo-ficha-vehicular-e-historial)
-   - [3.4. Órdenes de Trabajo Taller](#modulo-ordenes-de-trabajo-taller)
-   - [3.5. Inventario y Stock](#modulo-inventario-y-stock)
-   - [3.6. Punto de Venta POS](#modulo-punto-de-venta-pos)
-   - [3.7. Caja Chica](#modulo-caja-chica)
-   - [3.8. Backup y Copias](#modulo-backup-y-copias)
-   - [3.9. Administración](#modulo-administracion)
-   - [3.10. Reportes](#modulo-reportes)
-4. [Roles y permisos](#roles)
-5. [Flujo de trabajo](#flujo)
-6. [Arquitectura y base de datos](#arquitectura)
-7. [Instalación y ejecución](#instalacion)
-8. [Pruebas y calidad](#pruebas)
-9. [Documentación](#documentacion)
-10. [Autores y contexto académico](#autor)
-
----
-
 <a id="presentacion"></a>
 
-## 1. Presentación del proyecto
+## 1. Presentación
 
-**Lubricentro Gloria** es un software de escritorio orientado a organizar la atención de vehículos, el trabajo del taller, las existencias, los cobros y el control de caja de **Lubricentro Gloria S.R.L.**
+**Lubricentro Gloria** es una aplicación de escritorio para conectar atención vehicular, taller, inventario, ventas y caja en **Lubricentro Gloria S.R.L.** Busca evitar registros dispersos, consumos duplicados y cobros desvinculados del trabajo realizado.
 
-El proyecto conecta la información de cada atención: vehículo y cliente, servicios realizados, materiales consumidos, venta y comprobante. Su alcance también contempla ventas directas de productos y servicios.
-
-### Objetivo
-
-Facilitar el trabajo diario del lubricentro mediante procesos claros, permisos por rol y registros relacionados que eviten duplicar información, consumos o cobros.
-
-### Tecnologías
+**Objetivo:** facilitar la gestión diaria mediante procesos claros, datos relacionados y permisos por rol.
 
 | Tecnología             | Uso en el proyecto                                                        |
 | ---------------------- | ------------------------------------------------------------------------- |
@@ -70,240 +37,87 @@ Facilitar el trabajo diario del lubricentro mediante procesos claros, permisos p
 | **SQLite**             | Almacenamiento local de los datos.                                        |
 | **NubeFact**           | Integración definida para comprobantes electrónicos vinculados con SUNAT. |
 
-### Estado del proyecto
+**Alcance:** un establecimiento, una PC con Windows 11, una sesión activa y una caja abierta a la vez. Moneda PEN y hora `America/Lima` (UTC−05:00). La operación local no requiere conexión permanente; NubeFact sí la requiere para envíos, consultas y archivos oficiales.
 
-**En desarrollo.** El alcance funcional está definido en los documentos v7 de los diez módulos y en el informe general. La implementación se está adaptando a esa definición.
+<a id="estado"></a>
 
-Los apartados de cada módulo se completarán conforme se revise su código y se disponga de capturas y resultados de pruebas. El alcance documentado no implica que todas las funcionalidades ya estén implementadas.
+## 2. Estado del proyecto
 
-<a id="vista-general"></a>
+Desarrollo secuencial, módulo por módulo, conforme al alcance funcional v7.
 
-## 2. Vista general del sistema
+| #   | Módulo                                   | Estado                                | Avance |
+| --- | ---------------------------------------- | ------------------------------------- | ------ |
+| 01  | [Login y Sesión](#modulo-login-y-sesion) | 🟢 Ajustes finales                    | ~90 %  |
+| 02  | Inicio Dashboard                         | ⚪ Pendiente de revisión y adaptación | —      |
+| 03  | Ficha Vehicular e Historial              | ⚪ Pendiente de revisión y adaptación | —      |
+| 04  | Órdenes de Trabajo Taller                | ⚪ Pendiente de revisión y adaptación | —      |
+| 05  | Inventario y Stock                       | ⚪ Pendiente de revisión y adaptación | —      |
+| 06  | Punto de Venta POS                       | ⚪ Pendiente                          | —      |
+| 07  | Caja Chica                               | ⚪ Pendiente                          | —      |
+| 08  | Backup y Copias                          | ⚪ Pendiente                          | —      |
+| 09  | Administración                           | ⚪ Pendiente                          | —      |
+| 10  | Reportes                                 | ⚪ Pendiente                          | —      |
 
-La versión definida está orientada a **un establecimiento, una PC con Windows 11, una sesión de usuario activa y una caja abierta a la vez**, con tres roles: administrador, mecánico y cajero.
+**Leyenda:** ⚪ Pendiente · 🟡 En curso · 🟢 Ajustes finales · ✅ Completado.
 
-| Aspecto          | Alcance definido                                                          |
-| ---------------- | ------------------------------------------------------------------------- |
-| Operación        | Aplicación de escritorio con datos locales.                               |
-| Atención         | Identificación del vehículo, recepción y ejecución de órdenes de trabajo. |
-| Comercial        | Ventas al contado, cobro de OT y devoluciones controladas.                |
-| Inventario       | Productos, servicios, entradas, consumos, ajustes y kardex.               |
-| Comprobantes     | Boletas, facturas y notas de crédito mediante NubeFact.                   |
-| Control          | Caja, reportes, auditoría y copias de seguridad.                          |
-| Moneda y horario | Sol peruano (PEN) y hora del negocio `America/Lima`, UTC−05:00.           |
-
-Las operaciones locales autorizadas están previstas para funcionar sin conexión permanente. Enviar o consultar comprobantes y descargar sus archivos oficiales requiere internet.
-
-<!-- CAPTURA GENERAL: cuando esté disponible, guardar docs/images/dashboard.png
-     y activar la siguiente línea. No publicar imágenes con datos reales o secretos.
-![Vista general de Lubricentro Gloria](docs/images/dashboard.png)
--->
+> El porcentaje estima implementación, no cobertura de pruebas. Las filas pendientes indican trabajo por completar o validar; puede existir código previo. Los roles, flujos y diagramas describen el alcance definido y no certifican que todo el sistema esté terminado.
 
 <a id="modulos"></a>
 
-## 3. Módulos del software
+## 3. Detalle de los módulos
 
 <a id="modulo-login-y-sesion"></a>
 
-### 3.1. Login y Sesión
+<details>
+<summary><b>01 · Login y Sesión</b> — 🟢 Ajustes finales · ~90 %</summary>
 
-**Descripción:**
-
-Controla el acceso a Lubricentro Gloria mediante cuentas individuales y mantiene la sesión del trabajador. Identifica su rol para habilitar los módulos y las acciones que le corresponden. Incluye la configuración del primer administrador y los flujos de cambio y recuperación de contraseña.
+**Qué hace:** controla el acceso mediante cuentas individuales y mantiene la sesión del trabajador. Identifica su rol y reúne los flujos de primera instalación, cambio y recuperación de contraseña.
 
 **Funciones principales:**
 
-- **Inicio de sesión:** ingreso con usuario y contraseña, validación de credenciales y acceso al Dashboard correspondiente al rol.
-- **Primera instalación:** creación del primer administrador cuando la base no contiene cuentas y entrega de su código de recuperación.
-- **Acceso por rol:** menú y operaciones disponibles según el perfil Administrador, Mecánico o Cajero, con validaciones en el backend.
-- **Cambio de contraseña:** actualización voluntaria de la clave y cambio obligatorio al ingresar con una contraseña temporal; en este último caso se solicita la nueva clave y su confirmación.
-- **Recuperación de acceso:** recuperación administrativa mediante el código vigente y atención de las cuentas de trabajadores por un administrador autorizado, sin registro público de usuarios.
-- **Protección frente a intentos fallidos:** bloqueo temporal de Login durante 15 minutos tras cinco fallos consecutivos de una cuenta existente, con mensajes de validación y control de disponibilidad del acceso.
-- **Control de sesión:** una sesión activa por aplicación y vencimiento tras 15 minutos de inactividad; las tareas automáticas no cuentan como actividad del usuario.
-- **Cierre de sesión:** salida desde el menú, con confirmación si existe una captura modificada sin guardar; salir no cierra automáticamente la caja ni cancela trabajos registrados.
+- Ingreso con usuario y contraseña y acceso al Dashboard según el rol.
+- Creación del primer administrador solo en una instalación sin cuentas, con código de recuperación.
+- Menú y operaciones autorizados para Administrador, Mecánico o Cajero, validados en backend.
+- Cambio voluntario de clave y cambio obligatorio de temporal por nueva contraseña y confirmación.
+- Recuperación administrativa con código; recuperación de trabajadores mediante administrador autorizado.
+- Bloqueo temporal de Login: cinco fallos consecutivos de una cuenta existente, durante 15 minutos.
+- Una sesión por aplicación y vencimiento tras 15 minutos de inactividad humana.
+- Cierre de sesión con aviso por captura sin guardar, sin cerrar caja ni cancelar trabajos automáticamente.
 
-**Acceso:**
+**Acceso por rol:**
 
-| Usuario                     | Alcance                                                                                                                                                |
-| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **Administrador**           | Inicio y cierre de su sesión, cambio de contraseña y recuperación administrativa con código. La gestión de otras cuentas corresponde a Administración. |
-| **Mecánico**                | Inicio y cierre de su sesión, cambio de contraseña y acceso a los módulos permitidos por su rol.                                                       |
-| **Cajero**                  | Inicio y cierre de su sesión, cambio de contraseña y acceso a los módulos permitidos por su rol.                                                       |
-| **Instalación sin cuentas** | Creación exclusiva del primer administrador; el formulario inicial deja de estar disponible cuando ya existen cuentas.                                 |
+| Usuario                 | Alcance                                                                                                 |
+| ----------------------- | ------------------------------------------------------------------------------------------------------- |
+| Administrador           | Sesión propia, cambio de clave y recuperación con código; otras cuentas se gestionan en Administración. |
+| Mecánico                | Sesión propia, cambio de clave y módulos autorizados.                                                   |
+| Cajero                  | Sesión propia, cambio de clave y módulos autorizados.                                                   |
+| Instalación sin cuentas | Creación exclusiva del primer administrador.                                                            |
 
-Las cuentas deben estar activas y cumplir las condiciones de acceso. No se habilita el trabajo habitual hasta completar un cambio obligatorio de contraseña. La protección de contraseñas utiliza hashes Argon2id; las claves no se muestran ni se guardan como texto legible.
+Se requiere cuenta activa y completar el cambio obligatorio antes de operar. Las contraseñas se protegen mediante hashes Argon2id.
 
-**Captura de pantalla:**
+**Capturas:**
 
-_Espacio reservado para incorporar las capturas del módulo._
-
-| Vista                             | Captura         |
-| --------------------------------- | --------------- |
-| Inicio de sesión                  | Por incorporar. |
-| Creación del primer administrador | Por incorporar. |
-| Cambio de contraseña              | Por incorporar. |
-| Recuperación de acceso            | Por incorporar. |
+_Inicio de sesión_
 
 ![Pantalla de inicio de sesión](docs/images/01-login.png)
+
+_Recuperación de acceso_
+
 ![Recuperación de acceso](docs/images/01-login-recuperacion.png)
 
-**Estado:**
+Capturas por incorporar: primer administrador (`docs/images/01-login-primer-administrador.png`) y cambio de contraseña (`docs/images/01-login-cambio-clave.png`).
 
-![Avance del módulo Login y Sesión](https://img.shields.io/badge/Avance_estimado-90%25-0F766E?style=flat-square)
+**Pendiente para cerrar:** mejoras menores, validaciones complementarias y consolidación de evidencias de prueba.
 
-**Desarrollo completado aproximadamente al 90 %.** El módulo se encuentra en fase de ajustes finales, pendiente de mejoras menores y validaciones complementarias antes de su cierre definitivo. Este porcentaje expresa una estimación del avance de implementación, no la cobertura de pruebas.
+**Estado:** desarrollo completado aproximadamente al **90 %**, en fase de ajustes finales antes de su cierre definitivo.
 
----
+</details>
 
-<a id="modulo-inicio-dashboard"></a>
-
-### 3.2. Inicio Dashboard
-
-**Descripción:**
-
-**Funciones principales:**
-
-**Acceso:**
-
-**Captura de pantalla:**
-
-**Estado:**
-
----
-
-<a id="modulo-ficha-vehicular-e-historial"></a>
-
-### 3.3. Ficha Vehicular e Historial
-
-**Descripción:**
-
-**Funciones principales:**
-
-**Acceso:**
-
-**Captura de pantalla:**
-
-**Estado:**
-
----
-
-<a id="modulo-ordenes-de-trabajo-taller"></a>
-
-### 3.4. Órdenes de Trabajo Taller
-
-**Descripción:**
-
-**Funciones principales:**
-
-**Acceso:**
-
-**Captura de pantalla:**
-
-**Estado:**
-
----
-
-<a id="modulo-inventario-y-stock"></a>
-
-### 3.5. Inventario y Stock
-
-**Descripción:**
-
-**Funciones principales:**
-
-**Acceso:**
-
-**Captura de pantalla:**
-
-**Estado:**
-
----
-
-<a id="modulo-punto-de-venta-pos"></a>
-
-### 3.6. Punto de Venta POS
-
-**Descripción:**
-
-**Funciones principales:**
-
-**Acceso:**
-
-**Captura de pantalla:**
-
-**Estado:**
-
----
-
-<a id="modulo-caja-chica"></a>
-
-### 3.7. Caja Chica
-
-**Descripción:**
-
-**Funciones principales:**
-
-**Acceso:**
-
-**Captura de pantalla:**
-
-**Estado:**
-
----
-
-<a id="modulo-backup-y-copias"></a>
-
-### 3.8. Backup y Copias
-
-**Descripción:**
-
-**Funciones principales:**
-
-**Acceso:**
-
-**Captura de pantalla:**
-
-**Estado:**
-
----
-
-<a id="modulo-administracion"></a>
-
-### 3.9. Administración
-
-**Descripción:**
-
-**Funciones principales:**
-
-**Acceso:**
-
-**Captura de pantalla:**
-
-**Estado:**
-
----
-
-<a id="modulo-reportes"></a>
-
-### 3.10. Reportes
-
-**Descripción:**
-
-**Funciones principales:**
-
-**Acceso:**
-
-**Captura de pantalla:**
-
-**Estado:**
-
----
+Los módulos 02–10 se incorporarán aquí conforme avance su revisión e implementación.
 
 <a id="roles"></a>
 
 ## 4. Roles y permisos
-
-La siguiente matriz resume el **alcance funcional definido**. Las autorizaciones y restricciones específicas se desarrollan en los documentos de cada módulo.
 
 | Módulo                      | Administrador                                              | Mecánico                                                    | Cajero                                         |
 | --------------------------- | ---------------------------------------------------------- | ----------------------------------------------------------- | ---------------------------------------------- |
@@ -318,7 +132,7 @@ La siguiente matriz resume el **alcance funcional definido**. Las autorizaciones
 | Administración              | Usuarios, empresa, facturación y taller.                   | Sin acceso.                                                 | Sin acceso.                                    |
 | Reportes                    | Consulta y exportación.                                    | Sin acceso.                                                 | Sin acceso.                                    |
 
-Los permisos se deben validar en el backend. Ocultar un botón en la interfaz no sustituye esa validación. Los costos y las notas internas no se incluyen en respuestas dirigidas a roles sin autorización.
+Las autorizaciones se validan en Rust. Los costos y las notas internas se restringen por rol; ocultar botones no sustituye el control del backend.
 
 <a id="flujo"></a>
 
@@ -333,15 +147,17 @@ Los permisos se deben validar en el backend. Ocultar un botón en la interfaz no
 | **5. Cobrar**            | Recuperar la OT desde POS y confirmar el pago.                      | Venta y cobro registrados sin repetir la salida de insumos del taller. |
 | **6. Cerrar y proteger** | Contar efectivo, cerrar el turno y gestionar una copia.             | Cierre conservado y datos protegidos según la política de copias.      |
 
-**Venta directa:** también está prevista la venta de productos o servicios desde POS sin crear una OT.
+**Venta directa:** el POS contempla productos y servicios sin crear una OT.
 
-**Comprobante electrónico:** después del guardado local se realiza el intento de envío. Los errores o respuestas inciertas se atienden desde POS, sin registrar otra venta ni otro cobro. La devolución exige el original y las notas anteriores aceptados.
+**Comprobante electrónico:** el envío ocurre después del guardado local. Las incidencias se atienden en POS sin otra venta ni cobro; devolver exige original y notas anteriores aceptados.
 
 <a id="arquitectura"></a>
 
 ## 6. Arquitectura y base de datos
 
-### Organización de la aplicación
+### 6.1. Organización del código
+
+**Arquitectura en capas dentro de un monolito de escritorio organizado por módulos.** React/TypeScript presenta la interfaz y Rust aplica las reglas y consulta SQLite mediante comandos Tauri. El acceso a datos todavía comparte servicios con la lógica del negocio.
 
 | Capa              | Ubicación                                               | Responsabilidad                                                         |
 | ----------------- | ------------------------------------------------------- | ----------------------------------------------------------------------- |
@@ -353,7 +169,7 @@ Los permisos se deben validar en el backend. Ocultar un botón en la interfaz no
 | Integración       | `src-tauri/src/nubefact.rs`                             | Comunicación con NubeFact.                                              |
 | Pruebas           | `src-tauri/tests/` y carpetas `__tests__/` del frontend | Casos automatizados de las capas correspondientes.                      |
 
-### Guardado local e integración
+### 6.2. Guardado local e integración
 
 ```mermaid
 sequenceDiagram
@@ -375,149 +191,108 @@ sequenceDiagram
     end
 ```
 
-Este diagrama describe el comportamiento definido para la integración, no una certificación del código actual.
+### 6.3. Esquema SQL v7
 
-### Esquema v7
+**27 tablas de aplicación y 6 vistas.** Historial desde OT finalizadas; estado de envío en comprobantes; cierre con conteo de efectivo y resúmenes digitales. Dinero comercial en céntimos, cantidades UND/ml y costos internos con seis decimales. Bases separadas para Prueba y Producción.
 
-- **27 tablas de aplicación y 6 vistas** en el esquema revisado.
-- Historial vehicular consultado desde las OT finalizadas, sin una tabla duplicada de mantenimientos.
-- Estado de envío y archivos del comprobante conservados en el propio documento.
-- Un cierre de caja con conteo de efectivo y resúmenes digitales de lectura.
-- Importes comerciales en céntimos; cantidades por unidad o mililitros y costos internos con precisión de seis decimales.
-- Prueba y Producción con bases independientes.
-
-El esquema v7 es de **inicialización de una base vacía**. Incorporarlo a una instalación con datos requiere una migración específica y adaptar el código que utiliza tablas o columnas anteriores. No se deben reemplazar migraciones ya aplicadas.
-
-<!-- DIAGRAMA BD: cuando exista una imagen verificada, se puede insertar aquí:
-![Diagrama de la base de datos](docs/images/diagrama-bd.png)
--->
+**El SQL inicial es exclusivamente para una base vacía.** Una instalación con datos necesita migración específica y adaptación del código; no reemplazar una migración ya aplicada.
 
 <a id="instalacion"></a>
 
 ## 7. Instalación y ejecución
 
-### Requisitos para desarrollo en Windows
+### 7.1. Requisitos
 
-- Windows 11 de 64 bits como plataforma objetivo del proyecto.
-- Node.js y npm compatibles con las dependencias del repositorio.
-- Rust y Cargo con las herramientas de compilación para Windows.
-- Microsoft C++ Build Tools con la carga de trabajo de desarrollo de escritorio con C++.
-- Microsoft Edge WebView2 Runtime.
-- Git, si se trabajará mediante un clon del repositorio.
+Windows 11 de 64 bits; Node.js/npm compatibles con el proyecto; Rust/Cargo; Microsoft C++ Build Tools con desarrollo de escritorio C++; WebView2 Runtime y Git para clonar. Ver [requisitos oficiales de Tauri](https://v2.tauri.app/start/prerequisites/).
 
-Consultar los [requisitos oficiales de Tauri](https://v2.tauri.app/start/prerequisites/) para preparar las herramientas del equipo.
+Ejecutar desde la raíz del repositorio, donde está `package.json`.
 
-### Preparar dependencias
-
-Abrir una terminal en la raíz del proyecto, donde se encuentra `package.json`:
+### 7.2. Instalar dependencias
 
 ```powershell
 npm install
 ```
 
-### Ejecutar en desarrollo
-
-Con la CLI de Tauri instalada como dependencia del proyecto:
+### 7.3. Ejecutar en desarrollo
 
 ```powershell
 npx tauri dev
 ```
 
-La configuración de `src-tauri/tauri.conf.json` determina el comando previo del frontend y la dirección de desarrollo. Si allí se utilizan scripts npm, deben existir en `package.json`.
-
-### Generar la compilación de escritorio
+### 7.4. Compilar
 
 ```powershell
 npx tauri build
 ```
 
-La generación de instaladores depende de la configuración de empaquetado y de las herramientas disponibles en Windows. Estos son los comandos estándar de Tauri; su ejecución en este repositorio debe comprobarse con sus archivos de configuración.
+La configuración actual de Tauri invoca `npm run dev` antes del desarrollo y `npm run build` antes de compilar. Los scripts existen en `package.json`; el arranque y el instalador se validan en el equipo Windows objetivo.
 
-### Configuración inicial definida
+### 7.5. Configuración inicial definida
 
-1. Trabajar primero en **Prueba**, con datos ficticios.
-2. Crear el primer administrador desde el flujo inicial de Login, sin credenciales compartidas por defecto.
-3. Configurar empresa, NubeFact, series y zanjas desde Administración.
-4. Registrar catálogos y existencias reales desde Inventario.
-5. Configurar la protección y generar una primera copia desde Backup y Copias.
-6. Validar el flujo completo de atención, cobro y cierre antes de utilizar Producción.
-
-La inicialización de SQLite debe seguir el mecanismo del backend. No ejecutar manualmente un esquema inicial encima de una base que ya contiene datos.
-
-**Entorno recomendado:** [Visual Studio Code](https://code.visualstudio.com/) con las extensiones [Tauri](https://marketplace.visualstudio.com/items?itemName=tauri-apps.tauri-vscode) y [rust-analyzer](https://marketplace.visualstudio.com/items?itemName=rust-lang.rust-analyzer).
+1. Empezar en Prueba y crear el primer administrador, sin credenciales predeterminadas.
+2. Configurar empresa, NubeFact, series y zanjas; registrar catálogos y existencias.
+3. Preparar la protección de copias y validar atención, cobro y cierre antes de Producción.
 
 <a id="pruebas"></a>
 
 ## 8. Pruebas y calidad
 
-La validación del proyecto debe comprobar datos y permisos, además de la apariencia de las pantallas.
+### 8.1. Qué se verifica
 
-| Área                | Qué verificar                                                                  |
-| ------------------- | ------------------------------------------------------------------------------ |
-| Acceso              | Sesión válida, roles, bloqueos y protección de información.                    |
-| Taller e inventario | Estados de OT, disponibilidad, consumos y ausencia de stock duplicado.         |
-| POS y caja          | Venta única, pagos, devoluciones, efectivo disponible y cierre.                |
-| Documentos          | Respuesta incierta, consulta previa al reenvío y ausencia de cobros repetidos. |
-| Recuperación        | Copia válida, restauración completa y numeración conservada.                   |
-| Hora del negocio    | Persistencia y consultas en Lima, incluso cerca de medianoche.                 |
+Sesiones y permisos; estados de OT; stock sin duplicaciones; ventas, devoluciones y cierre; documentos inciertos y reenvío; recuperación, numeración y fechas de Lima.
 
-### Comandos de comprobación
+### 8.2. Cómo ejecutarlas
 
-Desde la raíz, para ejecutar las pruebas Rust del manifiesto del backend:
+Desde la raíz:
 
 ```powershell
+npm test
+npm run typecheck
 cargo test --manifest-path src-tauri/Cargo.toml
 ```
 
-Para consultar los scripts disponibles del frontend:
+Las pruebas de integración externas deben usar datos y credenciales de Prueba. El flujo de [GitHub Actions](.github/workflows/ci.yml) define comprobaciones del frontend y backend; sus resultados se consultan en [Actions](https://github.com/JesusLoza1506/lubricentro-erp/actions).
 
-```powershell
-npm run
-```
+### 8.3. Estado de la validación
 
-Ejecutar el script de pruebas que efectivamente esté definido en `package.json`. Las pruebas de integración con servicios externos deben usar el ambiente y las credenciales de Prueba; no emitir comprobantes de Producción como prueba automatizada.
-
-### Estado de la validación
-
-En la revisión independiente del esquema v7 se ejecutaron **27 casos sobre SQLite**, con resultado satisfactorio. Se verificaron creación, restricciones, relaciones y flujos de datos seleccionados. Estas verificaciones no representan una cobertura medida del repositorio ni una validación completa de Tauri, la interfaz o la API real de NubeFact.
-
-La ejecución y el resultado de las pruebas del código se documentarán con evidencia de cada revisión. Este README no publica porcentajes de cobertura ni un estado de CI/CD sin verificar la configuración y la última ejecución del repositorio.
+**Esquema verificado en SQLite:** 27 casos satisfactorios sobre creación, restricciones, relaciones y flujos seleccionados. Esta evidencia corresponde al esquema revisado, no a la ejecución completa del código ni de NubeFact. Las revisiones de Login disponibles se enlazan en Documentación.
 
 <a id="documentacion"></a>
 
 ## 9. Documentación
 
-| Documento de referencia                     | Contenido                                                                            |
-| ------------------------------------------- | ------------------------------------------------------------------------------------ |
-| **Informe general del software v7**         | Propósito, alcance, roles, relaciones, funcionamiento y reglas comunes.              |
-| **Especificaciones de los diez módulos v7** | Requerimientos, permisos, interfaz, reglas, manual de uso y criterios de aceptación. |
-| **Esquema SQL v7**                          | Tablas, relaciones, restricciones, vistas y resumen de cambios.                      |
+| Recurso                                                                  | Contenido                          |
+| ------------------------------------------------------------------------ | ---------------------------------- |
+| [Carpeta docs](docs/)                                                    | Documentos actualmente publicados. |
+| [Revisión de Login v7 — R4](docs/Reevaluacion_Login_v7_2026-10-17_R4.md) | Revisión del módulo de acceso.     |
+| [Comandos Tauri](docs/api/tauri-commands.md)                             | Referencia técnica existente.      |
+| [Wireframes y diseño](docs/ui/wireframes-y-diseno.md)                    | Referencia de interfaz existente.  |
+| [Esquema SQL v7](src-tauri/migrations/0001_initial_schema_v7.sql)        | Modelo inicial de datos.           |
 
-La documentación funcional y el código deben mantenerse alineados. Una modificación de reglas compartidas exige revisar los módulos afectados, el informe general y el esquema cuando corresponda.
+El informe general y las diez especificaciones funcionales v7 son documentos de referencia; sus enlaces se incorporarán cuando estén publicados en el repositorio. Los cambios de reglas deben reflejarse en código, documentación y esquema cuando corresponda.
 
-<!-- Cuando los documentos estén incorporados al repositorio, añadir aquí enlaces
-     relativos a sus rutas reales. No activar enlaces a archivos aún inexistentes.
-     Para capturas futuras: docs/images/01-login.png ... docs/images/10-reportes.png.
-     Insertar cada imagen bajo Captura de pantalla en su módulo correspondiente.
--->
+<a id="hoja-de-ruta"></a>
+
+## 10. Hoja de ruta
+
+- [ ] **01:** cerrar ajustes y validaciones de Login y Sesión.
+- [ ] **02–03:** revisar y adaptar Dashboard y Ficha Vehicular e Historial.
+- [ ] **04–05:** revisar y adaptar Órdenes de Trabajo Taller e Inventario y Stock.
+- [ ] **06–07:** completar Punto de Venta POS y Caja Chica.
+- [ ] **08–09:** completar Backup y Copias y Administración.
+- [ ] **10:** completar Reportes y validar el flujo integrado del software.
+
+Cada módulo avanzará en la tabla de progreso y tendrá su detalle plegable, capturas y evidencias conforme se complete.
 
 <a id="autor"></a>
 
-## 10. Autores y contexto académico
+## 11. Autores y licencia
 
-**Jesús Ángel Loza Yataco**  
-**Esteban Ricardo Puma Palomino**  
-**Reyes Esterripa Carlos Edén**  
-**Magallanes Llanos Juan Jesús**
+- **Jesús Ángel Loza Yataco**
+- **Esteban Ricardo Puma Palomino**
+- **Reyes Esterripa Carlos Edén**
+- **Magallanes Llanos Juan Jesús**
 
-Estudiante de Ingeniería de Sistemas — Perú.
+**Estudiantes de Ingeniería de Sistemas — Perú.** Proyecto académico para aplicar desarrollo, diseño de datos, integración de servicios y aseguramiento de la calidad a la gestión de un lubricentro.
 
-Proyecto académico para aplicar desarrollo de software, diseño de datos, integración de servicios y aseguramiento de la calidad a la gestión de un lubricentro.
-
----
-
-<div align="center">
-
-**Lubricentro Gloria** · Atención vehicular, taller y gestión del negocio
-
-</div>
+**Licencia:** este README no incorpora una licencia de uso o distribución; su elección corresponde al acuerdo de los autores.
