@@ -1,0 +1,76 @@
+use lubricentro_erp_lib::{commands::auth_commands::iniciar_sesion_local, dto::usuario_dto::*, services::{auth_service::AuthService, session_manager::SessionState}};
+use rusqlite::Connection;
+
+fn setup() -> (Connection, String) {
+    let mut c = Connection::open_in_memory().unwrap();
+    c.execute_batch(include_str!("../migrations/0001_initial_schema_v7.sql")).unwrap();
+    let r = AuthService::instalacion_inicial(&mut c, InstalacionInicialRequestDto {
+        nombre_completo: "Administrador Prueba".into(), username: "admin".into(), password: "Original123".into()
+    }).unwrap();
+    (c, r.codigo_recuperacion)
+}
+
+#[test]
+fn review_recovery_wrong_admin_should_count_failed_credentials() {
+    let (mut c, code) = setup();
+    for _ in 0..5 {
+        assert!(AuthService::recuperar_acceso_admin(&mut c, RecuperarAccesoAdminRequestDto {
+            username: "inexistente".into(), codigo_recuperacion: code.clone(), nueva_password: "Diferente123".into()
+        }).is_err());
+    }
+    let failed: i32 = c.query_row("SELECT recuperacion_fallos FROM configuracion", [], |r| r.get(0)).unwrap();
+    assert_eq!(failed, 5, "Cinco rechazos por usuario de recuperacion incorrecto deben contar");
+}
+
+#[test]
+fn review_recovery_five_bad_codes_is_independent_of_login() {
+    let (mut c, _) = setup();
+    for _ in 0..5 {
+        assert!(AuthService::recuperar_acceso_admin(&mut c, RecuperarAccesoAdminRequestDto {
+            username: "admin".into(), codigo_recuperacion: "INVALIDO".into(), nueva_password: "Diferente123".into()
+        }).is_err());
+    }
+    let (failed, blocked): (i32, bool) = c.query_row("SELECT recuperacion_fallos, recuperacion_bloqueada_hasta IS NOT NULL FROM configuracion", [], |r| Ok((r.get(0)?, r.get(1)?))).unwrap();
+    assert_eq!((failed, blocked), (5, true));
+    assert!(AuthService::login(&c, LoginRequestDto {username:"admin".into(), password:"Original123".into()}).is_ok());
+}
+
+#[test]
+fn review_file_database_retains_login_lock_across_connections() {
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join("review.sqlite");
+    {
+        let mut c = Connection::open(&path).unwrap();
+        c.execute_batch(include_str!("../migrations/0001_initial_schema_v7.sql")).unwrap();
+        AuthService::instalacion_inicial(&mut c, InstalacionInicialRequestDto {
+            nombre_completo:"Administrador Prueba".into(), username:"admin".into(), password:"Original123".into()
+        }).unwrap();
+        for _ in 0..5 {
+            assert!(AuthService::login(&c, LoginRequestDto {username:"admin".into(),password:"Incorrecta123".into()}).is_err());
+        }
+    }
+    let c = Connection::open(&path).unwrap();
+    let before: String = c.query_row("SELECT bloqueado_hasta FROM usuarios", [], |r| r.get(0)).unwrap();
+    assert!(AuthService::login(&c, LoginRequestDto {username:"admin".into(), password:"Original123".into()}).is_err());
+    let after: String = c.query_row("SELECT bloqueado_hasta FROM usuarios", [], |r| r.get(0)).unwrap();
+    assert_eq!(before, after);
+    c.execute("UPDATE usuarios SET bloqueado_hasta=datetime('now','-5 hours','-16 minutes')",[]).unwrap();
+    assert!(AuthService::login(&c, LoginRequestDto {username:"admin".into(), password:"Incorrecta123".into()}).is_err());
+    let count: i32 = c.query_row("SELECT intentos_fallidos FROM usuarios", [], |r| r.get(0)).unwrap();
+    assert_eq!(count, 1);
+    assert!(AuthService::login(&c, LoginRequestDto {username:"admin".into(), password:"Original123".into()}).is_ok());
+    let count: i32 = c.query_row("SELECT intentos_fallidos FROM usuarios", [], |r| r.get(0)).unwrap();
+    assert_eq!(count, 0);
+}
+
+#[test]
+fn review_characterizes_session_scope_as_one_manager_not_global() {
+    let (c, _) = setup();
+    let mut a = SessionState::new();
+    let mut b = SessionState::new();
+    iniciar_sesion_local(&c, &mut a, LoginRequestDto {username:"admin".into(),password:"Original123".into()}).unwrap();
+    iniciar_sesion_local(&c, &mut b, LoginRequestDto {username:"admin".into(),password:"Original123".into()}).unwrap();
+    assert!(a.validar_sesion_operativa(&c).is_ok());
+    assert!(b.validar_sesion_operativa(&c).is_ok());
+    assert_ne!(a.session_id, b.session_id);
+}

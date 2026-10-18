@@ -59,7 +59,6 @@ pub fn run() {
             cerrar_sesion,
             reautenticar,
             autorizar_descuento,
-            probar_consumo_autorizacion_cmd,
             // Clientes & Vehículos
             registrar_cliente_cmd,
             buscar_cliente_por_doc_cmd,

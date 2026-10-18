@@ -45,18 +45,18 @@
 
 Desarrollo secuencial, módulo por módulo, conforme al alcance funcional v7.
 
-| #   | Módulo                                   | Estado                                | Avance |
-| --- | ---------------------------------------- | ------------------------------------- | ------ |
-| 01  | [Login y Sesión](#modulo-login-y-sesion) | 🟢 Ajustes finales                    | ~90 %  |
-| 02  | Inicio Dashboard                         | ⚪ Pendiente de revisión y adaptación | —      |
-| 03  | Ficha Vehicular e Historial              | ⚪ Pendiente de revisión y adaptación | —      |
-| 04  | Órdenes de Trabajo Taller                | ⚪ Pendiente de revisión y adaptación | —      |
-| 05  | Inventario y Stock                       | ⚪ Pendiente de revisión y adaptación | —      |
-| 06  | Punto de Venta POS                       | ⚪ Pendiente                          | —      |
-| 07  | Caja Chica                               | ⚪ Pendiente                          | —      |
-| 08  | Backup y Copias                          | ⚪ Pendiente                          | —      |
-| 09  | Administración                           | ⚪ Pendiente                          | —      |
-| 10  | Reportes                                 | ⚪ Pendiente                          | —      |
+| #   | Módulo                                   | Estado                                       | Avance |
+| --- | ---------------------------------------- | -------------------------------------------- | ------ |
+| 01  | [Login y Sesión](#modulo-login-y-sesion) | 🟢 Ajustes finales                           | ~95 %  |
+| 02  | Inicio Dashboard                         | 🟡 En curso: inicio de revisión y adaptación | —      |
+| 03  | Ficha Vehicular e Historial              | ⚪ Pendiente de revisión y adaptación        | —      |
+| 04  | Órdenes de Trabajo Taller                | ⚪ Pendiente de revisión y adaptación        | —      |
+| 05  | Inventario y Stock                       | ⚪ Pendiente de revisión y adaptación        | —      |
+| 06  | Punto de Venta POS                       | ⚪ Pendiente                                 | —      |
+| 07  | Caja Chica                               | ⚪ Pendiente                                 | —      |
+| 08  | Backup y Copias                          | ⚪ Pendiente                                 | —      |
+| 09  | Administración                           | ⚪ Pendiente                                 | —      |
+| 10  | Reportes                                 | ⚪ Pendiente                                 | —      |
 
 **Leyenda:** ⚪ Pendiente · 🟡 En curso · 🟢 Ajustes finales · ✅ Completado.
 
@@ -69,7 +69,7 @@ Desarrollo secuencial, módulo por módulo, conforme al alcance funcional v7.
 <a id="modulo-login-y-sesion"></a>
 
 <details>
-<summary><b>01 · Login y Sesión</b> — 🟢 Ajustes finales · ~90 %</summary>
+<summary><b>01 · Login y Sesión</b> — 🟢 Ajustes finales · ~95 %</summary>
 
 **Qué hace:** controla el acceso mediante cuentas individuales y mantiene la sesión del trabajador. Identifica su rol y reúne los flujos de primera instalación, cambio y recuperación de contraseña.
 
@@ -105,15 +105,21 @@ _Recuperación de acceso_
 
 ![Recuperación de acceso](docs/images/01-login-recuperacion.png)
 
-Capturas por incorporar: primer administrador (`docs/images/01-login-primer-administrador.png`) y cambio de contraseña (`docs/images/01-login-cambio-clave.png`).
+_Creación del primer administrador_
+
+![Creación del primer administrador](docs/images/01-login-primer-administrador.png)
+
+_Cambio de contraseña_
+
+![Cambio de contraseña](docs/images/01-login-cambio-clave.png)
 
 **Pendiente para cerrar:** mejoras menores, validaciones complementarias y consolidación de evidencias de prueba.
 
-**Estado:** desarrollo completado aproximadamente al **90 %**, en fase de ajustes finales antes de su cierre definitivo.
+**Estado:** desarrollo completado aproximadamente al **95 %**, en fase de ajustes finales antes de su cierre definitivo.
 
 </details>
 
-Los módulos 02–10 se incorporarán aquí conforme avance su revisión e implementación.
+**Siguiente etapa:** iniciar la revisión y adaptación de **Inicio Dashboard**. Su detalle se incorporará conforme avance el trabajo; los módulos 03–10 se documentarán progresivamente.
 
 <a id="roles"></a>
 
@@ -276,7 +282,8 @@ El informe general y las diez especificaciones funcionales v7 son documentos de 
 ## 10. Hoja de ruta
 
 - [ ] **01:** cerrar ajustes y validaciones de Login y Sesión.
-- [ ] **02–03:** revisar y adaptar Dashboard y Ficha Vehicular e Historial.
+- [ ] **02 · En curso:** iniciar la revisión y adaptación de Inicio Dashboard.
+- [ ] **03:** continuar con la revisión y adaptación de Ficha Vehicular e Historial.
 - [ ] **04–05:** revisar y adaptar Órdenes de Trabajo Taller e Inventario y Stock.
 - [ ] **06–07:** completar Punto de Venta POS y Caja Chica.
 - [ ] **08–09:** completar Backup y Copias y Administración.

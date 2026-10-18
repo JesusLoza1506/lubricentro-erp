@@ -7,6 +7,7 @@ import {
   apiInstalacionInicial,
   apiRecuperarAccesoAdmin,
   apiVerificarInstalacion,
+  mensajeErrorAuth,
 } from '../../services/authService';
 
 import { LoginBrandPanel } from './components/LoginBrandPanel';
@@ -147,7 +148,7 @@ export const LoginPage: React.FC = () => {
       }
     } catch (err: any) {
       setPasswordInput('');
-      const mensaje = typeof err === 'string' ? err : err?.message || 'Credenciales inválidas.';
+      const mensaje = mensajeErrorAuth(err, 'Credenciales inválidas.');
       setErrorMsg(mensaje);
     }
   };
@@ -190,7 +191,7 @@ export const LoginPage: React.FC = () => {
       setNuevaClaveOblig('');
       setConfirmClaveOblig('');
       const mensaje =
-        typeof err === 'string' ? err : err?.message || 'Error al actualizar la contraseña.';
+        mensajeErrorAuth(err, 'Error al actualizar la contraseña.');
       setErrorMsg(mensaje);
     } finally {
       setProcesando(false);
@@ -240,7 +241,7 @@ export const LoginPage: React.FC = () => {
       setInstPassword('');
       setInstConfirmPassword('');
       const mensaje =
-        typeof err === 'string' ? err : err?.message || 'Error al realizar la instalación inicial.';
+        mensajeErrorAuth(err, 'Error al realizar la instalación inicial.');
       setErrorMsg(mensaje);
     } finally {
       setProcesando(false);

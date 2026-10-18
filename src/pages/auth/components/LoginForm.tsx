@@ -88,7 +88,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({
               value={passwordInput}
               onChange={(e) => setPasswordInput(e.target.value)}
               placeholder="••••••••"
-              maxLength={128}
+              maxLength={256}
               style={s.inputWithIcon}
               autoComplete="current-password"
             />

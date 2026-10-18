@@ -9,16 +9,8 @@ use crate::services::auditoria_service::AuditoriaService;
 use crate::services::auth_service::AuthService;
 use crate::services::session_manager::SessionState;
 use rusqlite::Connection;
-use serde::Deserialize;
 use std::sync::Mutex;
 use tauri::State;
-
-#[derive(Debug, Deserialize)]
-pub struct ProbarConsumoAutorizacionDto {
-    pub token: String,
-    pub accion_esperada: String,
-    pub referencia_esperada: String,
-}
 
 fn obtener_ambiente_actual_strict(conn: &Connection) -> Result<String, AppError> {
     conn.query_row(
@@ -54,19 +46,27 @@ pub fn login_usuario(
     let mut session = session_state.lock().map_err(|_| AppError::DbLock)?;
     let conn = db_state.lock().map_err(|_| AppError::DbLock)?;
 
-    if !session.verificar_inactividad_con_auditoria(Some(&conn)) {
+    iniciar_sesion_local(&conn, &mut session, req)
+}
+
+pub fn iniciar_sesion_local(
+    conn: &Connection,
+    session: &mut SessionState,
+    req: LoginRequestDto,
+) -> Result<LoginResponseDto, AppError> {
+    if !session.verificar_inactividad_con_auditoria(Some(conn)) {
         return Err(AppError::SessionActive);
     }
 
     // 1. CORRECCIÓN R7 (Punto 5): Consultar ambiente ANTES de invocar AuthService::login
-    let ambiente = obtener_ambiente_actual_strict(&conn)?;
+    let ambiente = obtener_ambiente_actual_strict(conn)?;
 
     // 2. Autenticar credenciales y registrar auditoría solo si el ambiente responde
-    let (mut res, usuario_version) = AuthService::login(&conn, req)?;
+    let (mut res, usuario_version) = AuthService::login(conn, req)?;
     res.ambiente_actual = ambiente;
 
     // 3. Abrir la sesión en memoria una vez que la operación entera ha sido exitosa
-    session.abrir_sesion(
+    res.session_id = session.abrir_sesion(
         res.id_usuario,
         usuario_version,
         res.username.clone(),
@@ -93,15 +93,13 @@ pub fn recuperar_acceso_admin(
     session_state: State<'_, Mutex<SessionState>>,
     req: RecuperarAccesoAdminRequestDto,
 ) -> Result<InstalacionInicialResponseDto, AppError> {
-    let mut session = session_state.lock().ok();
+    let mut session = session_state.lock().map_err(|_| AppError::DbLock)?;
 
     let mut conn = db_state.lock().map_err(|_| AppError::DbLock)?;
 
     let res = AuthService::recuperar_acceso_admin(&mut conn, req)?;
 
-    if let Some(ref mut s) = session {
-        s.cerrar_sesion();
-    }
+    session.cerrar_sesion();
 
     Ok(res)
 }
@@ -183,22 +181,13 @@ pub fn cambiar_clave_voluntaria(
 pub fn registrar_actividad(
     db_state: State<'_, Mutex<Connection>>,
     session_state: State<'_, Mutex<SessionState>>,
-    delta_ms: Option<u64>,
+    sesion_id: String,
 ) -> Result<(), AppError> {
     let mut session = session_state.lock().map_err(|_| AppError::DbLock)?;
 
     let conn = db_state.lock().map_err(|_| AppError::DbLock)?;
 
-    if session.verificar_inactividad_con_auditoria(Some(&conn)) {
-        return Err(AppError::NoAutenticado);
-    }
-
-    if let Some(ms) = delta_ms {
-        session.renovar_actividad_con_delta(ms);
-    } else {
-        session.renovar_actividad();
-    }
-    Ok(())
+    session.registrar_interaccion(&conn, &sesion_id)
 }
 
 #[tauri::command]
@@ -216,7 +205,7 @@ pub fn cerrar_sesion(
         if let Ok(conn) = db_state.lock() {
             if let Err(e) = AuditoriaService::registrar_cierre_sesion(&conn, id, &usr, &rol) {
                 tracing::error!(
-                    "Fallo de trazabilidad al registrar auditoria de logout: {:?}",
+                    "Fallo de trazabilidad al registrar auditoria de logout: {}",
                     e
                 );
             }
@@ -344,31 +333,10 @@ pub fn autorizar_descuento(
         "OK",
     ) {
         tracing::error!(
-            "Fallo de trazabilidad al registrar auditoria de autorizacion: {:?}",
+            "Fallo de trazabilidad al registrar auditoria de autorizacion: {}",
             e
         );
     }
 
     Ok(token)
-}
-
-#[tauri::command]
-pub fn probar_consumo_autorizacion_cmd(
-    db_state: State<'_, Mutex<Connection>>,
-    session_state: State<'_, Mutex<SessionState>>,
-    req: ProbarConsumoAutorizacionDto,
-) -> Result<i64, AppError> {
-    let mut session = session_state.lock().map_err(|_| AppError::DbLock)?;
-    let conn = db_state.lock().map_err(|_| AppError::DbLock)?;
-
-    let id_solicitante = session.validar_sesion_operativa(&conn)?;
-
-    let id_autorizante = session.consumir_autorizacion(
-        &req.token,
-        id_solicitante,
-        &req.accion_esperada,
-        &req.referencia_esperada,
-    )?;
-
-    Ok(id_autorizante)
 }

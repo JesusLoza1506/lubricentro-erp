@@ -9,6 +9,7 @@ pub struct LoginRequestDto {
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct LoginResponseDto {
+    pub session_id: String,
     pub id_usuario: i64,
     pub nombre_completo: String,
     pub username: String,
@@ -71,6 +72,7 @@ pub struct AutorizarDescuentoRequestDto {
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct SesionResumenDto {
+    pub session_id: String,
     pub id_usuario: i64,
     pub username: String,
     pub nombre_completo: String,

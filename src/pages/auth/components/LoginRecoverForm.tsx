@@ -105,7 +105,7 @@ export const LoginRecoverForm: React.FC<LoginRecoverFormProps> = ({
               value={recNuevaPassword}
               onChange={(e) => setRecNuevaPassword(e.target.value)}
               placeholder="8 a 128 caracteres (letras y números)"
-              maxLength={128}
+              maxLength={256}
               style={s.inputBox}
               autoComplete="new-password"
             />
@@ -122,7 +122,7 @@ export const LoginRecoverForm: React.FC<LoginRecoverFormProps> = ({
               value={recConfirmNuevaPassword}
               onChange={(e) => setRecConfirmNuevaPassword(e.target.value)}
               placeholder="Repite la nueva contraseña"
-              maxLength={128}
+              maxLength={256}
               style={s.inputBox}
               autoComplete="new-password"
             />

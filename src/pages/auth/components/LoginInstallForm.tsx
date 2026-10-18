@@ -102,7 +102,7 @@ export const LoginInstallForm: React.FC<LoginInstallFormProps> = ({
               value={instPassword}
               onChange={(e) => setInstPassword(e.target.value)}
               placeholder="8 a 128 caracteres (letras y números)"
-              maxLength={128}
+              maxLength={256}
               style={s.inputBox}
               autoComplete="new-password"
             />
@@ -119,7 +119,7 @@ export const LoginInstallForm: React.FC<LoginInstallFormProps> = ({
               value={instConfirmPassword}
               onChange={(e) => setInstConfirmPassword(e.target.value)}
               placeholder="Repite la contraseña"
-              maxLength={128}
+              maxLength={256}
               style={s.inputBox}
               autoComplete="new-password"
             />

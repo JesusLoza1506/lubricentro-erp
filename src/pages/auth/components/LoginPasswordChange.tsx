@@ -58,7 +58,7 @@ export const LoginPasswordChange: React.FC<LoginPasswordChangeProps> = ({
             value={nuevaClaveOblig}
             onChange={(e) => setNuevaClaveOblig(e.target.value)}
             placeholder="8 a 128 caracteres (letras y números)"
-            maxLength={128}
+            maxLength={256}
             style={s.inputBox}
             autoComplete="new-password"
           />
@@ -75,7 +75,7 @@ export const LoginPasswordChange: React.FC<LoginPasswordChangeProps> = ({
             value={confirmClaveOblig}
             onChange={(e) => setConfirmClaveOblig(e.target.value)}
             placeholder="Repite la nueva contraseña"
-            maxLength={128}
+            maxLength={256}
             style={s.inputBox}
             autoComplete="new-password"
           />

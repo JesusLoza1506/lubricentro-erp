@@ -11,6 +11,7 @@ export interface PermisoModulo {
 }
 
 export interface UsuarioSesion {
+  session_id: string;
   id_usuario: number;
   nombre_completo: string;
   username: string;
@@ -23,6 +24,7 @@ export interface UsuarioSesion {
 }
 
 export interface SesionResumenDto {
+  session_id: string;
   id_usuario: number;
   username: string;
   nombre_completo: string;

@@ -127,13 +127,18 @@ impl SessionState {
         }
     }
 
-    pub fn renovar_actividad_con_delta(&mut self, delta_ms: u64) {
-        if self.estado_sesion != EstadoSesion::SinSesion {
-            let ahora = Instant::now();
-            let retraso = Duration::from_millis(delta_ms);
-            // Deduce el desfasaje del reporte sin permitir underflow de Instant
-            self.ultima_actividad = ahora.checked_sub(retraso).unwrap_or(ahora);
+    pub fn registrar_interaccion(
+        &mut self,
+        conn: &Connection,
+        sesion_id: &str,
+    ) -> Result<(), AppError> {
+        // Una petición retrasada de una sesión anterior nunca renueva la actual.
+        if self.session_id.as_deref() != Some(sesion_id) {
+            return Err(AppError::NoAutenticado);
         }
+        self.validar_sesion_vigente(conn, true)?;
+        self.renovar_actividad();
+        Ok(())
     }
 
     pub fn verificar_inactividad(&mut self) -> bool {
@@ -171,7 +176,7 @@ impl SessionState {
                     Some("Cierre automático por inactividad de 15 minutos"),
                 ) {
                     tracing::error!(
-                        "Fallo de trazabilidad al registrar auditoria de expiracion: {:?}",
+                        "Fallo de trazabilidad al registrar auditoria de expiracion: {}",
                         e
                     );
                 }
@@ -329,5 +334,20 @@ impl SessionState {
                 AppError::AccessDenied("Token de autorización inválido o ya utilizado.".to_string())
             })?;
         Ok(conf_valida.autorizante_id)
+    }
+
+    /// El origen fija acción y referencia y ejecuta su efecto solo tras validar la autorización.
+    /// Un fallo del efecto exige una autorización nueva; nunca se reutiliza el token.
+    pub fn ejecutar_operacion_autorizada<T>(
+        &mut self,
+        conn: &Connection,
+        token: &str,
+        accion: &'static str,
+        referencia: &str,
+        efecto: impl FnOnce(&Connection, i64, i64) -> Result<T, AppError>,
+    ) -> Result<T, AppError> {
+        let ejecutor = self.validar_sesion_operativa(conn)?;
+        let autorizante = self.consumir_autorizacion(token, ejecutor, accion, referencia)?;
+        efecto(conn, ejecutor, autorizante)
     }
 }

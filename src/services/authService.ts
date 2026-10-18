@@ -19,16 +19,13 @@ import {
  */
 export const esErrorNoAutenticado = (err: unknown): boolean => {
   if (!err) return false;
-  const msg = typeof err === 'string' ? err : (err as any)?.message || JSON.stringify(err);
-  return (
-    msg.startsWith('NO_AUTENTICADO') ||
-    msg.includes('NO_AUTENTICADO') ||
-    msg.includes('NoAutenticado') ||
-    msg.includes('Debes iniciar sesión') ||
-    msg.includes('sin sesión') ||
-    msg.includes('Sesión no válida') ||
-    msg.includes('invalidada')
-  );
+  const msg = typeof err === 'string' ? err : err instanceof Error ? err.message : '';
+  return msg.split(':', 1)[0].trim() === 'NO_AUTENTICADO';
+};
+
+export const mensajeErrorAuth = (err: unknown, fallback: string): string => {
+  const msg = typeof err === 'string' ? err : err instanceof Error ? err.message : fallback;
+  return msg.replace(/^(?:NO_AUTENTICADO|AUTH_ERROR|ACCESS_DENIED|VALIDATION_ERROR|PERMISO_DENEGADO|SESSION_ACTIVE|DB_LOCK|NOT_FOUND|DATABASE_ERROR):\s*/, '');
 };
 
 export const apiObtenerVersionApp = async (): Promise<string> => {
@@ -83,8 +80,8 @@ export const apiCambiarClaveVoluntaria = async (
   await invoke<void>('cambiar_clave_voluntaria', { req: payload });
 };
 
-export const apiRegistrarActividad = async (deltaMs?: number): Promise<void> => {
-  await invoke<void>('registrar_actividad', { deltaMs: deltaMs ?? null });
+export const apiRegistrarActividad = async (sesionId: string): Promise<void> => {
+  await invoke<void>('registrar_actividad', { sesionId });
 };
 
 export const apiCerrarSesion = async (): Promise<void> => {

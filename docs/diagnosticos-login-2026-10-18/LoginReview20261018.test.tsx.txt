@@ -1,0 +1,54 @@
+import React from 'react';
+import {act, cleanup, fireEvent, render, screen} from '@testing-library/react';
+import {afterEach, beforeEach, expect, it, vi} from 'vitest';
+import {AuthProvider, useAuth} from '../AuthContext';
+import {LoginPage} from '../../pages/auth/LoginPage';
+import {CambioClaveModal} from '../../components/CambioClaveModal';
+import * as api from '../../services/authService';
+vi.mock('../../services/authService', async original => ({
+  ...await original<typeof import('../../services/authService')>(),
+  apiObtenerSesion:vi.fn(),apiObtenerVersionApp:vi.fn(),apiObtenerAmbienteInicial:vi.fn(),
+  apiRegistrarActividad:vi.fn(),apiCerrarSesion:vi.fn(),apiLoginUsuario:vi.fn(),
+  apiVerificarInstalacion:vi.fn(),apiRecuperarAccesoAdmin:vi.fn(),apiCambiarClaveVoluntaria:vi.fn()
+}));
+const session = {session_id:'review-session',id_usuario:1,username:'admin',nombre_completo:'Admin',rol:'ADMINISTRADOR',estado_sesion:'NORMAL',permisos:[],ambiente_actual:'PRUEBA'};
+let auth: ReturnType<typeof useAuth>;
+function Probe(){auth=useAuth();return null;}
+beforeEach(()=>{
+  vi.resetAllMocks();
+  vi.mocked(api.apiObtenerVersionApp).mockResolvedValue('7');
+  vi.mocked(api.apiObtenerAmbienteInicial).mockResolvedValue('PRUEBA');
+  vi.mocked(api.apiObtenerSesion).mockResolvedValue(session as any);
+  vi.mocked(api.apiVerificarInstalacion).mockResolvedValue(false);
+  vi.mocked(api.apiRegistrarActividad).mockResolvedValue();
+});
+afterEach(()=>cleanup());
+it('review: a failed logout followed by a session check must not restore the prior identity',async()=>{
+  await act(async()=>{render(<AuthProvider><Probe/></AuthProvider>)});
+  vi.mocked(api.apiCerrarSesion).mockRejectedValue('DB_LOCK: Fallo al sincronizar.');
+  await act(async()=>{await auth.cerrarSesion()});
+  expect(auth.estadoSesion).toBe('SIN_SESION');
+  await act(async()=>{await auth.verificarSesion()});
+  expect(auth.estadoSesion, 'Tras el cierre fallido el backend conserva la sesion anterior y el contexto la readmite').toBe('SIN_SESION');
+});
+it('review: mandatory password form must offer Mostrar/Ocultar',async()=>{
+  vi.mocked(api.apiObtenerSesion).mockResolvedValue({...session,estado_sesion:'CAMBIO_OBLIGATORIO'} as any);
+  await act(async()=>{render(<AuthProvider><LoginPage/></AuthProvider>)});
+  expect(screen.queryByRole('button',{name:/mostrar|ocultar/i})).not.toBeNull();
+});
+it('review: voluntary password form must offer Mostrar/Ocultar',async()=>{
+  await act(async()=>{render(<AuthProvider><CambioClaveModal onClose={()=>{}}/></AuthProvider>)});
+  expect(screen.queryByRole('button',{name:/mostrar|ocultar/i})).not.toBeNull();
+});
+it('review: recovery shows a message without its technical error prefix',async()=>{
+  vi.mocked(api.apiObtenerSesion).mockRejectedValue('NO_AUTENTICADO: Debes iniciar sesion.');
+  vi.mocked(api.apiRecuperarAccesoAdmin).mockRejectedValue('AUTH_ERROR: No se pudo recuperar el acceso con los datos ingresados.');
+  await act(async()=>{render(<AuthProvider><LoginPage/></AuthProvider>)});
+  fireEvent.click(screen.getByRole('button',{name:/olvidaste/i}));
+  fireEvent.change(screen.getByLabelText('Usuario Administrador'),{target:{value:'admin'}});
+  fireEvent.change(screen.getByLabelText('Código de Recuperación'),{target:{value:'INVALIDO'}});
+  fireEvent.change(screen.getByLabelText('Nueva Contraseña'),{target:{value:'Diferente123'}});
+  fireEvent.change(screen.getByLabelText('Confirmar Nueva Contraseña'),{target:{value:'Diferente123'}});
+  await act(async()=>{fireEvent.click(screen.getByRole('button',{name:'Restablecer Clave de Admin'}))});
+  expect(screen.queryByText(/^AUTH_ERROR:/)).toBeNull();
+});

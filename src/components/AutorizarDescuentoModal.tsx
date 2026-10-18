@@ -271,7 +271,7 @@ export const AutorizarDescuentoModal: React.FC<Props> = ({
                 value={passwordAdmin}
                 onChange={(e) => setPasswordAdmin(e.target.value)}
                 placeholder="••••••••"
-                maxLength={128}
+                maxLength={256}
                 style={{
                   width: '100%',
                   padding: '12px 14px 12px 42px',

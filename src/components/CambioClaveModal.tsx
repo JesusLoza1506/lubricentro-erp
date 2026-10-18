@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { apiCambiarClaveVoluntaria } from '../services/authService';
+import { apiCambiarClaveVoluntaria, mensajeErrorAuth } from '../services/authService';
 import { ShieldAlert, Check, X, KeyRound } from 'lucide-react';
 import { ConfirmModal } from './ConfirmModal';
 
@@ -147,7 +147,7 @@ export const CambioClaveModal: React.FC<Props> = ({ onClose }) => {
       onClose();
     } catch (err: any) {
       const mensaje =
-        typeof err === 'string' ? err : err?.message || 'Error al cambiar la contraseña.';
+        mensajeErrorAuth(err, 'Error al cambiar la contraseña.');
       setErrorMsg(mensaje);
     } finally {
       setProcesando(false);
@@ -313,7 +313,7 @@ export const CambioClaveModal: React.FC<Props> = ({ onClose }) => {
                 value={nuevaPassword}
                 onChange={(e) => handleInputChange(setNuevaPassword, e.target.value)}
                 placeholder="••••••••"
-                maxLength={128}
+                maxLength={256}
                 style={{
                   width: '100%',
                   padding: '12px 14px',
@@ -349,7 +349,7 @@ export const CambioClaveModal: React.FC<Props> = ({ onClose }) => {
                 value={confirmarPassword}
                 onChange={(e) => handleInputChange(setConfirmarPassword, e.target.value)}
                 placeholder="••••••••"
-                maxLength={128}
+                maxLength={256}
                 style={{
                   width: '100%',
                   padding: '12px 14px',

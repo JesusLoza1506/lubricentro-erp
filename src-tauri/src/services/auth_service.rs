@@ -76,7 +76,7 @@ impl AuthService {
         }
 
         let tiene_letra = password.chars().any(|c| c.is_alphabetic());
-        let tiene_numero = password.chars().any(|c| c.is_numeric());
+        let tiene_numero = password.chars().any(|c| c.is_ascii_digit());
 
         if !tiene_letra || !tiene_numero {
             return Err(AppError::Validation(
@@ -102,9 +102,12 @@ impl AuthService {
                 "El nombre de usuario debe tener entre 3 y 30 caracteres.".to_string(),
             ));
         }
-        if clean.contains(' ') {
+        if !clean
+            .chars()
+            .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || "._-".contains(c))
+        {
             return Err(AppError::Validation(
-                "El nombre de usuario no puede contener espacios.".to_string(),
+                "El usuario solo admite letras a-z, números y los símbolos . _ -".to_string(),
             ));
         }
         Ok(clean)
@@ -152,10 +155,15 @@ impl AuthService {
 
         let id_usuario = tx.last_insert_rowid();
 
-        tx.execute(
+        let configuracion_actualizada = tx.execute(
             "UPDATE configuracion SET recuperacion_hash = ?1, fecha_codigo_recuperacion = datetime('now', '-5 hours') WHERE id_config = 1",
             params![codigo_hash],
         )?;
+        if configuracion_actualizada != 1 {
+            return Err(AppError::Validation(
+                "No hay configuración inicial disponible.".to_string(),
+            ));
+        }
 
         AuditoriaService::registrar_evento_login(
             &tx,
@@ -311,6 +319,7 @@ impl AuthService {
 
             Ok((
                 LoginResponseDto {
+                    session_id: String::new(), // El comando abre y vincula la sesión.
                     id_usuario,
                     nombre_completo,
                     username,
@@ -382,6 +391,7 @@ impl AuthService {
         };
 
         Ok(SesionResumenDto {
+            session_id: session.session_id.clone().ok_or(AppError::NoAutenticado)?,
             id_usuario,
             username,
             nombre_completo,
