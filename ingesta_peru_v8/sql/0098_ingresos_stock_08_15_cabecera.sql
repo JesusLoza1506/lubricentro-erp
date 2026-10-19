@@ -1,0 +1,5 @@
+-- LUBRICENTRO GLORIA | DATOS FICTICIOS | PRODUCCION LOCAL
+-- Tabla: ingresos_stock. Ejecutar en orden del plan, dentro de la transaccion global.
+-- No ejecutar aisladamente ni desactivar triggers/foreign_keys.
+
+INSERT INTO ingresos_stock (id_ingreso,id_operacion,codigo,origen,total_costo_micro,id_usuario,observacion,fecha_registro,id_proveedor,proveedor_snapshot,tipo_documento,numero_documento,fecha_documento) VALUES (15,'lg-carga-20261018-ingreso-14','ING-2026-0015','COMPRA',2736000000,1,'Recepción de mercadería y verificación de cantidades','2026-03-01 10:14:00',13,'{"id_proveedor":13,"tipo_documento":"RUC","numero_documento":"20371952960","nombre_razon_social":"Distribuidora Los Portales de Chincha S.A.C.","telefono":"929410279","correo":"distribuidora.los.portales32@hotmail.com","direccion":"Calle San José N.° 201, Urb. El Rosario, Sunampe, Chincha, Ica","contacto_asesor":"Víctor Manuel Salazar Vega","fecha_creacion":"2026-03-01 08:00:00","version":0}','FACTURA','F001-00096445','2026-03-01');

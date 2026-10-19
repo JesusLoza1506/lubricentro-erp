@@ -795,6 +795,7 @@ impl AuthService {
                     puede_editar: true,
                     puede_eliminar: true,
                 },
+                // ✅ CORREGIDO (Punto 4): El Mecánico en FICHA_VEHICULAR solo tiene lectura (puede_ver).
                 "MECANICO" => PermisoDto {
                     modulo: mod_name.to_string(),
                     puede_ver: matches!(
@@ -811,8 +812,8 @@ impl AuthService {
                         mod_name,
                         "DASHBOARD" | "FICHA_VEHICULAR" | "OT" | "INVENTARIO" | "POS" | "CAJA"
                     ),
-                    puede_crear: matches!(mod_name, "OT" | "POS" | "CAJA"),
-                    puede_editar: matches!(mod_name, "POS" | "CAJA"),
+                    puede_crear: matches!(mod_name, "OT" | "POS" | "CAJA" | "FICHA_VEHICULAR"),
+                    puede_editar: matches!(mod_name, "POS" | "CAJA" | "FICHA_VEHICULAR"),
                     puede_eliminar: false,
                 },
                 _ => PermisoDto {

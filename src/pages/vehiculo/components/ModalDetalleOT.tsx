@@ -1,6 +1,6 @@
 import React from 'react';
 import { OrdenTrabajoHistorialDTO } from '../../../types/vehiculo';
-import { Wrench, Calendar, Gauge, FileText, X, Droplet, UserCheck } from 'lucide-react';
+import { Wrench, Calendar, Gauge, FileText, X, Droplet, UserCheck, User, Car } from 'lucide-react';
 
 interface ModalDetalleOTProps {
   modalAbierto: boolean;
@@ -93,6 +93,37 @@ export const ModalDetalleOT: React.FC<ModalDetalleOTProps> = ({
           </button>
         </div>
 
+        {/* ✅ CORREGIDO (Punto 2): SECCIÓN DE IDENTIDAD HISTÓRICA (CLIENTE Y VEHÍCULO AL MOMENTO DE LA OT) */}
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: '1fr 1fr',
+            gap: '12px',
+            padding: '12px',
+            backgroundColor: 'rgba(30, 41, 59, 0.7)',
+            borderRadius: '12px',
+            border: '1px solid #334155',
+            fontSize: '13px',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#CBD5E1' }}>
+            <Car size={16} color="#38BDF8" />
+            <span>
+              Placa / Vehículo: <strong>{ordenTrabajo.placa}</strong>
+              {ordenTrabajo.marca_vehiculo &&
+                ` (${ordenTrabajo.marca_vehiculo} ${ordenTrabajo.modelo_vehiculo || ''})`}
+            </span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#CBD5E1' }}>
+            <User size={16} color="#34D399" />
+            <span>
+              Cliente: <strong>{ordenTrabajo.nombre_cliente || 'N/A'}</strong>
+              {ordenTrabajo.documento_cliente &&
+                ` [${ordenTrabajo.tipo_documento_cliente || 'DOC'}: ${ordenTrabajo.documento_cliente}]`}
+            </span>
+          </div>
+        </div>
+
         {/* METADATOS DE LA OT */}
         <div
           style={{
@@ -112,11 +143,17 @@ export const ModalDetalleOT: React.FC<ModalDetalleOTProps> = ({
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#CBD5E1' }}>
             <Gauge size={16} color="#FBBF24" />
-            <span>Ingreso: {ordenTrabajo.kilometraje_ingreso.toLocaleString()} km</span>
+            <span>Ingreso: {(ordenTrabajo.kilometraje_ingreso ?? 0).toLocaleString()} km</span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#CBD5E1' }}>
             <Wrench size={16} color="#34D399" />
-            <span>Próximo: {ordenTrabajo.proximo_kilometraje.toLocaleString()} km</span>
+            <span>
+              Próximo:{' '}
+              {ordenTrabajo.proximo_kilometraje !== null &&
+              ordenTrabajo.proximo_kilometraje !== undefined
+                ? `${ordenTrabajo.proximo_kilometraje.toLocaleString()} km`
+                : 'Sin cambio'}
+            </span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#CBD5E1' }}>
             <FileText size={16} color="#A855F7" />

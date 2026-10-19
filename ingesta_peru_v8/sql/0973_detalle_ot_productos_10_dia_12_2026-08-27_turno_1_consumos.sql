@@ -1,0 +1,8 @@
+-- LUBRICENTRO GLORIA | DATOS FICTICIOS | PRODUCCION LOCAL
+-- Tabla: detalle_ot_productos. Ejecutar en orden del plan, dentro de la transaccion global.
+-- No ejecutar aisladamente ni desactivar triggers/foreign_keys.
+
+INSERT INTO detalle_ot_productos (id_detalle,id_operacion,id_ot,id_producto,codigo_snapshot,nombre_snapshot,unidad_medida,cantidad,precio_unitario_cent,costo_unitario_micro,valor_consumido_micro,id_usuario,fecha_consumo) VALUES (122,'lg-carga-20261018-consumo-122',111,113,'GRA-0113','Aceite mineral SAE 20W-50 a granel','ML',4000,2500,15000000,60000000,8,'2026-08-27 09:10:00');
+INSERT INTO detalle_ot_productos (id_detalle,id_operacion,id_ot,id_producto,codigo_snapshot,nombre_snapshot,unidad_medida,cantidad,precio_unitario_cent,costo_unitario_micro,valor_consumido_micro,id_usuario,fecha_consumo) VALUES (123,'lg-carga-20261018-consumo-123',111,39,'FIL-0039','Filtro de aceite línea A03','UND',1,2400,14400000,14400000,8,'2026-08-27 09:10:00');
+INSERT INTO detalle_ot_productos (id_detalle,id_operacion,id_ot,id_producto,codigo_snapshot,nombre_snapshot,unidad_medida,cantidad,precio_unitario_cent,costo_unitario_micro,valor_consumido_micro,id_usuario,fecha_consumo) VALUES (124,'lg-carga-20261018-consumo-124',112,114,'GRA-0114','Aceite sintético SAE 5W-30 a granel','ML',4000,4500,27000000,108000000,9,'2026-08-27 09:10:00');
+INSERT INTO detalle_ot_productos (id_detalle,id_operacion,id_ot,id_producto,codigo_snapshot,nombre_snapshot,unidad_medida,cantidad,precio_unitario_cent,costo_unitario_micro,valor_consumido_micro,id_usuario,fecha_consumo) VALUES (125,'lg-carga-20261018-consumo-125',112,40,'FIL-0040','Filtro de aceite línea A04','UND',1,2700,16200000,16200000,9,'2026-08-27 09:10:00');

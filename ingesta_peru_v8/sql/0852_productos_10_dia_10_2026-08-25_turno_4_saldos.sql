@@ -1,0 +1,6 @@
+-- LUBRICENTRO GLORIA | DATOS FICTICIOS | PRODUCCION LOCAL
+-- Tabla: productos. Ejecutar en orden del plan, dentro de la transaccion global.
+-- No ejecutar aisladamente ni desactivar triggers/foreign_keys.
+
+UPDATE productos SET stock_actual=330,valor_stock_micro=3168000000,version=12 WHERE id_producto=105;
+UPDATE productos SET stock_actual=337,valor_stock_micro=9099000000,version=4 WHERE id_producto=76;

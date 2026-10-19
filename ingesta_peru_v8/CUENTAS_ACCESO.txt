@@ -1,0 +1,16 @@
+Solo cuentas ficticias. Contrasena comun: q123456
+Administrador original: SIN CAMBIOS
+
+cajero01     CAJERO     Jorge Luis Flores Mendoza
+cajero02     CAJERO     Miguel Angel Rojas Garcia
+cajero03     CAJERO     Jose Antonio Torres Ramos
+cajero04     CAJERO     Rosa Elena Vargas Palomino
+cajero05     CAJERO     Maria Fernanda Chavez Yataco
+mecanico01   MECANICO   Rosa Elena Flores Mendoza
+mecanico02   MECANICO   Maria Fernanda Rojas Garcia
+mecanico03   MECANICO   Ana Lucia Torres Ramos
+mecanico04   MECANICO   Patricia Isabel Vargas Palomino
+mecanico05   MECANICO   Daniel Alejandro Chavez Yataco
+
+Hash Argon2id proporcionado y verificado:
+$argon2id$v=19$m=19456,t=2,p=1$it49HuMPRub4Q2szeQehVQ$oGe0NxVV7VRqPFIk5uyDg1c8BGadEAk2sz07HBzysTA

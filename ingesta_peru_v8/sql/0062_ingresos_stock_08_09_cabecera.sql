@@ -1,0 +1,5 @@
+-- LUBRICENTRO GLORIA | DATOS FICTICIOS | PRODUCCION LOCAL
+-- Tabla: ingresos_stock. Ejecutar en orden del plan, dentro de la transaccion global.
+-- No ejecutar aisladamente ni desactivar triggers/foreign_keys.
+
+INSERT INTO ingresos_stock (id_ingreso,id_operacion,codigo,origen,total_costo_micro,id_usuario,observacion,fecha_registro,id_proveedor,proveedor_snapshot,tipo_documento,numero_documento,fecha_documento) VALUES (9,'lg-carga-20261018-ingreso-8','ING-2026-0009','COMPRA',19848000000,1,'Recepción de mercadería y verificación de cantidades','2026-03-01 10:08:00',7,'{"id_proveedor":7,"tipo_documento":"RUC","numero_documento":"20802972742","nombre_razon_social":"Comercial Lubrisur del Valle S.A.C.","telefono":"925842044","correo":"comercial.lubrisur.del50@outlook.com","direccion":"Av. Óscar R. Benavides N.° 118, Urb. Los Álamos, Grocio Prado, Chincha, Ica","contacto_asesor":"Julio César Cruz García","fecha_creacion":"2026-03-01 08:00:00","version":0}','FACTURA','F001-00093839','2026-03-01');

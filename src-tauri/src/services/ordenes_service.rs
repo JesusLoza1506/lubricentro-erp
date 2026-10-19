@@ -21,21 +21,78 @@ impl OrdenesService {
     }
 
     fn obtener_tipo_aceite_ot(conn: &Connection, id_ot: i64) -> Result<Option<String>, AppError> {
-        let sql = "SELECT p.nombre
-                   FROM detalle_ot_productos dp
-                   JOIN productos p ON dp.id_producto = p.id_producto
-                   WHERE dp.id_ot = ?1
-                     AND (UPPER(p.categoria) = 'ACEITE' OR UPPER(p.categoria) = 'GRANEL')
-                   LIMIT 1";
+        let sql = "SELECT tipo_aceite FROM ordenes_trabajo WHERE id_ot = ?1";
+        if let Ok(Some(Some(t))) = conn
+            .query_row(sql, [id_ot], |row| row.get::<_, Option<String>>(0))
+            .optional()
+        {
+            if !t.trim().is_empty() {
+                return Ok(Some(t));
+            }
+        }
 
-        let resultado = conn.query_row(sql, [id_ot], |row| row.get(0)).optional()?;
+        let sql_prod = "SELECT p.nombre
+                        FROM detalle_ot_productos dp
+                        JOIN productos p ON dp.id_producto = p.id_producto
+                        WHERE dp.id_ot = ?1
+                          AND (UPPER(p.categoria) = 'ACEITE' OR UPPER(p.categoria) = 'GRANEL')
+                        LIMIT 1";
+
+        let resultado = conn
+            .query_row(sql_prod, [id_ot], |row| row.get(0))
+            .optional()?;
         Ok(resultado)
+    }
+
+    fn tiene_cambio_aceite(conn: &Connection, id_ot: i64) -> bool {
+        let serv_count: i32 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM detalle_ot_servicios WHERE id_ot = ?1 AND es_cambio_aceite = 1",
+                [id_ot],
+                |row| row.get(0),
+            )
+            .unwrap_or(0);
+
+        if serv_count > 0 {
+            return true;
+        }
+
+        let prod_count: i32 = conn
+            .query_row(
+                "SELECT COUNT(*) 
+                 FROM detalle_ot_productos dp
+                 JOIN productos p ON dp.id_producto = p.id_producto
+                 WHERE dp.id_ot = ?1 AND (UPPER(p.categoria) = 'ACEITE' OR UPPER(p.categoria) = 'GRANEL')",
+                [id_ot],
+                |row| row.get(0),
+            )
+            .unwrap_or(0);
+
+        prod_count > 0
+    }
+
+    fn calcular_proximo_kilometraje(
+        conn: &Connection,
+        id_ot: i64,
+        km_base: i64,
+        tipo_aceite: Option<&str>,
+    ) -> Option<i64> {
+        if !Self::tiene_cambio_aceite(conn, id_ot) {
+            return None;
+        }
+
+        let intervalo = match tipo_aceite {
+            Some(t) if t.trim().eq_ignore_ascii_case("SINTETICO") => 10000,
+            _ => 5000,
+        };
+
+        Some(km_base + intervalo)
     }
 
     fn recalcular_kilometraje_vehiculo(conn: &Connection, placa: &str) -> Result<(), AppError> {
         let max_km: Option<i64> = conn
             .query_row(
-                "SELECT MAX(kilometraje_ingreso) FROM ordenes_trabajo WHERE placa_snapshot = ?1 AND estado != 'CANCELADO'",
+                "SELECT MAX(COALESCE(kilometraje_salida, kilometraje_ingreso)) FROM ordenes_trabajo WHERE placa_snapshot = ?1 AND estado != 'CANCELADO'",
                 [placa],
                 |row| row.get(0),
             )
@@ -149,7 +206,7 @@ impl OrdenesService {
     pub fn crear_orden_trabajo(
         conn: &mut Connection,
         req: CrearOrdenTrabajoDto,
-        id_creador: i64, // Inyección de identidad real
+        id_creador: i64,
     ) -> Result<OrdenTrabajoHistorialDto, AppError> {
         let placa = req.placa.trim().to_uppercase();
 
@@ -195,14 +252,14 @@ impl OrdenesService {
             }
 
             let ocupada: i32 = conn.query_row(
-                "SELECT COUNT(*) FROM ordenes_trabajo WHERE id_zanja_ejecucion = ?1 AND estado = 'EN_PROCESO'",
+                "SELECT COUNT(*) FROM ordenes_trabajo WHERE id_zanja_ejecucion = ?1 AND estado IN ('EN_ESPERA', 'EN_PROCESO')",
                 [z],
                 |row| row.get(0),
             )?;
 
             if ocupada > 0 {
                 return Err(AppError::Validation(format!(
-                    "La zanja {} ya se encuentra ocupada por otra orden en proceso.",
+                    "La zanja {} ya se encuentra ocupada por otra orden activa.",
                     z
                 )));
             }
@@ -219,7 +276,7 @@ impl OrdenesService {
         tx.execute(
             "INSERT INTO ordenes_trabajo (
                 id_operacion, codigo_ot, id_vehiculo, id_cliente_atendido, placa_snapshot, cliente_snapshot,
-                id_creador, id_mecanico, id_zanja_prevista, estado, kilometraje_ingreso, pedido_cliente, tipo_aceite, fecha_ingreso
+                id_creador, id_mecanico, id_zanja_ejecucion, estado, kilometraje_ingreso, pedido_cliente, tipo_aceite, fecha_ingreso
             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, 'EN_ESPERA', ?10, ?11, ?12, datetime('now', '-5 hours'))",
             params![
                 id_operacion,
@@ -228,7 +285,7 @@ impl OrdenesService {
                 id_cliente_atendido,
                 placa,
                 cliente_snapshot,
-                id_creador, // Remplazado literal 1 por el id real
+                id_creador,
                 req.id_mecanico,
                 req.zanja,
                 req.kilometraje_ingreso,
@@ -393,8 +450,8 @@ impl OrdenesService {
         let mut sql = String::from(
             "SELECT
                 ot.id_ot, ot.codigo_ot, ot.placa_snapshot, ot.id_mecanico, ot.id_zanja_ejecucion, ot.estado,
-                ot.kilometraje_ingreso, ot.pedido_cliente, ot.fecha_ingreso,
-                u.nombre_completo
+                COALESCE(ot.kilometraje_salida, ot.kilometraje_ingreso), COALESCE(ot.resumen_publico, ot.pedido_cliente), ot.fecha_ingreso,
+                u.nombre_completo, ot.corregido
              FROM ordenes_trabajo ot
              LEFT JOIN usuarios u ON ot.id_mecanico = u.id_usuario",
         );
@@ -418,6 +475,7 @@ impl OrdenesService {
                 row.get::<_, Option<String>>(7)?,
                 row.get::<_, String>(8)?,
                 row.get::<_, Option<String>>(9)?,
+                row.get::<_, Option<i32>>(10)?.unwrap_or(0),
             ))
         })?;
 
@@ -426,6 +484,12 @@ impl OrdenesService {
             let raw_data = item?;
             let detalles = Self::obtener_detalles_ot(conn, raw_data.0)?;
             let tipo_aceite = Self::obtener_tipo_aceite_ot(conn, raw_data.0)?;
+            let proximo_km = Self::calcular_proximo_kilometraje(
+                conn,
+                raw_data.0,
+                raw_data.6,
+                tipo_aceite.as_deref(),
+            );
 
             lista.push(OrdenTrabajoHistorialDto {
                 id_ot: raw_data.0,
@@ -435,12 +499,13 @@ impl OrdenesService {
                 zanja: raw_data.4,
                 estado: raw_data.5,
                 kilometraje_ingreso: raw_data.6,
-                proximo_kilometraje: raw_data.6 + 5000,
+                proximo_kilometraje: proximo_km,
                 observaciones: raw_data.7,
                 fecha_ingreso: Some(raw_data.8),
                 nombre_mecanico: raw_data.9,
                 tipo_aceite,
                 detalles,
+                corregido: Some(raw_data.10),
             });
         }
 
@@ -515,8 +580,8 @@ impl OrdenesService {
         let mut stmt = conn.prepare(
             "SELECT
                 ot.id_ot, ot.codigo_ot, ot.placa_snapshot, ot.id_mecanico, ot.id_zanja_ejecucion, ot.estado,
-                ot.kilometraje_ingreso, ot.pedido_cliente, ot.fecha_ingreso,
-                u.nombre_completo
+                COALESCE(ot.kilometraje_salida, ot.kilometraje_ingreso), COALESCE(ot.resumen_publico, ot.pedido_cliente), ot.fecha_ingreso,
+                u.nombre_completo, ot.corregido
              FROM ordenes_trabajo ot
              LEFT JOIN usuarios u ON ot.id_mecanico = u.id_usuario
              WHERE ot.id_ot = ?1",
@@ -535,12 +600,19 @@ impl OrdenesService {
                     row.get::<_, Option<String>>(7)?,
                     row.get::<_, String>(8)?,
                     row.get::<_, Option<String>>(9)?,
+                    row.get::<_, Option<i32>>(10)?.unwrap_or(0),
                 ))
             })
             .map_err(|_| AppError::NotFound(format!("No se encontró la OT con ID {}", id_ot)))?;
 
         let detalles = Self::obtener_detalles_ot(conn, raw_data.0)?;
         let tipo_aceite = Self::obtener_tipo_aceite_ot(conn, raw_data.0)?;
+        let proximo_km = Self::calcular_proximo_kilometraje(
+            conn,
+            raw_data.0,
+            raw_data.6,
+            tipo_aceite.as_deref(),
+        );
 
         Ok(OrdenTrabajoHistorialDto {
             id_ot: raw_data.0,
@@ -550,32 +622,33 @@ impl OrdenesService {
             zanja: raw_data.4,
             estado: raw_data.5,
             kilometraje_ingreso: raw_data.6,
-            proximo_kilometraje: raw_data.6 + 5000,
+            proximo_kilometraje: proximo_km,
             observaciones: raw_data.7,
             fecha_ingreso: Some(raw_data.8),
             nombre_mecanico: raw_data.9,
             tipo_aceite,
             detalles,
+            corregido: Some(raw_data.10),
         })
     }
 
-    pub fn obtener_historial_por_placa(
+    pub fn obtener_historial_por_id_vehiculo(
         conn: &Connection,
-        placa: &str,
+        id_vehiculo: i64,
     ) -> Result<Vec<OrdenTrabajoHistorialDto>, AppError> {
-        let placa_clean = placa.trim().to_uppercase();
         let mut stmt = conn.prepare(
             "SELECT
                 ot.id_ot, ot.codigo_ot, ot.placa_snapshot, ot.id_mecanico, ot.id_zanja_ejecucion, ot.estado,
-                ot.kilometraje_ingreso, ot.pedido_cliente, ot.fecha_ingreso,
-                u.nombre_completo
+                COALESCE(ot.kilometraje_salida, ot.kilometraje_ingreso), COALESCE(ot.resumen_publico, ot.pedido_cliente), COALESCE(ot.fecha_fin, ot.fecha_ingreso),
+                u.nombre_completo, ot.corregido
              FROM ordenes_trabajo ot
              LEFT JOIN usuarios u ON ot.id_mecanico = u.id_usuario
-             WHERE ot.placa_snapshot = ?1
-             ORDER BY ot.fecha_ingreso DESC, ot.id_ot DESC",
+             WHERE ot.id_vehiculo = ?1
+               AND ot.estado = 'FINALIZADO'
+             ORDER BY COALESCE(ot.fecha_fin, ot.fecha_ingreso) DESC, ot.id_ot DESC",
         )?;
 
-        let iter = stmt.query_map([&placa_clean], |row| {
+        let iter = stmt.query_map([id_vehiculo], |row| {
             Ok((
                 row.get::<_, i64>(0)?,
                 row.get::<_, String>(1)?,
@@ -587,6 +660,7 @@ impl OrdenesService {
                 row.get::<_, Option<String>>(7)?,
                 row.get::<_, String>(8)?,
                 row.get::<_, Option<String>>(9)?,
+                row.get::<_, Option<i32>>(10)?.unwrap_or(0),
             ))
         })?;
 
@@ -595,6 +669,12 @@ impl OrdenesService {
             let raw_data = item?;
             let detalles = Self::obtener_detalles_ot(conn, raw_data.0)?;
             let tipo_aceite = Self::obtener_tipo_aceite_ot(conn, raw_data.0)?;
+            let proximo_km = Self::calcular_proximo_kilometraje(
+                conn,
+                raw_data.0,
+                raw_data.6,
+                tipo_aceite.as_deref(),
+            );
 
             historial.push(OrdenTrabajoHistorialDto {
                 id_ot: raw_data.0,
@@ -604,16 +684,37 @@ impl OrdenesService {
                 zanja: raw_data.4,
                 estado: raw_data.5,
                 kilometraje_ingreso: raw_data.6,
-                proximo_kilometraje: raw_data.6 + 5000,
+                proximo_kilometraje: proximo_km,
                 observaciones: raw_data.7,
                 fecha_ingreso: Some(raw_data.8),
                 nombre_mecanico: raw_data.9,
                 tipo_aceite,
                 detalles,
+                corregido: Some(raw_data.10),
             });
         }
 
         Ok(historial)
+    }
+
+    pub fn obtener_historial_por_placa(
+        conn: &Connection,
+        placa: &str,
+    ) -> Result<Vec<OrdenTrabajoHistorialDto>, AppError> {
+        let placa_clean = placa.trim().to_uppercase();
+        let id_vehiculo: Option<i64> = conn
+            .query_row(
+                "SELECT id_vehiculo FROM vehiculos WHERE placa = ?1",
+                [&placa_clean],
+                |row| row.get(0),
+            )
+            .optional()?;
+
+        if let Some(id_v) = id_vehiculo {
+            Self::obtener_historial_por_id_vehiculo(conn, id_v)
+        } else {
+            Ok(Vec::new())
+        }
     }
 
     pub fn agregar_producto_ot(
@@ -661,8 +762,8 @@ impl OrdenesService {
         tx.execute(
             "INSERT INTO detalle_ot_productos (
                 id_operacion, id_ot, id_producto, codigo_snapshot, nombre_snapshot, unidad_medida,
-                cantidad, precio_unitario_cent, costo_unitario_micro, valor_consumido_micro, recuperable, id_usuario
-            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, 0, 0, 1, ?9)",
+                cantidad, precio_unitario_cent, costo_unitario_micro, valor_consumido_micro, id_usuario
+            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, 1, 1, ?9)",
             params![
                 id_op_det,
                 req.id_ot,
@@ -684,7 +785,7 @@ impl OrdenesService {
                 id_operacion, id_producto, id_usuario, tipo_movimiento, id_consumo_ot, unidad_medida,
                 stock_anterior, diferencia, stock_resultante, valor_anterior_micro, valor_delta_micro,
                 valor_resultante_micro, costo_unitario_micro
-            ) VALUES (?1, ?2, ?3, 'USO_OT', ?4, ?5, ?6, ?7, ?8, 0, 0, 0, 0)",
+            ) VALUES (?1, ?2, ?3, 'CONSUMO_OT', ?4, ?5, ?6, ?7, ?8, 1, -1, 0, 1)",
             params![
                 id_op_kardex,
                 req.id_producto,
@@ -745,7 +846,7 @@ impl OrdenesService {
                     id_operacion, id_producto, id_usuario, tipo_movimiento, id_consumo_ot, unidad_medida,
                     stock_anterior, diferencia, stock_resultante, valor_anterior_micro, valor_delta_micro,
                     valor_resultante_micro, costo_unitario_micro, motivo
-                ) VALUES (?1, ?2, ?3, 'RETORNO_OT', ?4, ?5, ?6, ?7, ?8, 0, 0, 0, 0, 'Devolucion de producto por eliminacion de detalle en OT')",
+                ) VALUES (?1, ?2, ?3, 'REPOSICION_OT', ?4, ?5, ?6, ?7, ?8, 0, 1, 1, 1, 'Devolución de producto por eliminación de detalle en OT')",
                 params![
                     id_op_kardex,
                     id_prod,

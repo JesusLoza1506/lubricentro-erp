@@ -16,7 +16,7 @@
 ![Plataforma](https://img.shields.io/badge/Plataforma-Windows_11-2563EB?style=flat-square)
 ![Módulos](https://img.shields.io/badge/Alcance-10_m%C3%B3dulos-0F766E?style=flat-square)
 
-[Progreso](#estado) · [Login](#modulo-login-y-sesion) · [Instalación](#instalacion) · [Documentación](#documentacion)
+[Progreso](#estado) · [Login](#modulo-login-y-sesion) · [Ficha vehicular](#modulo-ficha-vehicular-e-historial) · [Instalación](#instalacion) · [Documentación](#documentacion)
 
 </div>
 
@@ -43,20 +43,20 @@
 
 ## 2. Estado del proyecto
 
-Desarrollo secuencial, módulo por módulo, conforme al alcance funcional v7.
+Desarrollo secuencial, módulo por módulo, conforme al alcance funcional v7. **Ficha Vehicular e Historial se encuentra al 80 %**. Inicio Dashboard se desarrollará al final para integrar los datos y resultados de los demás módulos.
 
-| #   | Módulo                                   | Estado                                       | Avance |
-| --- | ---------------------------------------- | -------------------------------------------- | ------ |
-| 01  | [Login y Sesión](#modulo-login-y-sesion) | 🟢 Ajustes finales                           | ~95 %  |
-| 02  | Inicio Dashboard                         | 🟡 En curso: inicio de revisión y adaptación | —      |
-| 03  | Ficha Vehicular e Historial              | ⚪ Pendiente de revisión y adaptación        | —      |
-| 04  | Órdenes de Trabajo Taller                | ⚪ Pendiente de revisión y adaptación        | —      |
-| 05  | Inventario y Stock                       | ⚪ Pendiente de revisión y adaptación        | —      |
-| 06  | Punto de Venta POS                       | ⚪ Pendiente                                 | —      |
-| 07  | Caja Chica                               | ⚪ Pendiente                                 | —      |
-| 08  | Backup y Copias                          | ⚪ Pendiente                                 | —      |
-| 09  | Administración                           | ⚪ Pendiente                                 | —      |
-| 10  | Reportes                                 | ⚪ Pendiente                                 | —      |
+| Orden | Módulo | Estado | Avance |
+| --- | --- | --- | --- |
+| 01 | [Login y Sesión](#modulo-login-y-sesion) | 🟢 Ajustes finales | ~95 % |
+| 02 | [Ficha Vehicular e Historial](#modulo-ficha-vehicular-e-historial) | 🟡 En desarrollo | ~80 % |
+| 03 | Órdenes de Trabajo Taller | ⚪ Pendiente de revisión y adaptación | — |
+| 04 | Inventario y Stock | ⚪ Pendiente de revisión y adaptación | — |
+| 05 | Punto de Venta POS | ⚪ Pendiente | — |
+| 06 | Caja Chica | ⚪ Pendiente | — |
+| 07 | Backup y Copias | ⚪ Pendiente | — |
+| 08 | Administración | ⚪ Pendiente | — |
+| 09 | Reportes | ⚪ Pendiente | — |
+| 10 | Inicio Dashboard | ⚪ Pendiente; se desarrollará al final | — |
 
 **Leyenda:** ⚪ Pendiente · 🟡 En curso · 🟢 Ajustes finales · ✅ Completado.
 
@@ -119,7 +119,48 @@ _Cambio de contraseña_
 
 </details>
 
-**Siguiente etapa:** iniciar la revisión y adaptación de **Inicio Dashboard**. Su detalle se incorporará conforme avance el trabajo; los módulos 03–10 se documentarán progresivamente.
+<a id="modulo-ficha-vehicular-e-historial"></a>
+
+<details>
+<summary><b>02 · Ficha Vehicular e Historial</b> — 🟡 En desarrollo · ~80 %</summary>
+
+**Qué hace:** centraliza la identificación del vehículo, su propietario y las atenciones realizadas. Permite consultar la ficha y mantener sus datos relacionados con las órdenes del taller.
+
+**Funciones principales:**
+
+- Búsqueda y consulta de la ficha vehicular.
+- Registro de clientes y vehículos, vinculando cada vehículo con su propietario identificado.
+- Actualización de datos del vehículo y de su propietario según los permisos del usuario.
+- Consulta del historial de atenciones finalizadas, kilometraje y datos de cambio de aceite cuando corresponda.
+- Desactivación lógica de vehículos con motivo, conservando el historial.
+- Bloqueo de la desactivación cuando el vehículo tiene una orden de trabajo abierta.
+- Restricción de acciones e información según el rol, con validación en backend.
+
+**Acceso por rol:**
+
+| Rol | Alcance |
+| --- | --- |
+| Administrador | Gestión de la ficha y correcciones autorizadas. |
+| Cajero | Registro, edición de datos comunes y consulta autorizada. |
+| Mecánico | Consulta de información pública del vehículo y sus atenciones. |
+
+**Capturas por incorporar:**
+
+- Ficha principal: `docs/images/ficha-vehicular.png`.
+- Historial de atenciones: `docs/images/ficha-vehicular-historial.png`.
+- Registro o edición del vehículo: `docs/images/ficha-vehicular-registro.png`.
+
+Las rutas son sugeridas; las imágenes se mostrarán cuando se incorporen al repositorio.
+
+**Validaciones relacionadas:** la ejecución de pruebas compartida registró seis casos satisfactorios en [vehiculo_tests.rs](src-tauri/tests/vehiculo_tests.rs), sobre registro, actualización, consulta de ficha, permisos y desactivación con o sin OT abierta.
+
+**Pendiente para cerrar:** completar las funciones restantes del alcance, revisar la interfaz y los mensajes, validar los flujos por rol e incorporar capturas y evidencias de uso.
+
+**Estado:** avance aproximado del **80 %**, en desarrollo y validación. Este porcentaje expresa progreso de implementación, no cobertura de pruebas.
+
+</details>
+
+**Trabajo actual:** completar Ficha Vehicular e Historial y los ajustes finales de Login y Sesión. **Siguiente módulo:** Órdenes de Trabajo Taller. El detalle de los demás módulos se incorporará conforme avancen en la secuencia definida.
 
 <a id="roles"></a>
 
@@ -128,7 +169,6 @@ _Cambio de contraseña_
 | Módulo                      | Administrador                                              | Mecánico                                                    | Cajero                                         |
 | --------------------------- | ---------------------------------------------------------- | ----------------------------------------------------------- | ---------------------------------------------- |
 | Login y Sesión              | Cuenta propia y gestión autorizada.                        | Cuenta propia.                                              | Cuenta propia.                                 |
-| Inicio Dashboard            | Resumen del negocio.                                       | Resumen de trabajos propios y disponibles.                  | Resumen de caja y OT por cobrar.               |
 | Ficha Vehicular e Historial | Gestión y correcciones autorizadas.                        | Consulta de información pública de atención.                | Registro, edición de datos comunes y consulta. |
 | Órdenes de Trabajo Taller   | Gestión del taller.                                        | Inicio de OT libres o propias y ejecución de las asignadas. | Recepción y consulta pública.                  |
 | Inventario y Stock          | Catálogos, entradas, costos, kardex y ajustes.             | Consulta de activos, stock y precios.                       | Consulta de activos, stock y precios.          |
@@ -137,6 +177,7 @@ _Cambio de contraseña_
 | Backup y Copias             | Configuración, copias y recuperación.                      | Sin acceso.                                                 | Sin acceso.                                    |
 | Administración              | Usuarios, empresa, facturación y taller.                   | Sin acceso.                                                 | Sin acceso.                                    |
 | Reportes                    | Consulta y exportación.                                    | Sin acceso.                                                 | Sin acceso.                                    |
+| Inicio Dashboard            | Resumen del negocio.                                       | Resumen de trabajos propios y disponibles.                  | Resumen de caja y OT por cobrar.               |
 
 Las autorizaciones se validan en Rust. Los costos y las notas internas se restringen por rol; ocultar botones no sustituye el control del backend.
 
@@ -281,15 +322,20 @@ El informe general y las diez especificaciones funcionales v7 son documentos de 
 
 ## 10. Hoja de ruta
 
-- [ ] **01:** cerrar ajustes y validaciones de Login y Sesión.
-- [ ] **02 · En curso:** iniciar la revisión y adaptación de Inicio Dashboard.
-- [ ] **03:** continuar con la revisión y adaptación de Ficha Vehicular e Historial.
-- [ ] **04–05:** revisar y adaptar Órdenes de Trabajo Taller e Inventario y Stock.
-- [ ] **06–07:** completar Punto de Venta POS y Caja Chica.
-- [ ] **08–09:** completar Backup y Copias y Administración.
-- [ ] **10:** completar Reportes y validar el flujo integrado del software.
+La implementación seguirá este orden:
 
-Cada módulo avanzará en la tabla de progreso y tendrá su detalle plegable, capturas y evidencias conforme se complete.
+1. **Login y Sesión (~95 %):** cerrar ajustes y validaciones finales.
+2. **Ficha Vehicular e Historial (~80 %, en curso):** completar funcionalidades, revisión de interfaz y evidencias.
+3. **Órdenes de Trabajo Taller:** continuar con la revisión y adaptación del flujo de recepción, ejecución y finalización.
+4. **Inventario y Stock:** revisar catálogos, entradas, consumos y ajustes.
+5. **Punto de Venta POS:** completar ventas, cobros y gestión de comprobantes.
+6. **Caja Chica:** completar aperturas, movimientos y cierres.
+7. **Backup y Copias:** completar copias de seguridad y recuperación.
+8. **Administración:** completar la configuración y gestión autorizada.
+9. **Reportes:** integrar las consultas y exportaciones de los módulos anteriores.
+10. **Inicio Dashboard:** integrar al final los indicadores y resúmenes por rol con los datos de los demás módulos.
+
+Cada módulo avanzará en la tabla de progreso y tendrá su detalle plegable, capturas y evidencias conforme se complete. Este orden de desarrollo no modifica el flujo operativo del taller descrito en la sección 5.
 
 <a id="autor"></a>
 

@@ -91,7 +91,7 @@ export const ModalCrearOT: React.FC<ModalCrearOTProps> = ({
     const cargarVehiculosDeBD = async () => {
       try {
         setCargandoVehiculos(true);
-        const listaBD = await vehiculoService.listarVehiculos(idMecanicoDefault);
+        const listaBD = await vehiculoService.listarVehiculos();
         if (Array.isArray(listaBD)) {
           setListaVehiculosBD(listaBD);
           if (placaInicial) {
@@ -144,7 +144,7 @@ export const ModalCrearOT: React.FC<ModalCrearOTProps> = ({
     try {
       setLoading(true);
       setErrorMsg('');
-      const data = await vehiculoService.obtenerVehiculoPorPlaca(placaLimpia, idMecanicoDefault);
+      const data = await vehiculoService.obtenerVehiculoPorPlaca(placaLimpia);
       if (data && data.placa) {
         seleccionarVehiculoReal(data);
       } else {
@@ -200,7 +200,6 @@ export const ModalCrearOT: React.FC<ModalCrearOTProps> = ({
       return;
     }
 
-    // Permite mayor o igual para mantener consistencia estricta con la validación de Backend
     const ultimoKmBD = vehiculoSeleccionado.kilometraje_actual || 0;
     if (kmIngresadoNum < ultimoKmBD) {
       setErrorMsg(
@@ -228,7 +227,6 @@ export const ModalCrearOT: React.FC<ModalCrearOTProps> = ({
     }
   };
 
-  // Cálculo para ayuda informativa
   const ultimoKm = vehiculoSeleccionado?.kilometraje_actual || 0;
   const estimadoProximo = ultimoKm + (tipoAceite === 'SINTETICO' ? 10000 : 5000);
 
@@ -591,7 +589,6 @@ export const ModalCrearOT: React.FC<ModalCrearOTProps> = ({
                 boxSizing: 'border-box',
               }}
             />
-            {/* Texto de Ayuda / Placeholder Informativo */}
             {vehiculoSeleccionado && (
               <div
                 style={{

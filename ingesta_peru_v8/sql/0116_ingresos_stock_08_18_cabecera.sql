@@ -1,0 +1,5 @@
+-- LUBRICENTRO GLORIA | DATOS FICTICIOS | PRODUCCION LOCAL
+-- Tabla: ingresos_stock. Ejecutar en orden del plan, dentro de la transaccion global.
+-- No ejecutar aisladamente ni desactivar triggers/foreign_keys.
+
+INSERT INTO ingresos_stock (id_ingreso,id_operacion,codigo,origen,total_costo_micro,id_usuario,observacion,fecha_registro,id_proveedor,proveedor_snapshot,tipo_documento,numero_documento,fecha_documento) VALUES (18,'lg-carga-20261018-ingreso-17','ING-2026-0018','COMPRA',3312000000,1,'Recepción de mercadería y verificación de cantidades','2026-03-01 10:17:00',16,'{"id_proveedor":16,"tipo_documento":"RUC","numero_documento":"20169158658","nombre_razon_social":"Comercial Automotriz Valle Verde S.A.C.","telefono":"971192674","correo":"comercial.automotriz.valle36@gmail.com","direccion":"Av. América N.° 579, Urb. Los Álamos, Imperial, Cañete, Lima","contacto_asesor":"Karen Melissa Pérez Torres","fecha_creacion":"2026-03-01 08:00:00","version":0}','FACTURA','F001-00038539','2026-03-01');

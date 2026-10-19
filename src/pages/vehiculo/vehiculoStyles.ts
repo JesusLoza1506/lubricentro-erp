@@ -10,7 +10,7 @@ export const pageContainerStyle: React.CSSProperties = {
   boxShadow: '0 20px 40px rgba(0, 0, 0, 0.4)',
   display: 'flex',
   flexDirection: 'column',
-  gap: '28px',
+  gap: '24px',
   overflowY: 'auto',
   position: 'relative',
 };
@@ -36,5 +36,5 @@ export const inputBusquedaStyle: React.CSSProperties = {
   fontWeight: '600',
   letterSpacing: '1px',
   outline: 'none',
-  width: '180px',
+  width: '200px',
 };

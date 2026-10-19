@@ -59,15 +59,17 @@ pub fn run() {
             cerrar_sesion,
             reautenticar,
             autorizar_descuento,
-            // Clientes & Vehículos
+            // Clientes & Vehículos V7.0 (Módulo 03)
             registrar_cliente_cmd,
+            actualizar_cliente_cmd,
             buscar_cliente_por_doc_cmd,
             registrar_vehiculo_cmd,
             actualizar_vehiculo_cmd,
+            cambiar_estado_vehiculo_cmd,
+            corregir_historial_ot_cmd,
             obtener_vehiculo_por_placa_cmd,
-            obtener_todos_vehiculos_cmd,
             obtener_ficha_vehicular_completa_cmd,
-            eliminar_vehiculo_cmd,
+            obtener_proximos_cambios_aceite_cmd,
             // Inventario
             listar_productos_cmd,
             listar_productos_publicos_cmd,

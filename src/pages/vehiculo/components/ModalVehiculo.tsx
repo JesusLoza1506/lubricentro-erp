@@ -1,5 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { CrearVehiculoDTO, EditarVehiculoDTO, VehiculoCompletoDTO } from '../../../types/vehiculo';
+import {
+  CrearVehiculoDTO,
+  EditarVehiculoDTO,
+  VehiculoCompletoDTO,
+  TipoMotor,
+} from '../../../types/vehiculo';
 
 export type ModoModalVehiculo = 'CREAR' | 'EDITAR';
 
@@ -11,7 +16,6 @@ interface ModalVehiculoProps {
   handleGuardar: (data: CrearVehiculoDTO | EditarVehiculoDTO) => Promise<void>;
 }
 
-// Helper para extraer de forma segura el mensaje de error sin usar 'any'
 const extraerMensajeError = (err: unknown): string => {
   if (typeof err === 'string') return err;
   if (err && typeof err === 'object' && 'message' in err) {
@@ -31,21 +35,23 @@ export const ModalVehiculo: React.FC<ModalVehiculoProps> = ({
   const [marca, setMarca] = useState('');
   const [modelo, setModelo] = useState('');
   const [anio, setAnio] = useState<number | ''>('');
-  const [tipoMotor, setTipoMotor] = useState('');
+  const [tipoMotor, setTipoMotor] = useState<string>('');
   const [kilometraje, setKilometraje] = useState<number | ''>('');
   const [nombreCliente, setNombreCliente] = useState('');
   const [tipoDoc, setTipoDoc] = useState('DNI');
   const [numDoc, setNumDoc] = useState('');
   const [telefono, setTelefono] = useState('');
+  const [correo, setCorreo] = useState('');
   const [direccion, setDireccion] = useState('');
+  const [motivo, setMotivo] = useState('');
   const [guardando, setGuardando] = useState(false);
   const [errorModal, setErrorModal] = useState<string | null>(null);
 
-  // Cálculo dinámico del año máximo permitido (Año actual + 1)
   const anioMaximo = new Date().getFullYear() + 1;
 
   useEffect(() => {
     setErrorModal(null);
+    setMotivo('');
     if (modo === 'EDITAR' && vehiculoEditar) {
       setPlaca(vehiculoEditar.placa || '');
       setMarca(vehiculoEditar.marca || '');
@@ -61,6 +67,7 @@ export const ModalVehiculo: React.FC<ModalVehiculoProps> = ({
       );
       setNumDoc(vehiculoEditar.cliente?.numero_documento || vehiculoEditar.documento_cliente || '');
       setTelefono(vehiculoEditar.cliente?.telefono || vehiculoEditar.telefono_cliente || '');
+      setCorreo(vehiculoEditar.cliente?.correo || vehiculoEditar.correo_cliente || '');
       setDireccion(vehiculoEditar.cliente?.direccion || vehiculoEditar.direccion_cliente || '');
     } else {
       setPlaca('');
@@ -73,37 +80,34 @@ export const ModalVehiculo: React.FC<ModalVehiculoProps> = ({
       setTipoDoc('DNI');
       setNumDoc('');
       setTelefono('');
+      setCorreo('');
       setDireccion('');
     }
   }, [modo, vehiculoEditar, modalAbierto]);
 
   if (!modalAbierto) return null;
 
-  // Manejo de cambio en campo Placa (Auto-formato peruano ABC-123)
   const handlePlacaChange = (val: string) => {
-    let clean = val.toUpperCase().replace(/[^A-Z0-9]/g, '');
-    if (clean.length > 6) clean = clean.slice(0, 6);
-
-    if (clean.length > 3 && /^[A-Z]{3}[0-9]/.test(clean)) {
-      setPlaca(`${clean.slice(0, 3)}-${clean.slice(3)}`);
-    } else {
-      setPlaca(clean);
-    }
+    const clean = val
+      .toUpperCase()
+      .replace(/[^A-Z0-9]/g, '')
+      .slice(0, 6);
+    setPlaca(clean);
   };
 
-  // Manejo de cambio en N° Documento según tipo
   const handleNumDocChange = (val: string) => {
     if (tipoDoc === 'DNI') {
-      const clean = val.replace(/\D/g, '').slice(0, 8);
-      setNumDoc(clean);
+      setNumDoc(val.replace(/\D/g, '').slice(0, 8));
     } else if (tipoDoc === 'RUC') {
-      const clean = val.replace(/\D/g, '').slice(0, 11);
-      setNumDoc(clean);
+      setNumDoc(val.replace(/\D/g, '').slice(0, 11));
     } else {
-      const clean = val.replace(/[^a-zA-Z0-9]/g, '').slice(0, 12);
-      setNumDoc(clean);
+      setNumDoc(val.replace(/[^a-zA-Z0-9]/g, '').slice(0, 12));
     }
   };
+
+  const kmActualVal = Number(kilometraje) || 0;
+  const kmAnteriorVal = vehiculoEditar?.kilometraje_actual || 0;
+  const disminuyeKm = modo === 'EDITAR' && kmActualVal < kmAnteriorVal;
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -111,19 +115,28 @@ export const ModalVehiculo: React.FC<ModalVehiculoProps> = ({
     setErrorModal(null);
 
     try {
+      if (disminuyeKm && (!motivo.trim() || motivo.trim().length < 5)) {
+        throw new Error(
+          'Al disminuir el kilometraje, debe ingresar un motivo obligatorio (mínimo 5 caracteres).'
+        );
+      }
+
+      const motorFinal = (tipoMotor.trim() as TipoMotor) || null;
+
       if (modo === 'CREAR') {
         const payload: CrearVehiculoDTO = {
           placa: placa.trim().toUpperCase(),
           marca: marca.trim(),
           modelo: modelo.trim(),
           anio: anio ? Number(anio) : null,
-          tipo_motor: tipoMotor.trim() || null,
-          kilometraje_actual: Number(kilometraje) || 0,
+          tipo_motor: motorFinal,
+          kilometraje_actual: kmActualVal,
           nombre_razon_social: nombreCliente.trim(),
           tipo_documento: tipoDoc,
           numero_documento: numDoc.trim(),
-          telefono: telefono.trim(),
-          direccion: direccion.trim(),
+          telefono: telefono.trim() || undefined,
+          correo: correo.trim() || undefined,
+          direccion: direccion.trim() || undefined,
         };
         await handleGuardar(payload);
       } else {
@@ -133,14 +146,16 @@ export const ModalVehiculo: React.FC<ModalVehiculoProps> = ({
           marca: marca.trim(),
           modelo: modelo.trim(),
           anio: anio ? Number(anio) : null,
-          tipo_motor: tipoMotor.trim() || null,
-          kilometraje_actual: Number(kilometraje) || 0,
-          id_cliente: vehiculoEditar?.id_cliente || vehiculoEditar?.cliente?.id_cliente,
+          tipo_motor: motorFinal,
+          kilometraje_actual: kmActualVal,
+          id_cliente: vehiculoEditar?.id_cliente,
           nombre_razon_social: nombreCliente.trim(),
           tipo_documento: tipoDoc,
           numero_documento: numDoc.trim(),
-          telefono: telefono.trim(),
-          direccion: direccion.trim(),
+          telefono: telefono.trim() || undefined,
+          correo: correo.trim() || undefined,
+          direccion: direccion.trim() || undefined,
+          motivo: motivo.trim() || undefined,
         };
         await handleGuardar(payload);
       }
@@ -154,82 +169,18 @@ export const ModalVehiculo: React.FC<ModalVehiculoProps> = ({
   };
 
   return (
-    <div
-      style={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        width: '100vw',
-        height: '100vh',
-        backgroundColor: 'rgba(0,0,0,0.75)',
-        backdropFilter: 'blur(4px)',
-        display: 'flex',
-        justifyContent: 'center',
-        alignItems: 'center',
-        zIndex: 1000,
-      }}
-    >
-      <div
-        style={{
-          width: '560px',
-          backgroundColor: '#0F172A',
-          border: '1px solid #334155',
-          borderRadius: '16px',
-          padding: '28px',
-          boxShadow: '0 20px 40px rgba(0,0,0,0.5)',
-        }}
-      >
-        <h3
-          style={{
-            fontSize: '20px',
-            fontWeight: '800',
-            color: '#F8FAFC',
-            marginTop: 0,
-            marginBottom: '20px',
-          }}
-        >
+    <div style={overlayStyle}>
+      <div style={modalBoxStyle}>
+        <h3 style={{ fontSize: '20px', fontWeight: '800', color: '#F8FAFC', margin: '0 0 20px 0' }}>
           {modo === 'CREAR' ? 'Registrar Nuevo Vehículo / Cliente' : 'Editar Ficha Vehicular'}
         </h3>
 
-        {errorModal && (
-          <div
-            style={{
-              padding: '12px 16px',
-              backgroundColor: 'rgba(239, 68, 68, 0.15)',
-              border: '1px solid rgba(239, 68, 68, 0.4)',
-              borderRadius: '8px',
-              color: '#FCA5A5',
-              fontSize: '13px',
-              marginBottom: '14px',
-            }}
-          >
-            ⚠️ {errorModal}
-          </div>
-        )}
+        {errorModal && <div style={errorBoxStyle}>⚠️ {errorModal}</div>}
 
         <form onSubmit={onSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
           {/* DATOS DEL CLIENTE */}
-          <div
-            style={{
-              padding: '12px',
-              backgroundColor: 'rgba(30, 41, 59, 0.5)',
-              borderRadius: '10px',
-              border: '1px solid #334155',
-            }}
-          >
-            <span
-              style={{
-                fontSize: '11px',
-                fontWeight: '700',
-                color: '#38BDF8',
-                letterSpacing: '0.5px',
-                textTransform: 'uppercase',
-                display: 'block',
-                marginBottom: '10px',
-              }}
-            >
-              Datos del Propietario / Cliente
-            </span>
+          <div style={sectionBoxStyle}>
+            <span style={sectionTitleStyle}>Datos del Propietario / Cliente</span>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
               <div>
                 <label style={labelStyle}>Cliente / Razón Social *</label>
@@ -253,18 +204,9 @@ export const ModalVehiculo: React.FC<ModalVehiculoProps> = ({
                     }}
                     style={{ ...inputStyle, backgroundColor: '#1E293B', cursor: 'pointer' }}
                   >
-                    <option value="DNI" style={optionStyle}>
-                      DNI
-                    </option>
-                    <option value="RUC" style={optionStyle}>
-                      RUC
-                    </option>
-                    <option value="CE" style={optionStyle}>
-                      CE
-                    </option>
-                    <option value="PASAPORTE" style={optionStyle}>
-                      PASAPORTE
-                    </option>
+                    <option value="DNI">DNI</option>
+                    <option value="RUC">RUC</option>
+                    <option value="CE">CE</option>
                   </select>
                 </div>
                 <div>
@@ -273,11 +215,7 @@ export const ModalVehiculo: React.FC<ModalVehiculoProps> = ({
                     required
                     type="text"
                     placeholder={
-                      tipoDoc === 'DNI'
-                        ? '8 dígitos'
-                        : tipoDoc === 'RUC'
-                          ? '11 dígitos'
-                          : 'N° Documento'
+                      tipoDoc === 'DNI' ? '8 dígitos' : tipoDoc === 'RUC' ? '11 dígitos' : 'CE'
                     }
                     value={numDoc}
                     onChange={(e) => handleNumDocChange(e.target.value)}
@@ -290,57 +228,56 @@ export const ModalVehiculo: React.FC<ModalVehiculoProps> = ({
                     type="text"
                     placeholder="987654321"
                     value={telefono}
-                    onChange={(e) => setTelefono(e.target.value.replace(/\D/g, '').slice(0, 9))}
+                    onChange={(e) => setTelefono(e.target.value)}
                     style={inputStyle}
                   />
                 </div>
               </div>
-              <div>
-                <label style={labelStyle}>Dirección</label>
-                <input
-                  type="text"
-                  placeholder="Ej. Av. Larco 123, Miraflores"
-                  value={direccion}
-                  onChange={(e) => setDireccion(e.target.value)}
-                  style={inputStyle}
-                />
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                <div>
+                  <label style={labelStyle}>Correo Electrónico</label>
+                  <input
+                    type="email"
+                    placeholder="cliente@correo.com"
+                    value={correo}
+                    onChange={(e) => setCorreo(e.target.value)}
+                    style={inputStyle}
+                  />
+                </div>
+                <div>
+                  <label style={labelStyle}>Dirección</label>
+                  <input
+                    type="text"
+                    placeholder="Av. Principal 123"
+                    value={direccion}
+                    onChange={(e) => setDireccion(e.target.value)}
+                    style={inputStyle}
+                  />
+                </div>
               </div>
             </div>
           </div>
 
           {/* DATOS DEL VEHÍCULO */}
-          <div
-            style={{
-              padding: '12px',
-              backgroundColor: 'rgba(30, 41, 59, 0.5)',
-              borderRadius: '10px',
-              border: '1px solid #334155',
-            }}
-          >
-            <span
-              style={{
-                fontSize: '11px',
-                fontWeight: '700',
-                color: '#C084FC',
-                letterSpacing: '0.5px',
-                textTransform: 'uppercase',
-                display: 'block',
-                marginBottom: '10px',
-              }}
-            >
-              Datos del Vehículo
-            </span>
+          <div style={sectionBoxStyle}>
+            <span style={{ ...sectionTitleStyle, color: '#C084FC' }}>Datos del Vehículo</span>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px' }}>
                 <div>
-                  <label style={labelStyle}>Placa *</label>
+                  <label style={labelStyle}>Placa * (6 Caracteres)</label>
                   <input
                     required
+                    disabled={modo === 'EDITAR'}
                     type="text"
-                    placeholder="ABC-123"
+                    placeholder="ABC123"
                     value={placa}
                     onChange={(e) => handlePlacaChange(e.target.value)}
-                    style={{ ...inputStyle, fontFamily: 'monospace', fontWeight: '700' }}
+                    style={{
+                      ...inputStyle,
+                      fontFamily: 'monospace',
+                      fontWeight: '700',
+                      opacity: modo === 'EDITAR' ? 0.6 : 1,
+                    }}
                   />
                 </div>
                 <div>
@@ -372,7 +309,7 @@ export const ModalVehiculo: React.FC<ModalVehiculoProps> = ({
                   <label style={labelStyle}>Año</label>
                   <input
                     type="number"
-                    min="1980"
+                    min="1900"
                     max={anioMaximo}
                     placeholder="2020"
                     value={anio}
@@ -381,14 +318,21 @@ export const ModalVehiculo: React.FC<ModalVehiculoProps> = ({
                   />
                 </div>
                 <div>
-                  <label style={labelStyle}>Motor</label>
-                  <input
-                    type="text"
-                    placeholder="1.5L 1NZ-FE"
+                  <label style={labelStyle}>Tipo de Motor</label>
+                  <select
                     value={tipoMotor}
                     onChange={(e) => setTipoMotor(e.target.value)}
-                    style={inputStyle}
-                  />
+                    style={{ ...inputStyle, backgroundColor: '#1E293B', cursor: 'pointer' }}
+                  >
+                    <option value="">Sin especificar</option>
+                    <option value="GASOLINA">GASOLINA</option>
+                    <option value="DIESEL">DIESEL</option>
+                    <option value="GLP">GLP</option>
+                    <option value="GNV">GNV</option>
+                    <option value="HIBRIDO">HÍBRIDO</option>
+                    <option value="ELECTRICO">ELÉCTRICO</option>
+                    <option value="OTRO">OTRO</option>
+                  </select>
                 </div>
                 <div>
                   <label style={labelStyle}>KM Actual *</label>
@@ -405,51 +349,91 @@ export const ModalVehiculo: React.FC<ModalVehiculoProps> = ({
                   />
                 </div>
               </div>
+
+              {disminuyeKm && (
+                <div style={{ marginTop: '4px' }}>
+                  <label style={{ ...labelStyle, color: '#EF4444', fontWeight: '700' }}>
+                    ⚠️ Motivo de Disminución de Kilometraje (Obligatorio, 5-250 chars) *
+                  </label>
+                  <input
+                    required
+                    type="text"
+                    placeholder="Ej. Corrección por error de digitación en tablero"
+                    value={motivo}
+                    onChange={(e) => setMotivo(e.target.value)}
+                    style={{ ...inputStyle, borderColor: '#EF4444' }}
+                  />
+                </div>
+              )}
             </div>
           </div>
 
           <div
-            style={{
-              display: 'flex',
-              justifyContent: 'flex-end',
-              gap: '12px',
-              marginTop: '10px',
-            }}
+            style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '10px' }}
           >
-            <button
-              type="button"
-              onClick={() => setModalAbierto(false)}
-              style={{
-                padding: '10px 16px',
-                backgroundColor: 'transparent',
-                border: '1px solid #334155',
-                color: '#CBD5E1',
-                borderRadius: '8px',
-                cursor: 'pointer',
-              }}
-            >
+            <button type="button" onClick={() => setModalAbierto(false)} style={btnSecondaryStyle}>
               Cancelar
             </button>
-            <button
-              type="submit"
-              disabled={guardando}
-              style={{
-                padding: '10px 20px',
-                backgroundColor: '#2563EB',
-                color: '#FFFFFF',
-                border: 'none',
-                borderRadius: '8px',
-                fontWeight: '700',
-                cursor: 'pointer',
-              }}
-            >
-              {guardando ? 'Guardando...' : 'Guardar'}
+            <button type="submit" disabled={guardando} style={btnPrimaryStyle}>
+              {guardando ? 'Guardando...' : 'Guardar Ficha'}
             </button>
           </div>
         </form>
       </div>
     </div>
   );
+};
+
+const overlayStyle: React.CSSProperties = {
+  position: 'fixed',
+  top: 0,
+  left: 0,
+  width: '100vw',
+  height: '100vh',
+  backgroundColor: 'rgba(0,0,0,0.75)',
+  backdropFilter: 'blur(4px)',
+  display: 'flex',
+  justifyContent: 'center',
+  alignItems: 'center',
+  zIndex: 1000,
+};
+
+const modalBoxStyle: React.CSSProperties = {
+  width: '580px',
+  backgroundColor: '#0F172A',
+  border: '1px solid #334155',
+  borderRadius: '16px',
+  padding: '28px',
+  boxShadow: '0 20px 40px rgba(0,0,0,0.5)',
+  maxHeight: '90vh',
+  overflowY: 'auto',
+};
+
+const sectionBoxStyle: React.CSSProperties = {
+  padding: '12px',
+  backgroundColor: 'rgba(30, 41, 59, 0.5)',
+  borderRadius: '10px',
+  border: '1px solid #334155',
+};
+
+const sectionTitleStyle: React.CSSProperties = {
+  fontSize: '11px',
+  fontWeight: '700',
+  color: '#38BDF8',
+  letterSpacing: '0.5px',
+  textTransform: 'uppercase',
+  display: 'block',
+  marginBottom: '10px',
+};
+
+const errorBoxStyle: React.CSSProperties = {
+  padding: '12px 16px',
+  backgroundColor: 'rgba(239, 68, 68, 0.15)',
+  border: '1px solid rgba(239, 68, 68, 0.4)',
+  borderRadius: '8px',
+  color: '#FCA5A5',
+  fontSize: '13px',
+  marginBottom: '14px',
 };
 
 const labelStyle: React.CSSProperties = {
@@ -471,7 +455,21 @@ const inputStyle: React.CSSProperties = {
   boxSizing: 'border-box',
 };
 
-const optionStyle: React.CSSProperties = {
-  backgroundColor: '#0F172A',
-  color: '#F8FAFC',
+const btnPrimaryStyle: React.CSSProperties = {
+  padding: '10px 20px',
+  backgroundColor: '#2563EB',
+  color: '#FFFFFF',
+  border: 'none',
+  borderRadius: '8px',
+  fontWeight: '700',
+  cursor: 'pointer',
+};
+
+const btnSecondaryStyle: React.CSSProperties = {
+  padding: '10px 16px',
+  backgroundColor: 'transparent',
+  border: '1px solid #334155',
+  color: '#CBD5E1',
+  borderRadius: '8px',
+  cursor: 'pointer',
 };

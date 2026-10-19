@@ -1,74 +1,75 @@
 import { invoke } from '@tauri-apps/api/core';
 import {
   VehiculoCompletoDTO,
-  OrdenTrabajoHistorialDTO,
   FichaVehicularCompletaDTO,
   CrearVehiculoDTO,
   EditarVehiculoDTO,
+  CambiarEstadoVehiculoPayloadDTO,
+  CorregirHistorialOtPayloadDTO,
+  ProximoCambioAceiteDTO,
 } from '../types/vehiculo';
 
 export const vehiculoService = {
-  // 1. Obtener Ficha Vehicular e Historial en 1 sola consulta atómica
-  obtenerFichaVehicularCompleta: async (
-    placa: string,
-    idUsuario?: number
-  ): Promise<FichaVehicularCompletaDTO> => {
+  // 1. Obtener Ficha Vehicular e Historial en consulta atómica
+  obtenerFichaVehicularCompleta: async (placa: string): Promise<FichaVehicularCompletaDTO> => {
     return await invoke<FichaVehicularCompletaDTO>('obtener_ficha_vehicular_completa_cmd', {
-      placa,
-      idUsuario: idUsuario ?? null,
+      placa: placa.replace(/[^a-zA-Z0-9]/g, '').toUpperCase(),
     });
   },
 
-  // 2. Obtener Ficha Vehicular Completa por Placa
-  obtenerVehiculoPorPlaca: async (
-    placa: string,
-    idUsuario?: number
-  ): Promise<VehiculoCompletoDTO> => {
+  // 2. Obtener Vehículo por Placa
+  obtenerVehiculoPorPlaca: async (placa: string): Promise<VehiculoCompletoDTO> => {
     return await invoke<VehiculoCompletoDTO>('obtener_vehiculo_por_placa_cmd', {
-      placa,
-      idUsuario: idUsuario ?? null,
+      placa: placa.replace(/[^a-zA-Z0-9]/g, '').toUpperCase(),
     });
   },
 
-  // 3. Obtener Historial de Ordenes de Trabajo por Placa
-  obtenerHistorialPorPlaca: async (
-    placa: string,
-    idUsuario?: number
-  ): Promise<OrdenTrabajoHistorialDTO[]> => {
-    return await invoke<OrdenTrabajoHistorialDTO[]>('obtener_historial_por_placa_cmd', {
-      placa,
-      idUsuario: idUsuario ?? null,
-    });
+  // 3. Listar Vehículos Candidates (Compatibilidad Modal OT)
+  listarVehiculos: async (): Promise<VehiculoCompletoDTO[]> => {
+    const proximos = await invoke<ProximoCambioAceiteDTO[]>('obtener_proximos_cambios_aceite_cmd');
+    return proximos.map((p) => ({
+      id_vehiculo: p.id_vehiculo,
+      placa: p.placa,
+      id_cliente: p.id_cliente,
+      marca: '',
+      modelo: '',
+      kilometraje_actual: p.kilometraje_actual,
+      activo: 1,
+      nombre_cliente: p.nombre_razon_social,
+      telefono_cliente: p.telefono,
+    }));
   },
 
-  // 4. Listar TODOS los vehículos activos directamente de la tabla 'vehiculos'
-  listarVehiculos: async (idUsuario?: number): Promise<VehiculoCompletoDTO[]> => {
-    return await invoke<VehiculoCompletoDTO[]>('obtener_todos_vehiculos_cmd', {
-      idUsuario: idUsuario ?? null,
-    });
-  },
-
-  // 5. Registrar Nuevo Vehículo / Cliente
-  registrarVehiculo: async (payload: CrearVehiculoDTO, idUsuario?: number): Promise<void> => {
-    return await invoke('registrar_vehiculo_cmd', {
+  // 4. Registrar Nuevo Vehículo
+  registrarVehiculo: async (payload: CrearVehiculoDTO): Promise<string> => {
+    return await invoke<string>('registrar_vehiculo_cmd', {
       payload,
-      idUsuario: idUsuario ?? null,
     });
   },
 
-  // 6. Actualizar Vehículo Existente
-  actualizarVehiculo: async (payload: EditarVehiculoDTO, idUsuario?: number): Promise<void> => {
-    return await invoke('actualizar_vehiculo_cmd', {
+  // 5. Actualizar Vehículo / Reasignar Propietario
+  actualizarVehiculo: async (payload: EditarVehiculoDTO): Promise<void> => {
+    return await invoke<void>('actualizar_vehiculo_cmd', {
       payload,
-      idUsuario: idUsuario ?? null,
     });
   },
 
-  // 7. Eliminar Vehículo (Exclusivo Administrador)
-  eliminarVehiculo: async (placa: string, idUsuario?: number): Promise<void> => {
-    return await invoke('eliminar_vehiculo_cmd', {
-      placa,
-      idUsuario: idUsuario ?? null,
+  // 6. Cambiar Estado del Vehículo (Desactivar/Reactivar - Admins)
+  cambiarEstadoVehiculo: async (payload: CambiarEstadoVehiculoPayloadDTO): Promise<void> => {
+    return await invoke<void>('cambiar_estado_vehiculo_cmd', {
+      payload,
     });
+  },
+
+  // 7. Corregir Historial de OT Finalizada (Admins)
+  corregirHistorialOt: async (payload: CorregirHistorialOtPayloadDTO): Promise<void> => {
+    return await invoke<void>('corregir_historial_ot_cmd', {
+      payload,
+    });
+  },
+
+  // 8. Consultar Próximos Cambios de Aceite (Admins y Cajeros)
+  obtenerProximosCambiosAceite: async (): Promise<ProximoCambioAceiteDTO[]> => {
+    return await invoke<ProximoCambioAceiteDTO[]>('obtener_proximos_cambios_aceite_cmd');
   },
 };

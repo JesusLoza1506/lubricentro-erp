@@ -4,7 +4,7 @@ use argon2::{
 };
 
 fn main() {
-    let password = b"123456";
+    let password = b"q123456";
 
     // Generar un Salt seguro
     let salt = SaltString::generate(&mut OsRng);

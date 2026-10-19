@@ -1,0 +1,5 @@
+-- LUBRICENTRO GLORIA | DATOS FICTICIOS | PRODUCCION LOCAL
+-- Tabla: ingresos_stock. Ejecutar en orden del plan, dentro de la transaccion global.
+-- No ejecutar aisladamente ni desactivar triggers/foreign_keys.
+
+INSERT INTO ingresos_stock (id_ingreso,id_operacion,codigo,origen,total_costo_micro,id_usuario,observacion,fecha_registro,id_proveedor,proveedor_snapshot,tipo_documento,numero_documento,fecha_documento) VALUES (3,'lg-carga-20261018-ingreso-2','ING-2026-0003','COMPRA',11568000000,1,'Recepción de mercadería y verificación de cantidades','2026-03-01 10:02:00',1,'{"id_proveedor":1,"tipo_documento":"RUC","numero_documento":"20369632788","nombre_razon_social":"Distribuidora de Lubricantes Valle Sur S.A.C.","telefono":"954220113","correo":"distribuidora.de.lubricantes19@outlook.com","direccion":"Calle Los Girasoles N.° 338, Urb. Las Palmeras, Pisco, Pisco, Ica","contacto_asesor":"Miguel Ángel Vega Salazar","fecha_creacion":"2026-03-01 08:00:00","version":0}','FACTURA','F001-00039331','2026-03-01');

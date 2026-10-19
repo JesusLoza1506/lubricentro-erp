@@ -1,0 +1,5 @@
+-- LUBRICENTRO GLORIA | DATOS FICTICIOS | PRODUCCION LOCAL
+-- Tabla: ingresos_stock. Ejecutar en orden del plan, dentro de la transaccion global.
+-- No ejecutar aisladamente ni desactivar triggers/foreign_keys.
+
+INSERT INTO ingresos_stock (id_ingreso,id_operacion,codigo,origen,total_costo_micro,id_usuario,observacion,fecha_registro,id_proveedor,proveedor_snapshot,tipo_documento,numero_documento,fecha_documento) VALUES (4,'lg-carga-20261018-ingreso-3','ING-2026-0004','COMPRA',12576000000,1,'Recepción de mercadería y verificación de cantidades','2026-03-01 10:03:00',2,'{"id_proveedor":2,"tipo_documento":"RUC","numero_documento":"20443739956","nombre_razon_social":"Comercial Automotriz Los Viñedos E.I.R.L.","telefono":"987277596","correo":"comercial.automotriz.los34@hotmail.com","direccion":"Calle Las Palmeras N.° 202, Urb. Las Palmeras, Pisco, Pisco, Ica","contacto_asesor":"Patricia Isabel Sánchez Vargas","fecha_creacion":"2026-03-01 08:00:00","version":0}','FACTURA','F001-00047509','2026-03-01');

@@ -1,0 +1,5 @@
+-- LUBRICENTRO GLORIA | DATOS FICTICIOS | PRODUCCION LOCAL
+-- Tabla: ingresos_stock. Ejecutar en orden del plan, dentro de la transaccion global.
+-- No ejecutar aisladamente ni desactivar triggers/foreign_keys.
+
+INSERT INTO ingresos_stock (id_ingreso,id_operacion,codigo,origen,total_costo_micro,id_usuario,observacion,fecha_registro,id_proveedor,proveedor_snapshot,tipo_documento,numero_documento,fecha_documento) VALUES (13,'lg-carga-20261018-ingreso-12','ING-2026-0013','COMPRA',3312000000,1,'Recepción de mercadería y verificación de cantidades','2026-03-01 10:12:00',11,'{"id_proveedor":11,"tipo_documento":"RUC","numero_documento":"20843600621","nombre_razon_social":"Lubricantes El Carrizal S.R.L.","telefono":"953031505","correo":"lubricantes.el.carrizal28@outlook.com","direccion":"Av. Óscar R. Benavides N.° 1125, Urb. El Rosario, Chincha Baja, Chincha, Ica","contacto_asesor":"Claudia Paola Vásquez Fernández","fecha_creacion":"2026-03-01 08:00:00","version":0}','FACTURA','F001-00017701','2026-03-01');

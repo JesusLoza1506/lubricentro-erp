@@ -1,0 +1,5 @@
+-- LUBRICENTRO GLORIA | DATOS FICTICIOS | PRODUCCION LOCAL
+-- Tabla: ingresos_stock. Ejecutar en orden del plan, dentro de la transaccion global.
+-- No ejecutar aisladamente ni desactivar triggers/foreign_keys.
+
+INSERT INTO ingresos_stock (id_ingreso,id_operacion,codigo,origen,total_costo_micro,id_usuario,observacion,fecha_registro,id_proveedor,proveedor_snapshot,tipo_documento,numero_documento,fecha_documento) VALUES (27,'lg-carga-20261018-ingreso-26','ING-2026-0027','COMPRA',1728000000,1,'Recepción de mercadería y verificación de cantidades','2026-03-01 10:26:00',25,'{"id_proveedor":25,"tipo_documento":"RUC","numero_documento":"20814231331","nombre_razon_social":"Importadora Automotriz Los Cedros S.A.C.","telefono":"969544471","correo":"importadora.automotriz.los23@hotmail.com","direccion":"Av. Los Incas N.° 922, Urb. San Isidro, Pueblo Nuevo, Chincha, Ica","contacto_asesor":"Carlos Eduardo Cabrera Ramírez","fecha_creacion":"2026-03-01 08:00:00","version":0}','FACTURA','F001-00078596','2026-03-01');

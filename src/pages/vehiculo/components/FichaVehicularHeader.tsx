@@ -1,5 +1,5 @@
 import React from 'react';
-import { Search, Plus } from 'lucide-react';
+import { Search, Plus, UserPlus } from 'lucide-react';
 import { inputBusquedaStyle } from '../vehiculoStyles';
 
 interface Props {
@@ -9,6 +9,7 @@ interface Props {
   puedeCrear: boolean;
   onBuscar: (e: React.FormEvent) => void;
   onAbrirCrear: () => void;
+  onAbrirCrearCliente?: () => void;
 }
 
 export const FichaVehicularHeader: React.FC<Props> = ({
@@ -18,9 +19,20 @@ export const FichaVehicularHeader: React.FC<Props> = ({
   puedeCrear,
   onBuscar,
   onAbrirCrear,
+  onAbrirCrearCliente,
 }) => {
   return (
-    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+    <div
+      style={{
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        flexWrap: 'wrap',
+        gap: '16px',
+        paddingBottom: '8px',
+        borderBottom: '1px solid rgba(51, 65, 85, 0.4)',
+      }}
+    >
       <div>
         <h2 style={{ fontSize: '26px', fontWeight: '800', color: '#F8FAFC', margin: '0 0 4px 0' }}>
           Ficha Vehicular
@@ -30,14 +42,17 @@ export const FichaVehicularHeader: React.FC<Props> = ({
         </p>
       </div>
 
-      <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-        <form onSubmit={onBuscar} style={{ display: 'flex', gap: '12px' }}>
+      <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
+        <form onSubmit={onBuscar} style={{ display: 'flex', gap: '10px' }}>
           <div style={{ position: 'relative' }}>
             <input
               type="text"
-              placeholder="Ej. ABC-123"
+              placeholder="Ej. ABC123"
+              maxLength={6}
               value={placaBusqueda}
-              onChange={(e) => setPlacaBusqueda(e.target.value.toUpperCase())}
+              onChange={(e) =>
+                setPlacaBusqueda(e.target.value.replace(/[^a-zA-Z0-9]/g, '').toUpperCase())
+              }
               style={inputBusquedaStyle}
             />
             <Search
@@ -63,6 +78,7 @@ export const FichaVehicularHeader: React.FC<Props> = ({
               fontSize: '14px',
               fontWeight: '700',
               cursor: 'pointer',
+              transition: 'background 0.2s',
             }}
           >
             {cargando ? 'Buscando...' : 'Buscar'}
@@ -70,25 +86,56 @@ export const FichaVehicularHeader: React.FC<Props> = ({
         </form>
 
         {puedeCrear && (
-          <button
-            onClick={onAbrirCrear}
+          <div
             style={{
               display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              backgroundColor: 'rgba(16, 185, 129, 0.2)',
-              color: '#34D399',
-              border: '1px solid #10B981',
-              borderRadius: '12px',
-              padding: '12px 18px',
-              fontSize: '14px',
-              fontWeight: '700',
-              cursor: 'pointer',
+              gap: '10px',
+              borderLeft: '1px solid #334155',
+              paddingLeft: '12px',
             }}
           >
-            <Plus size={18} />
-            Nuevo Vehículo
-          </button>
+            {onAbrirCrearCliente && (
+              <button
+                onClick={onAbrirCrearCliente}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  backgroundColor: 'rgba(37, 99, 235, 0.15)',
+                  color: '#60A5FA',
+                  border: '1px solid rgba(37, 99, 235, 0.4)',
+                  borderRadius: '12px',
+                  padding: '10px 16px',
+                  fontSize: '13px',
+                  fontWeight: '700',
+                  cursor: 'pointer',
+                }}
+              >
+                <UserPlus size={16} />
+                Nuevo Cliente
+              </button>
+            )}
+
+            <button
+              onClick={onAbrirCrear}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                backgroundColor: 'rgba(16, 185, 129, 0.15)',
+                color: '#34D399',
+                border: '1px solid rgba(16, 185, 129, 0.4)',
+                borderRadius: '12px',
+                padding: '10px 16px',
+                fontSize: '13px',
+                fontWeight: '700',
+                cursor: 'pointer',
+              }}
+            >
+              <Plus size={16} />
+              Nuevo Vehículo
+            </button>
+          </div>
         )}
       </div>
     </div>

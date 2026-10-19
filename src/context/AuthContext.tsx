@@ -123,7 +123,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     verificarSesion();
   }, [verificarSesion]);
 
-  // Solo los eventos humanos registran actividad; sin agrupación ni envíos tardíos.
   useEffect(() => {
     if (estadoSesion === 'SIN_SESION') return;
 
@@ -155,7 +154,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     };
   }, [estadoSesion]);
 
-  // Consultar la sesión nunca renueva actividad humana.
   useEffect(() => {
     if (estadoSesion === 'SIN_SESION') return;
 
@@ -278,6 +276,17 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     accion: 'ver' | 'crear' | 'editar' | 'eliminar'
   ): boolean => {
     if (!usuario || !usuario.permisos || estadoSesion !== 'NORMAL') return false;
+
+    if (usuario.rol === 'ADMINISTRADOR') return true;
+
+    // Regla estricta: El rol MECANICO no puede crear, editar ni eliminar en FICHA_VEHICULAR
+    if (
+      usuario.rol === 'MECANICO' &&
+      modulo.toUpperCase() === 'FICHA_VEHICULAR' &&
+      accion !== 'ver'
+    ) {
+      return false;
+    }
 
     const permisoModulo = usuario.permisos.find(
       (p: PermisoModulo) => p.modulo.toUpperCase() === modulo.toUpperCase()

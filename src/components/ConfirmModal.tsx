@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { AlertTriangle, LogOut, Trash2, X } from 'lucide-react';
 
 interface ConfirmModalProps {
@@ -8,6 +8,9 @@ interface ConfirmModalProps {
   subtitulo?: string;
   textoConfirmar?: string;
   textoCancelar?: string;
+  requiereMotivo?: boolean;
+  motivoValue?: string;
+  onMotivoChange?: (val: string) => void;
   onConfirmar: () => void;
   onCancelar: () => void;
   cargando?: boolean;
@@ -18,23 +21,33 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
   titulo,
   mensaje,
   subtitulo = '⚠️ Acción Requiere Confirmación',
-  textoConfirmar = 'Sí, Eliminar',
+  textoConfirmar = 'Sí, Confirmar',
   textoCancelar = 'Cancelar',
+  requiereMotivo = false,
+  motivoValue = '',
+  onMotivoChange,
   onConfirmar,
   onCancelar,
   cargando = false,
 }) => {
   const modalRef = useRef<HTMLDivElement>(null);
   const previousFocusRef = useRef<HTMLElement | null>(null);
+  const [errorMotivo, setErrorMotivo] = useState<string | null>(null);
 
   useEffect(() => {
     if (abierto) {
+      setErrorMotivo(null);
       previousFocusRef.current = document.activeElement as HTMLElement;
 
       const timer = setTimeout(() => {
         if (modalRef.current) {
-          const btnCancelar = modalRef.current.querySelector<HTMLElement>('button');
-          if (btnCancelar) btnCancelar.focus();
+          const inputMotivo = modalRef.current.querySelector<HTMLElement>('textarea');
+          if (inputMotivo) {
+            inputMotivo.focus();
+          } else {
+            const btnCancelar = modalRef.current.querySelector<HTMLElement>('button');
+            if (btnCancelar) btnCancelar.focus();
+          }
         }
       }, 50);
 
@@ -59,7 +72,7 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
 
       if (e.key === 'Tab' && modalRef.current) {
         const focusables = modalRef.current.querySelectorAll<HTMLElement>(
-          'button:not([disabled]), [tabindex]:not([tabindex="-1"])'
+          'button:not([disabled]), textarea:not([disabled]), input:not([disabled]), [tabindex]:not([tabindex="-1"])'
         );
         if (focusables.length === 0) return;
 
@@ -83,6 +96,17 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
   if (!abierto) return null;
 
   const esCierreSesion = textoConfirmar.toLowerCase().includes('sesión');
+  const motivoValido =
+    !requiereMotivo || (motivoValue.trim().length >= 5 && motivoValue.trim().length <= 250);
+
+  const handleConfirmarSubmit = () => {
+    if (requiereMotivo && !motivoValido) {
+      setErrorMotivo('El motivo de la acción es obligatorio (entre 5 y 250 caracteres).');
+      return;
+    }
+    setErrorMotivo(null);
+    onConfirmar();
+  };
 
   return (
     <div
@@ -106,7 +130,7 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
       <div
         ref={modalRef}
         style={{
-          width: '460px',
+          width: '480px',
           backgroundColor: '#0F172A',
           border: '1px solid #7F1D1D',
           borderRadius: '16px',
@@ -167,6 +191,45 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
           {mensaje}
         </div>
 
+        {/* CAMPO OBLIGATORIO DE MOTIVO */}
+        {requiereMotivo && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+            <label style={{ fontSize: '12px', fontWeight: '700', color: '#FCA5A5' }}>
+              Motivo de la Acción * (5 a 250 caracteres)
+            </label>
+            <textarea
+              required
+              rows={3}
+              placeholder="Ingrese la razón justificada para realizar esta acción..."
+              value={motivoValue}
+              onChange={(e) => {
+                if (onMotivoChange) onMotivoChange(e.target.value);
+                if (errorMotivo) setErrorMotivo(null);
+              }}
+              style={{
+                width: '100%',
+                padding: '10px 12px',
+                backgroundColor: '#020617',
+                border: errorMotivo ? '1px solid #EF4444' : '1px solid #334155',
+                borderRadius: '8px',
+                color: '#F8FAFC',
+                fontSize: '13px',
+                outline: 'none',
+                resize: 'none',
+                boxSizing: 'border-box',
+              }}
+            />
+            {errorMotivo && (
+              <span style={{ fontSize: '11px', color: '#EF4444', fontWeight: '600' }}>
+                ⚠️ {errorMotivo}
+              </span>
+            )}
+            <span style={{ fontSize: '11px', color: '#64748B', textAlign: 'right' }}>
+              {motivoValue.trim().length} / 250 caracteres
+            </span>
+          </div>
+        )}
+
         {/* ACCIONES */}
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
           <button
@@ -187,19 +250,20 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
           </button>
           <button
             type="button"
-            onClick={onConfirmar}
-            disabled={cargando}
+            onClick={handleConfirmarSubmit}
+            disabled={cargando || (requiereMotivo && !motivoValido)}
             style={{
               display: 'flex',
               alignItems: 'center',
               gap: '8px',
               padding: '10px 20px',
-              backgroundColor: '#DC2626',
+              backgroundColor: requiereMotivo && !motivoValido ? '#991B1B' : '#DC2626',
               color: '#FFFFFF',
               border: 'none',
               borderRadius: '8px',
               fontWeight: '700',
-              cursor: 'pointer',
+              cursor: requiereMotivo && !motivoValido ? 'not-allowed' : 'pointer',
+              opacity: requiereMotivo && !motivoValido ? 0.6 : 1,
             }}
           >
             {esCierreSesion ? <LogOut size={16} /> : <Trash2 size={16} />}

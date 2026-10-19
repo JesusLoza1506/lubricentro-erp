@@ -1,0 +1,24 @@
+﻿import { render, screen, fireEvent, cleanup, waitFor } from '@testing-library/react';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { ModalCliente } from '../components/ModalCliente';
+import { ModalVehiculo } from '../components/ModalVehiculo';
+import { ModalDetalleOT } from '../components/ModalDetalleOT';
+import { FichaVehicularHistorial } from '../components/FichaVehicularHistorial';
+import { FichaVehicularPage } from '../FichaVehicularPage';
+import { vehiculoService } from '../../../services/vehiculoService';
+const auth = vi.hoisted(() => ({ rol: 'ADMINISTRADOR' }));
+vi.mock('../../../context/AuthContext', () => ({ useAuth: () => ({ tienePermiso: () => true, esAdmin: auth.rol === 'ADMINISTRADOR', usuario: { id_usuario: 1, rol: auth.rol } }) }));
+vi.mock('../../../services/vehiculoService', () => ({ vehiculoService: { obtenerFichaVehicularCompleta: vi.fn(), obtenerProximosCambiosAceite: vi.fn().mockResolvedValue([]), registrarVehiculo: vi.fn(), actualizarVehiculo: vi.fn(), cambiarEstadoVehiculo: vi.fn() } }));
+vi.mock('../../../services/ordenesService', () => ({ ordenesService: { listarOrdenesTrabajo: vi.fn().mockResolvedValue([]), crearOrdenTrabajo: vi.fn() } }));
+const vehicle: any = { id_vehiculo: 1, id_cliente: 2, placa: 'ABC123', marca: 'Toyota', modelo: 'Yaris', anio: 2020, tipo_motor: 'GASOLINA', kilometraje_actual: 50000, activo: 1, nombre_cliente: 'Juan Perez' };
+const ot: any = { id_ot: 1, codigo_ot: 'OT-001', placa: 'ABC123', id_mecanico: 3, estado: 'FINALIZADO', kilometraje_ingreso: 50010, proximo_kilometraje: null, tipo_aceite: null, fecha_ingreso: '2026-10-18T12:00:00', detalles: [] };
+beforeEach(() => { vi.clearAllMocks(); auth.rol = 'ADMINISTRADOR'; });
+afterEach(cleanup);
+it('detalle acepta null y muestra Sin cambio', () => { render(<ModalDetalleOT modalAbierto setModalAbierto={vi.fn()} ordenTrabajo={ot} />); expect(screen.getByText(/Sin cambio/)).toBeDefined(); });
+it('historial acepta null sin inventar cero', () => { render(<FichaVehicularHistorial historial={[ot]} onVerDetalleOT={vi.fn()} />); expect(screen.getByText(/Sin cambio/)).toBeDefined(); expect(screen.queryByText(/Próximo servicio: 0 km/)).toBeNull(); });
+it('administrador puede editar placa', () => { render(<ModalVehiculo modalAbierto setModalAbierto={vi.fn()} modo="EDITAR" vehiculoEditar={vehicle} handleGuardar={vi.fn()} />); expect((screen.getByPlaceholderText('ABC123') as HTMLInputElement).disabled).toBe(false); });
+it('cliente normaliza pegado +51 sin truncar', () => { render(<ModalCliente modalAbierto setModalAbierto={vi.fn()} modo="CREAR" onClienteGuardado={vi.fn()} />); const input = screen.getByPlaceholderText('987654321') as HTMLInputElement; fireEvent.change(input, { target: { value: '+51 912 345 678' } }); expect(input.value).toBe('912345678'); });
+it('historial muestra primera pagina de veinte', () => { const rows = Array.from({ length: 21 }, (_, i) => ({ ...ot, id_ot: i + 1, codigo_ot: `OT-TMP-${i+1}` })); render(<FichaVehicularHistorial historial={rows} onVerDetalleOT={vi.fn()} />); expect(screen.getAllByText(/^OT-TMP-/)).toHaveLength(20); });
+it('mecanico no ve acciones ni candidatos', async () => { auth.rol = 'MECANICO'; vi.mocked(vehiculoService.obtenerFichaVehicularCompleta).mockResolvedValue({ vehiculo: vehicle, historial: [] }); render(<FichaVehicularPage />); fireEvent.change(screen.getByPlaceholderText(/Ej\. ABC123/), { target: { value: 'ABC123' } }); fireEvent.click(screen.getByRole('button', { name: /buscar/i })); await screen.findByText('Juan Perez'); expect(screen.queryByRole('button', { name: /Nuevo cliente|Nuevo vehículo|Editar|Crear OT|Próximos cambios/i })).toBeNull(); });
+it('error tecnico no ofrece crear vehiculo como si no existiese', async () => { vi.mocked(vehiculoService.obtenerFichaVehicularCompleta).mockRejectedValue(new Error('Fallo técnico de lectura')); render(<FichaVehicularPage />); fireEvent.change(screen.getByPlaceholderText(/Ej\. ABC123/), { target: { value: 'ABC123' } }); fireEvent.click(screen.getByRole('button', { name: /buscar/i })); await screen.findByText('Fallo técnico de lectura'); await waitFor(() => expect(screen.queryAllByText(/no encontr|no existe|no está registrado/i)).toHaveLength(0)); });
+

@@ -25,12 +25,6 @@ pub struct AuditoriaDto {
 pub struct AuditoriaService;
 
 impl AuditoriaService {
-    /// Registra un evento de auditoría cumpliendo estrictamente con el esquema V7.0 de la tabla auditoria:
-    /// CHECKs aplicados por SQLite (0001_initial_schema_v7.sql):
-    /// - actor: 'USUARIO', 'SISTEMA', 'NO_IDENTIFICADO'
-    /// - modulo: 'LOGIN', 'DASHBOARD', 'FICHA_VEHICULAR', 'OT', 'INVENTARIO', 'POS', 'CAJA', 'BACKUP', 'ADMIN', 'REPORTES'
-    /// - resultado: 'OK', 'DENEGADO', 'ERROR'
-    /// - CHECK((actor='USUARIO' AND id_usuario IS NOT NULL AND username_snapshot IS NOT NULL AND rol_snapshot IS NOT NULL) OR (actor<>'USUARIO' AND id_usuario IS NULL))
     #[allow(clippy::too_many_arguments)]
     pub fn registrar_v5(
         conn: &Connection,
@@ -43,6 +37,8 @@ impl AuditoriaService {
         accion: &str,
         entidad: Option<&str>,
         id_entidad: Option<&str>,
+        antes_json: Option<&str>,
+        despues_json: Option<&str>,
         motivo: Option<&str>,
         resultado: &str,
     ) -> Result<(), AppError> {
@@ -52,6 +48,7 @@ impl AuditoriaService {
             && id_usuario.is_some()
             && username_snapshot.is_some()
             && rol_snapshot.is_some();
+
         let actor_final = if es_actor_usuario {
             "USUARIO"
         } else if actor == "SISTEMA" {
@@ -59,6 +56,7 @@ impl AuditoriaService {
         } else {
             "NO_IDENTIFICADO"
         };
+
         let id_usr_final = if actor_final == "USUARIO" {
             id_usuario
         } else {
@@ -79,11 +77,11 @@ impl AuditoriaService {
             "INSERT INTO auditoria (
                 id_operacion, id_usuario, actor, username_snapshot, rol_snapshot,
                 id_autorizante, modulo, accion, entidad, id_entidad,
-                motivo, resultado
+                antes_json, despues_json, motivo, resultado
             ) VALUES (
                 ?1, ?2, ?3, ?4, ?5,
                 ?6, ?7, ?8, ?9, ?10,
-                ?11, ?12
+                ?11, ?12, ?13, ?14
             )",
             params![
                 id_op,
@@ -96,6 +94,8 @@ impl AuditoriaService {
                 accion,
                 entidad,
                 id_entidad,
+                antes_json,
+                despues_json,
                 motivo,
                 resultado
             ],
@@ -130,6 +130,8 @@ impl AuditoriaService {
             accion,
             Some("usuarios"),
             id_usuario.map(|id| id.to_string()).as_deref(),
+            None,
+            None,
             motivo,
             resultado,
         )
@@ -152,6 +154,8 @@ impl AuditoriaService {
             "CERRAR_SESION",
             Some("usuarios"),
             Some(&id_usuario.to_string()),
+            None,
+            None,
             Some("Cierre voluntario de sesión"),
             "OK",
         )

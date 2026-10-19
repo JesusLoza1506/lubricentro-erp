@@ -1,6 +1,7 @@
-#![cfg(feature = "tests_deshabilitados_temporalmente")]
 use lubricentro_erp_lib::dto::cliente_dto::CrearClienteDto;
-use lubricentro_erp_lib::dto::vehiculo_dto::{CrearVehiculoPayloadDto, EditarVehiculoPayloadDto};
+use lubricentro_erp_lib::dto::vehiculo_dto::{
+    CambiarEstadoVehiculoPayloadDto, CrearVehiculoPayloadDto, EditarVehiculoPayloadDto,
+};
 use lubricentro_erp_lib::services::cliente_service::ClienteService;
 use rusqlite::Connection;
 
@@ -15,21 +16,30 @@ fn setup_test_db() -> Connection {
     let initial_schema = include_str!("../migrations/0001_initial_schema_v7.sql");
     conn.execute_batch(initial_schema).unwrap();
 
+    // Insertar usuarios de prueba:
+    // id_usuario = 1 -> ADMINISTRADOR
+    // id_usuario = 2 -> CAJERO
+    // id_usuario = 3 -> MECANICO
     conn.execute(
         "INSERT INTO usuarios (nombre_completo, username, password_hash, rol, activo)
          VALUES ('Admin System', 'admin', ?1, 'ADMINISTRADOR', 1),
+                ('Cajero Caja', 'caja', ?1, 'CAJERO', 1),
                 ('Mecanico Taller', 'meca', ?1, 'MECANICO', 1)",
         [DUMMY_ARGON2_HASH],
     )
     .unwrap();
 
+    // NOTA ESQUEMA V7:
+    // 1) id_cliente = 1 reservado ('Cliente varios', es_varios = 1).
+    // 2) Juan Pérez tomará id_cliente = 2 (es_varios = 0).
+    // 3) Las zanjas 1 y 2 nacen activas por defecto.
     conn.execute_batch(
         "
-        INSERT INTO clientes (tipo_documento, numero_documento, nombre_razon_social, telefono)
-        VALUES ('DNI', '12345678', 'Juan Perez', '987654321');
+        INSERT INTO clientes (tipo_documento, numero_documento, nombre_razon_social, telefono, es_varios)
+        VALUES ('DNI', '12345678', 'Juan Perez', '987654321', 0);
 
         INSERT INTO vehiculos (placa, id_cliente, marca, modelo, anio, tipo_motor, kilometraje_actual)
-        VALUES ('ABC-123', 1, 'Toyota', 'Yaris', 2020, '1.5L', 50000);
+        VALUES ('ABC123', 2, 'Toyota', 'Yaris', 2020, 'GASOLINA', 50000);
         ",
     )
     .unwrap();
@@ -47,30 +57,47 @@ fn test_registrar_cliente_y_vehiculo_service() {
         nombre_razon_social: "Maria Lopez".to_string(),
         telefono: Some("912345678".to_string()),
         direccion: Some("Av. Principal 123".to_string()),
+        correo: Some("maria@gmail.com".to_string()),
     };
 
-    let id_cliente = ClienteService::registrar_cliente(&conn, cliente_payload).unwrap();
+    let id_cliente = ClienteService::registrar_cliente(
+        &conn,
+        cliente_payload,
+        Some(1),
+        Some("admin"),
+        Some("ADMINISTRADOR"),
+    )
+    .unwrap();
     assert!(id_cliente > 0);
 
     let vehiculo_payload = CrearVehiculoPayloadDto {
-        placa: "XYZ-789".to_string(),
+        placa: "XYZ789".to_string(),
         marca: "Nissan".to_string(),
         modelo: "Sentra".to_string(),
         anio: Some(2021),
-        tipo_motor: Some("1.8L".to_string()),
+        tipo_motor: Some("GASOLINA".to_string()),
         kilometraje_actual: 15000,
         id_cliente: Some(id_cliente),
         nombre_razon_social: None,
         tipo_documento: None,
         numero_documento: None,
         telefono: None,
+        correo: None,
         direccion: None,
     };
 
-    let placa_res = ClienteService::registrar_vehiculo(&conn, vehiculo_payload, Some(1)).unwrap();
-    assert_eq!(placa_res, "XYZ-789");
+    let placa_res = ClienteService::registrar_vehiculo(
+        &conn,
+        vehiculo_payload,
+        Some(1),
+        Some("admin"),
+        Some("ADMINISTRADOR"),
+    )
+    .unwrap();
+    assert_eq!(placa_res, "XYZ789");
 
-    let vehiculo_res = ClienteService::obtener_vehiculo_por_placa(&conn, "XYZ-789");
+    let vehiculo_res =
+        ClienteService::obtener_vehiculo_por_placa(&conn, "XYZ789", Some("ADMINISTRADOR"));
     assert!(vehiculo_res.is_ok());
 }
 
@@ -79,26 +106,34 @@ fn test_actualizar_vehiculo_y_propietario_service() {
     let conn = setup_test_db();
 
     let edit_payload = EditarVehiculoPayloadDto {
-        id_vehiculo: None,
-        placa: "ABC-123".to_string(),
+        id_vehiculo: Some(1),
+        placa: "ABC123".to_string(),
         marca: "Toyota".to_string(),
         modelo: "Yaris Hatchback".to_string(),
         anio: Some(2021),
-        tipo_motor: Some("1.5L Dual VVT-i".to_string()),
+        tipo_motor: Some("GASOLINA".to_string()),
         kilometraje_actual: 55000,
-        id_cliente: Some(1),
+        id_cliente: Some(2),
         nombre_razon_social: Some("Juan Perez Actualizado".to_string()),
         tipo_documento: Some("DNI".to_string()),
         numero_documento: Some("12345678".to_string()),
         telefono: Some("999888777".to_string()),
+        correo: Some("juan@correo.com".to_string()),
         direccion: Some("Nueva Direccion 456".to_string()),
+        motivo: None,
     };
 
-    let res = ClienteService::actualizar_vehiculo(&conn, edit_payload, Some(1));
+    let res = ClienteService::actualizar_vehiculo(
+        &conn,
+        edit_payload,
+        Some(1),
+        Some("admin"),
+        "ADMINISTRADOR",
+    );
     assert!(res.is_ok());
 
     let vehiculo_actualizado =
-        ClienteService::obtener_vehiculo_por_placa(&conn, "ABC-123").unwrap();
+        ClienteService::obtener_vehiculo_por_placa(&conn, "ABC123", Some("ADMINISTRADOR")).unwrap();
     assert_eq!(vehiculo_actualizado.modelo, "Yaris Hatchback");
     assert_eq!(vehiculo_actualizado.kilometraje_actual, 55000);
     assert_eq!(
@@ -108,18 +143,213 @@ fn test_actualizar_vehiculo_y_propietario_service() {
 }
 
 #[test]
+fn test_actualizar_vehiculo_por_id_y_cambio_placa() {
+    let conn = setup_test_db();
+
+    let edit_payload = EditarVehiculoPayloadDto {
+        id_vehiculo: Some(1),
+        placa: "NEW123".to_string(),
+        marca: "Toyota".to_string(),
+        modelo: "Yaris".to_string(),
+        anio: Some(2020),
+        tipo_motor: Some("GASOLINA".to_string()),
+        kilometraje_actual: 50000,
+        id_cliente: Some(2),
+        nombre_razon_social: Some("Juan Perez".to_string()),
+        tipo_documento: Some("DNI".to_string()),
+        numero_documento: Some("12345678".to_string()),
+        telefono: Some("987654321".to_string()),
+        correo: None,
+        direccion: None,
+        motivo: Some("Correccion de placa por error de digitacion inicial".to_string()),
+    };
+
+    let res = ClienteService::actualizar_vehiculo(
+        &conn,
+        edit_payload,
+        Some(1),
+        Some("admin"),
+        "ADMINISTRADOR",
+    );
+    assert!(res.is_ok());
+
+    let vehiculo_modificado =
+        ClienteService::obtener_vehiculo_por_placa(&conn, "NEW123", Some("ADMINISTRADOR"));
+    assert!(vehiculo_modificado.is_ok());
+    assert_eq!(vehiculo_modificado.unwrap().placa, "NEW123");
+}
+
+#[test]
+fn test_cambio_placa_por_cajero_falla() {
+    let conn = setup_test_db();
+
+    let edit_payload = EditarVehiculoPayloadDto {
+        id_vehiculo: Some(1),
+        placa: "NEW123".to_string(),
+        marca: "Toyota".to_string(),
+        modelo: "Yaris".to_string(),
+        anio: Some(2020),
+        tipo_motor: Some("GASOLINA".to_string()),
+        kilometraje_actual: 50000,
+        id_cliente: Some(2),
+        nombre_razon_social: Some("Juan Perez".to_string()),
+        tipo_documento: Some("DNI".to_string()),
+        numero_documento: Some("12345678".to_string()),
+        telefono: Some("987654321".to_string()),
+        correo: None,
+        direccion: None,
+        motivo: Some("Intento de cambio de placa autorizado por cajero".to_string()),
+    };
+
+    let res =
+        ClienteService::actualizar_vehiculo(&conn, edit_payload, Some(2), Some("caja"), "CAJERO");
+    assert!(res.is_err());
+}
+
+#[test]
+fn test_cambio_placa_sin_motivo_falla() {
+    let conn = setup_test_db();
+
+    let edit_payload = EditarVehiculoPayloadDto {
+        id_vehiculo: Some(1),
+        placa: "NEW123".to_string(),
+        marca: "Toyota".to_string(),
+        modelo: "Yaris".to_string(),
+        anio: Some(2020),
+        tipo_motor: Some("GASOLINA".to_string()),
+        kilometraje_actual: 50000,
+        id_cliente: Some(2),
+        nombre_razon_social: Some("Juan Perez".to_string()),
+        tipo_documento: Some("DNI".to_string()),
+        numero_documento: Some("12345678".to_string()),
+        telefono: Some("987654321".to_string()),
+        correo: None,
+        direccion: None,
+        motivo: None,
+    };
+
+    let res = ClienteService::actualizar_vehiculo(
+        &conn,
+        edit_payload,
+        Some(1),
+        Some("admin"),
+        "ADMINISTRADOR",
+    );
+    assert!(res.is_err());
+}
+
+#[test]
+fn test_cambio_propietario_sin_motivo_falla() {
+    let conn = setup_test_db();
+
+    conn.execute(
+        "INSERT INTO clientes (tipo_documento, numero_documento, nombre_razon_social, telefono, es_varios)
+         VALUES ('DNI', '88888888', 'Nuevo Propietario', '911223344', 0)",
+        [],
+    )
+    .unwrap();
+
+    let edit_payload = EditarVehiculoPayloadDto {
+        id_vehiculo: Some(1),
+        placa: "ABC123".to_string(),
+        marca: "Toyota".to_string(),
+        modelo: "Yaris".to_string(),
+        anio: Some(2020),
+        tipo_motor: Some("GASOLINA".to_string()),
+        kilometraje_actual: 50000,
+        id_cliente: Some(3),
+        nombre_razon_social: Some("Nuevo Propietario".to_string()),
+        tipo_documento: Some("DNI".to_string()),
+        numero_documento: Some("88888888".to_string()),
+        telefono: Some("911223344".to_string()),
+        correo: None,
+        direccion: None,
+        motivo: None,
+    };
+
+    let res = ClienteService::actualizar_vehiculo(
+        &conn,
+        edit_payload,
+        Some(1),
+        Some("admin"),
+        "ADMINISTRADOR",
+    );
+    assert!(res.is_err());
+}
+
+#[test]
+fn test_reduccion_kilometraje_sin_motivo_falla() {
+    let conn = setup_test_db();
+
+    let edit_payload = EditarVehiculoPayloadDto {
+        id_vehiculo: Some(1),
+        placa: "ABC123".to_string(),
+        marca: "Toyota".to_string(),
+        modelo: "Yaris".to_string(),
+        anio: Some(2020),
+        tipo_motor: Some("GASOLINA".to_string()),
+        kilometraje_actual: 40000,
+        id_cliente: Some(2),
+        nombre_razon_social: Some("Juan Perez".to_string()),
+        tipo_documento: Some("DNI".to_string()),
+        numero_documento: Some("12345678".to_string()),
+        telefono: Some("987654321".to_string()),
+        correo: None,
+        direccion: None,
+        motivo: None,
+    };
+
+    let res = ClienteService::actualizar_vehiculo(
+        &conn,
+        edit_payload,
+        Some(1),
+        Some("admin"),
+        "ADMINISTRADOR",
+    );
+    assert!(res.is_err());
+}
+
+#[test]
+fn test_actualizar_vehiculo_por_mecanico_cambio_propietario_falla() {
+    let conn = setup_test_db();
+
+    conn.execute(
+        "INSERT INTO clientes (tipo_documento, numero_documento, nombre_razon_social, telefono, es_varios)
+         VALUES ('DNI', '88888888', 'Nuevo Propietario', '911223344', 0)",
+        [],
+    )
+    .unwrap();
+
+    let edit_payload = EditarVehiculoPayloadDto {
+        id_vehiculo: Some(1),
+        placa: "ABC123".to_string(),
+        marca: "Toyota".to_string(),
+        modelo: "Yaris".to_string(),
+        anio: Some(2020),
+        tipo_motor: Some("GASOLINA".to_string()),
+        kilometraje_actual: 50000,
+        id_cliente: Some(3),
+        nombre_razon_social: Some("Nuevo Propietario".to_string()),
+        tipo_documento: Some("DNI".to_string()),
+        numero_documento: Some("88888888".to_string()),
+        telefono: Some("911223344".to_string()),
+        correo: None,
+        direccion: None,
+        motivo: Some("Cambio de dueño autorizado por mecanico".to_string()),
+    };
+
+    let res =
+        ClienteService::actualizar_vehiculo(&conn, edit_payload, Some(3), Some("meca"), "MECANICO");
+    assert!(res.is_err());
+}
+
+#[test]
 fn test_consulta_atomica_ficha_completa_con_aceite() {
     let conn = setup_test_db();
 
     conn.execute(
-        "INSERT INTO ordenes_trabajo (
-            id_operacion, codigo_ot, id_vehiculo, id_cliente_atendido,
-            placa_snapshot, cliente_snapshot, id_creador, id_zanja_ejecucion,
-            estado, kilometraje_ingreso
-        ) VALUES (
-            'OP-TEST-01', 'OT-001', 1, 1, 'ABC-123', '{\"nombre\":\"Juan Perez\"}',
-            1, 1, 'FINALIZADO', 50000
-        )",
+        "INSERT INTO servicios (codigo, nombre, precio_venta_cent, es_cambio_aceite)
+         VALUES ('SERV-01', 'Cambio de Aceite Estándar', 1500, 1)",
         [],
     )
     .unwrap();
@@ -129,7 +359,7 @@ fn test_consulta_atomica_ficha_completa_con_aceite() {
             codigo, nombre, categoria, unidad_medida, stock_actual, stock_minimo,
             valor_stock_micro, precio_venta_cent, activo
         ) VALUES (
-            'PROD-001', 'Aceite Sintetico 5W-30', 'ACEITE', 'UND', 10.0, 2.0,
+            'PROD-001', 'Aceite Sintetico 5W-30', 'ACEITE', 'UND', 0, 2,
             0, 5000, 1
         )",
         [],
@@ -137,57 +367,136 @@ fn test_consulta_atomica_ficha_completa_con_aceite() {
     .unwrap();
 
     conn.execute(
-        "INSERT INTO detalle_ot_productos (
-            id_ot, id_producto, codigo_snapshot, nombre_snapshot, unidad_medida_snapshot,
-            cantidad, precio_aplicado_cent
+        "INSERT INTO ordenes_trabajo (
+            id_operacion, codigo_ot, id_vehiculo, id_cliente_atendido,
+            placa_snapshot, cliente_snapshot, id_creador,
+            estado, kilometraje_ingreso
         ) VALUES (
-            1, 1, 'PROD-001', 'Aceite Sintetico 5W-30', 'UND', 1.0, 5000
+            'OP-TEST-01', 'OT-001', 1, 2, 'ABC123', '{\"nombre\":\"Juan Perez\"}',
+            1, 'EN_ESPERA', 50000
         )",
         [],
     )
     .unwrap();
 
-    let ficha = ClienteService::obtener_ficha_vehicular_completa(&conn, "ABC-123").unwrap();
+    // Se asigna id_mecanico = 3 (MECANICO activo)
+    conn.execute(
+        "UPDATE ordenes_trabajo 
+         SET estado = 'EN_PROCESO', id_mecanico = 3, id_zanja_ejecucion = 1, fecha_inicio = datetime('now', '-5 hours')
+         WHERE id_ot = 1",
+        [],
+    )
+    .unwrap();
 
-    assert_eq!(ficha.vehiculo.placa, "ABC-123");
+    conn.execute(
+        "INSERT INTO detalle_ot_servicios (
+            id_operacion, id_ot, id_servicio, codigo_snapshot, nombre_snapshot,
+            cantidad, precio_unitario_cent, es_cambio_aceite, id_usuario
+        ) VALUES (
+            'OP-SERV-01', 1, 1, 'SERV-01', 'Cambio de Aceite Estándar',
+            1, 1500, 1, 1
+        )",
+        [],
+    )
+    .unwrap();
+
+    conn.execute(
+        "INSERT INTO detalle_ot_productos (
+            id_operacion, id_ot, id_producto, codigo_snapshot, nombre_snapshot, unidad_medida,
+            cantidad, precio_unitario_cent, costo_unitario_micro, valor_consumido_micro, id_usuario
+        ) VALUES (
+            'OP-PROD-01', 1, 1, 'PROD-001', 'Aceite Sintetico 5W-30', 'UND',
+            1, 5000, 10000, 10000, 1
+        )",
+        [],
+    )
+    .unwrap();
+
+    // Se asigna id_mecanico_terminal = 3 (MECANICO activo)
+    conn.execute(
+        "UPDATE ordenes_trabajo 
+         SET estado = 'FINALIZADO', id_mecanico_terminal = 3, kilometraje_salida = 50000,
+             tipo_aceite = 'SINTETICO', intervalo_aceite_km = 10000,
+             resumen_publico = 'Servicio completado correctamente', fecha_fin = datetime('now', '-5 hours')
+         WHERE id_ot = 1",
+        [],
+    )
+    .unwrap();
+
+    let ficha =
+        ClienteService::obtener_ficha_vehicular_completa(&conn, "ABC123", Some("ADMINISTRADOR"))
+            .unwrap();
+
+    assert_eq!(ficha.vehiculo.placa, "ABC123");
     assert_eq!(ficha.historial.len(), 1);
     assert_eq!(ficha.historial[0].codigo_ot, "OT-001");
-    assert_eq!(
-        ficha.historial[0].tipo_aceite.as_deref(),
-        Some("Aceite Sintetico 5W-30")
-    );
+    assert_eq!(ficha.historial[0].tipo_aceite.as_deref(), Some("SINTETICO"));
 }
 
 #[test]
-fn test_bloqueo_eliminacion_service_con_ot() {
+fn test_bloqueo_desactivacion_service_con_ot_abierta() {
     let conn = setup_test_db();
 
     conn.execute(
         "INSERT INTO ordenes_trabajo (
             id_operacion, codigo_ot, id_vehiculo, id_cliente_atendido,
-            placa_snapshot, cliente_snapshot, id_creador, id_zanja_ejecucion,
+            placa_snapshot, cliente_snapshot, id_creador,
             estado, kilometraje_ingreso
         ) VALUES (
-            'OP-TEST-02', 'OT-001', 1, 1, 'ABC-123', '{\"nombre\":\"Juan Perez\"}',
-            1, 1, 'FINALIZADO', 50000
+            'OP-TEST-02', 'OT-001', 1, 2, 'ABC123', '{\"nombre\":\"Juan Perez\"}',
+            1, 'EN_ESPERA', 50000
         )",
         [],
     )
     .unwrap();
 
-    let res_eliminar = ClienteService::eliminar_vehiculo(&conn, "ABC-123", Some(1));
-    assert!(res_eliminar.is_err());
+    // Se asigna id_mecanico = 3 (MECANICO activo)
+    conn.execute(
+        "UPDATE ordenes_trabajo 
+         SET estado = 'EN_PROCESO', id_mecanico = 3, id_zanja_ejecucion = 1, fecha_inicio = datetime('now', '-5 hours')
+         WHERE id_ot = 1",
+        [],
+    )
+    .unwrap();
+
+    let payload = CambiarEstadoVehiculoPayloadDto {
+        placa: "ABC123".to_string(),
+        activo: 0,
+        motivo: "Desactivacion por prueba tecnica".to_string(),
+    };
+
+    let res_desactivar = ClienteService::cambiar_estado_vehiculo(
+        &conn,
+        payload,
+        Some(1),
+        Some("admin"),
+        Some("ADMINISTRADOR"),
+    );
+    assert!(res_desactivar.is_err());
 }
 
 #[test]
-fn test_eliminacion_logica_exitosa_service() {
+fn test_desactivacion_logica_exitosa_service_con_motivo() {
     let conn = setup_test_db();
 
-    let res_eliminar = ClienteService::eliminar_vehiculo(&conn, "ABC-123", Some(1));
-    assert!(res_eliminar.is_ok());
+    let payload = CambiarEstadoVehiculoPayloadDto {
+        placa: "ABC123".to_string(),
+        activo: 0,
+        motivo: "Desactivacion por desuso del propietario".to_string(),
+    };
 
-    let res_get = ClienteService::obtener_vehiculo_por_placa(&conn, "ABC-123");
-    assert!(res_get.is_err());
+    let res_desactivar = ClienteService::cambiar_estado_vehiculo(
+        &conn,
+        payload,
+        Some(1),
+        Some("admin"),
+        Some("ADMINISTRADOR"),
+    );
+    assert!(res_desactivar.is_ok());
+
+    let vehiculo_desactivado =
+        ClienteService::obtener_vehiculo_por_placa(&conn, "ABC123", Some("ADMINISTRADOR")).unwrap();
+    assert_eq!(vehiculo_desactivado.activo, 0);
 }
 
 #[test]

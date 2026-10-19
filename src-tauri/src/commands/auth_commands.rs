@@ -58,14 +58,14 @@ pub fn iniciar_sesion_local(
         return Err(AppError::SessionActive);
     }
 
-    // 1. CORRECCIÓN R7 (Punto 5): Consultar ambiente ANTES de invocar AuthService::login
+    // 1. Consultar ambiente ANTES de invocar AuthService::login
     let ambiente = obtener_ambiente_actual_strict(conn)?;
 
-    // 2. Autenticar credenciales y registrar auditoría solo si el ambiente responde
+    // 2. Autenticar credenciales
     let (mut res, usuario_version) = AuthService::login(conn, req)?;
     res.ambiente_actual = ambiente;
 
-    // 3. Abrir la sesión en memoria una vez que la operación entera ha sido exitosa
+    // 3. Abrir sesión en memoria
     res.session_id = session.abrir_sesion(
         res.id_usuario,
         usuario_version,
@@ -318,6 +318,8 @@ pub fn autorizar_descuento(
 
     let username_cajero = session.username.as_deref();
     let rol_cajero = session.rol.as_deref();
+
+    // Módulo corregido a 'POS' (módulo válido en CHECK de auditoria) y se envía Some(id_admin) como autorizante
     if let Err(e) = AuditoriaService::registrar_v5(
         &conn,
         Some(id_cajero),
@@ -326,9 +328,11 @@ pub fn autorizar_descuento(
         rol_cajero,
         Some(id_admin),
         "POS",
-        "AUTORIZAR_DESCUENTO",
+        "APLICAR_DESCUENTO",
         Some("ventas"),
-        Some(&req.referencia_venta),
+        None,
+        None,
+        None,
         Some(&format!("Descuento de {} bp autorizado", req.descuento_bp)),
         "OK",
     ) {

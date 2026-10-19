@@ -1,0 +1,5 @@
+-- LUBRICENTRO GLORIA | DATOS FICTICIOS | PRODUCCION LOCAL
+-- Tabla: comprobantes. Ejecutar en orden del plan, dentro de la transaccion global.
+-- No ejecutar aisladamente ni desactivar triggers/foreign_keys.
+
+INSERT INTO comprobantes (id_comprobante,id_operacion,id_venta,relacion,tipo_comprobante,ambiente,id_serie,correlativo,empresa_snapshot,receptor_snapshot,payload_json,payload_sha256,base_cent,igv_cent,total_cent,fecha_emision,advertencias_json) VALUES (30,'lg-carga-20261018-doc-30',30,'ORIGINAL','BOLETA','PRODUCCION',1,12,'{"nombre":"Lubricentro Gloria","ruc":null}','{"id_cliente":1,"tipo_documento":null,"numero_documento":null,"nombre_razon_social":"Cliente varios","telefono":null,"correo":null,"direccion":null,"es_varios":1,"fecha_creacion":"2026-10-18 18:51:17","version":0}','{"no_enviar":true,"origen":"CARGA_INICIAL","advertencia":"NO ES PAYLOAD NUBEFACT. NO ACREDITA EMISION SUNAT.","id_venta":30,"total_cent":9000}','411a6a90a0a6c7a39a766f969a2a8c0dd44ed6d6ba864b6263b8ba3e720ca526',7627,1373,9000,'2026-04-10 15:14:00','["NO_ENVIAR","SIN_EMISION_FISCAL"]');

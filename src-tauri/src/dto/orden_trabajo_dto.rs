@@ -20,11 +20,12 @@ pub struct OrdenTrabajoHistorialDto {
     pub zanja: Option<i32>,
     pub estado: String,
     pub kilometraje_ingreso: i64,
-    pub proximo_kilometraje: i64,
+    pub proximo_kilometraje: Option<i64>, // ✅ Cambiado a Option<i64> para admitir NULL en la BD
     pub observaciones: Option<String>,
     pub fecha_ingreso: Option<String>,
     pub tipo_aceite: Option<String>,
     pub detalles: Vec<DetalleItemOtDto>,
+    pub corregido: Option<i32>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -33,7 +34,7 @@ pub struct CrearOrdenTrabajoDto {
     pub id_mecanico: i64,
     pub zanja: Option<i32>,
     pub kilometraje_ingreso: i64,
-    pub tipo_aceite: String, // "MINERAL" | "SINTETICO" (Usado para auto-calcular próximo KM)
+    pub tipo_aceite: String, // "MINERAL" | "SINTETICO"
     pub observaciones: Option<String>,
 }
 
@@ -49,8 +50,6 @@ pub struct ReasignarMecanicoOtDto {
     pub id_ot: i64,
     pub nuevo_id_mecanico: i64,
 }
-
-// --- NUEVOS DTOS PARA PASO 4 (GESTIÓN DE DETALLES) ---
 
 #[derive(Debug, Deserialize)]
 pub struct AgregarProductoOtDto {

@@ -9,13 +9,22 @@ vi.mock('../../../services/vehiculoService', () => ({
     obtenerFichaVehicularCompleta: vi.fn(),
     registrarVehiculo: vi.fn(),
     actualizarVehiculo: vi.fn(),
-    eliminarVehiculo: vi.fn(),
+    cambiarEstadoVehiculo: vi.fn(),
+    obtenerProximosCambiosAceite: vi.fn().mockResolvedValue([]),
+  },
+}));
+
+vi.mock('../../../services/ordenesService', () => ({
+  ordenesService: {
+    listarOrdenesTrabajo: vi.fn().mockResolvedValue([]),
+    crearOrdenTrabajo: vi.fn(),
   },
 }));
 
 vi.mock('../../../context/AuthContext', () => ({
   useAuth: () => ({
     tienePermiso: () => true,
+    esAdmin: true,
     usuario: { id_usuario: 1, nombre_completo: 'Administrador', rol: 'ADMINISTRADOR' },
   }),
 }));
@@ -27,27 +36,29 @@ describe('FichaVehicularPage - Pruebas de Integración Frontend (FASE 4)', () =>
 
   it('1. Renderiza correctamente el estado inicial vacío de búsqueda', () => {
     render(<FichaVehicularPage />);
-    expect(screen.getByPlaceholderText(/Ej\. ABC-123/i)).toBeDefined();
+    expect(screen.getByPlaceholderText(/Ej\. ABC123/i)).toBeDefined();
     expect(screen.getByText(/Consulta la Hoja de Vida Vehicular/i)).toBeDefined();
   });
 
   it('2. Muestra estado de carga y renderiza la ficha vehicular cuando la búsqueda es exitosa', async () => {
     const mockFicha: FichaVehicularCompletaDTO = {
       vehiculo: {
+        id_vehiculo: 1,
         id_cliente: 1,
-        placa: 'ABC-123',
+        placa: 'ABC123',
         marca: 'Toyota',
         modelo: 'Yaris',
         anio: 2020,
         tipo_motor: '1.5L',
         kilometraje_actual: 45000,
+        activo: 1,
         nombre_cliente: 'Juan Pérez',
       },
       historial: [
         {
           id_ot: 1,
           codigo_ot: 'OT-0001',
-          placa: 'ABC-123',
+          placa: 'ABC123',
           estado: 'FINALIZADO',
           kilometraje_ingreso: 45000,
           proximo_kilometraje: 50000,
@@ -64,8 +75,8 @@ describe('FichaVehicularPage - Pruebas de Integración Frontend (FASE 4)', () =>
 
     render(<FichaVehicularPage />);
 
-    const input = screen.getByPlaceholderText(/Ej\. ABC-123/i);
-    fireEvent.change(input, { target: { value: 'ABC-123' } });
+    const input = screen.getByPlaceholderText(/Ej\. ABC123/i);
+    fireEvent.change(input, { target: { value: 'ABC123' } });
 
     const botonBuscar = screen.getByRole('button', { name: /buscar/i });
     fireEvent.click(botonBuscar);
@@ -85,8 +96,8 @@ describe('FichaVehicularPage - Pruebas de Integración Frontend (FASE 4)', () =>
 
     render(<FichaVehicularPage />);
 
-    const input = screen.getByPlaceholderText(/Ej\. ABC-123/i);
-    fireEvent.change(input, { target: { value: 'XYZ-999' } });
+    const input = screen.getByPlaceholderText(/Ej\. ABC123/i);
+    fireEvent.change(input, { target: { value: 'XYZ999' } });
 
     const botonBuscar = screen.getByRole('button', { name: /buscar/i });
     fireEvent.click(botonBuscar);
@@ -99,13 +110,15 @@ describe('FichaVehicularPage - Pruebas de Integración Frontend (FASE 4)', () =>
   it('4. Permite buscar y cargar los datos de una placa correctamente', async () => {
     const mockFicha: FichaVehicularCompletaDTO = {
       vehiculo: {
+        id_vehiculo: 1,
         id_cliente: 1,
-        placa: 'ABC-123',
+        placa: 'ABC123',
         marca: 'Toyota',
         modelo: 'Yaris',
         anio: 2020,
         tipo_motor: '1.5L',
         kilometraje_actual: 45000,
+        activo: 1,
         nombre_cliente: 'Juan Pérez',
       },
       historial: [],
@@ -115,8 +128,8 @@ describe('FichaVehicularPage - Pruebas de Integración Frontend (FASE 4)', () =>
 
     render(<FichaVehicularPage />);
 
-    const input = screen.getByPlaceholderText(/Ej\. ABC-123/i);
-    fireEvent.change(input, { target: { value: 'ABC-123' } });
+    const input = screen.getByPlaceholderText(/Ej\. ABC123/i);
+    fireEvent.change(input, { target: { value: 'ABC123' } });
 
     const botonBuscar = screen.getByRole('button', { name: /buscar/i });
     fireEvent.click(botonBuscar);

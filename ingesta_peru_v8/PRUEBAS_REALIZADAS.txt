@@ -1,0 +1,15 @@
+PRUEBAS DE LA INGESTA PERUANA V8 — IDs CONSECUTIVOS / BD ORIGINAL
+
+OK: Carga DIRECTA en original: conserva completos los registros iniciales y un evento posterior al dump.
+OK: IDs consecutivos: usuarios 1-11, clientes 1-401; tablas antes vacias desde 1, con referencias verificadas.
+OK: Auditoria con AUTOINCREMENT: conserva 11 eventos previos sin choque con los nuevos.
+OK: Respaldo PREVIO real: corresponde al estado anterior de la BD, con hash y tamano verificables.
+OK: Carga repetida o BD ya poblada: se rechaza sin borrar ni modificar datos.
+OK: BD del paquete anterior con IDs altos: rechazo sin renumerar ni borrar registros.
+OK: Error SQL tardio: ROLLBACK completo; todas las tablas y sqlite_sequence vuelven al estado inicial.
+OK: 4571 archivos SQL independientes por tabla y etapa: orden y SHA256 comprobados.
+
+Hash Argon2id verificado para q123456.
+Pruebas de ejecucion en Node 24.19 sobre Linux; no en el equipo Windows del usuario.
+Se reconstruyo el origen desde el esquema v7 y los registros exportados. No se modifico la BD del usuario.
+Las seis vistas y conciliaciones de stock, importes y cobros pasaron las comprobaciones del ejecutor.
