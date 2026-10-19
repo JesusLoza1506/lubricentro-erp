@@ -144,13 +144,19 @@ _Cambio de contraseña_
 | Cajero | Registro, edición de datos comunes y consulta autorizada. |
 | Mecánico | Consulta de información pública del vehículo y sus atenciones. |
 
-**Capturas por incorporar:**
+**Capturas:**
 
-- Ficha principal: `docs/images/ficha-vehicular.png`.
-- Historial de atenciones: `docs/images/ficha-vehicular-historial.png`.
-- Registro o edición del vehículo: `docs/images/ficha-vehicular-registro.png`.
+_Ficha vehicular principal_
 
-Las rutas son sugeridas; las imágenes se mostrarán cuando se incorporen al repositorio.
+![Ficha vehicular principal](docs/images/ficha-vehicular.png)
+
+_Historial de atenciones_
+
+![Historial de atenciones del vehículo](docs/images/ficha-vehicular-historial.png)
+
+_Registro o edición del vehículo_
+
+![Formulario de registro o edición del vehículo](docs/images/ficha-vehicular-registro.png)
 
 **Validaciones relacionadas:** la ejecución de pruebas compartida registró seis casos satisfactorios en [vehiculo_tests.rs](src-tauri/tests/vehiculo_tests.rs), sobre registro, actualización, consulta de ficha, permisos y desactivación con o sin OT abierta.
 
