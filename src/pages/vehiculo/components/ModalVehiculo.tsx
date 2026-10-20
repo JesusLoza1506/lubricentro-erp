@@ -5,6 +5,8 @@ import {
   VehiculoCompletoDTO,
   TipoMotor,
 } from '../../../types/vehiculo';
+import { ClienteDTO } from '../../../types/cliente';
+import { clienteService } from '../../../services/clienteService';
 
 export type ModoModalVehiculo = 'CREAR' | 'EDITAR';
 
@@ -39,6 +41,9 @@ export const ModalVehiculo: React.FC<ModalVehiculoProps> = ({
   const [anio, setAnio] = useState<number | ''>('');
   const [tipoMotor, setTipoMotor] = useState<string>('');
   const [kilometraje, setKilometraje] = useState<number | ''>('');
+
+  // Datos del Cliente
+  const [idClienteSeleccionado, setIdClienteSeleccionado] = useState<number | null>(null);
   const [nombreCliente, setNombreCliente] = useState('');
   const [tipoDoc, setTipoDoc] = useState('DNI');
   const [numDoc, setNumDoc] = useState('');
@@ -46,6 +51,11 @@ export const ModalVehiculo: React.FC<ModalVehiculoProps> = ({
   const [correo, setCorreo] = useState('');
   const [direccion, setDireccion] = useState('');
   const [motivo, setMotivo] = useState('');
+
+  // Estados del Minibuscador Predictivo
+  const [sugerenciasClientes, setSugerenciasClientes] = useState<ClienteDTO[]>([]);
+  const [mostrarSugerencias, setMostrarSugerencias] = useState(false);
+
   const [guardando, setGuardando] = useState(false);
   const [errorModal, setErrorModal] = useState<string | null>(null);
 
@@ -58,6 +68,9 @@ export const ModalVehiculo: React.FC<ModalVehiculoProps> = ({
     setErrorModal(null);
     setMotivo('');
     setConfirmModalOpen(false);
+    setSugerenciasClientes([]);
+    setMostrarSugerencias(false);
+
     if (modo === 'EDITAR' && vehiculoEditar) {
       setPlaca(vehiculoEditar.placa || '');
       setMarca(vehiculoEditar.marca || '');
@@ -65,6 +78,8 @@ export const ModalVehiculo: React.FC<ModalVehiculoProps> = ({
       setAnio(vehiculoEditar.anio || '');
       setTipoMotor(vehiculoEditar.tipo_motor || '');
       setKilometraje(vehiculoEditar.kilometraje_actual || '');
+
+      setIdClienteSeleccionado(vehiculoEditar.id_cliente || null);
       setNombreCliente(
         vehiculoEditar.cliente?.nombre_razon_social || vehiculoEditar.nombre_cliente || ''
       );
@@ -82,6 +97,8 @@ export const ModalVehiculo: React.FC<ModalVehiculoProps> = ({
       setAnio('');
       setTipoMotor('');
       setKilometraje('');
+
+      setIdClienteSeleccionado(null);
       setNombreCliente('');
       setTipoDoc('DNI');
       setNumDoc('');
@@ -92,6 +109,37 @@ export const ModalVehiculo: React.FC<ModalVehiculoProps> = ({
   }, [modo, vehiculoEditar, modalAbierto]);
 
   if (!modalAbierto) return null;
+
+  // Manejador de entrada para el Minibuscador Predictivo de Clientes
+  const handleNombreClienteChange = async (val: string) => {
+    setNombreCliente(val);
+    setIdClienteSeleccionado(null); // Al editar el texto libre, liberamos el ID previo
+
+    if (val.trim().length >= 2) {
+      try {
+        const resultados = await clienteService.buscarClientesPorTermino(val);
+        setSugerenciasClientes(resultados);
+        setMostrarSugerencias(true);
+      } catch (err) {
+        console.error('Error al buscar clientes:', err);
+      }
+    } else {
+      setSugerenciasClientes([]);
+      setMostrarSugerencias(false);
+    }
+  };
+
+  // Al seleccionar un cliente sugerido de la lista flotante
+  const seleccionarClienteExistente = (cliente: ClienteDTO) => {
+    setIdClienteSeleccionado(cliente.id_cliente);
+    setNombreCliente(cliente.nombre_razon_social);
+    setTipoDoc(cliente.tipo_documento);
+    setNumDoc(cliente.numero_documento);
+    setTelefono(cliente.telefono || '');
+    setCorreo(cliente.correo || '');
+    setDireccion(cliente.direccion || '');
+    setMostrarSugerencias(false);
+  };
 
   const handlePlacaChange = (val: string) => {
     const clean = val
@@ -152,6 +200,7 @@ export const ModalVehiculo: React.FC<ModalVehiculoProps> = ({
           anio: anio ? Number(anio) : null,
           tipo_motor: motorFinal,
           kilometraje_actual: kmActualVal,
+          id_cliente: idClienteSeleccionado || undefined,
           nombre_razon_social: nombreCliente.trim(),
           tipo_documento: tipoDoc,
           numero_documento: numDoc.trim(),
@@ -169,7 +218,7 @@ export const ModalVehiculo: React.FC<ModalVehiculoProps> = ({
           anio: anio ? Number(anio) : null,
           tipo_motor: motorFinal,
           kilometraje_actual: kmActualVal,
-          id_cliente: vehiculoEditar?.id_cliente,
+          id_cliente: idClienteSeleccionado || vehiculoEditar?.id_cliente,
           nombre_razon_social: nombreCliente.trim(),
           tipo_documento: tipoDoc,
           numero_documento: numDoc.trim(),
@@ -230,17 +279,49 @@ export const ModalVehiculo: React.FC<ModalVehiculoProps> = ({
             <div style={sectionBoxStyle}>
               <span style={sectionTitleStyle}>Datos del Propietario / Cliente</span>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                <div>
-                  <label style={labelStyle}>Cliente / Razón Social *</label>
+                {/* Campo con Minibuscador Predictivo */}
+                <div style={{ position: 'relative' }}>
+                  <label style={labelStyle}>
+                    Cliente / Razón Social * (Escriba para buscar existente)
+                  </label>
                   <input
                     required
                     type="text"
-                    placeholder="Ej. Juan Pérez / Lubricentro S.A.C."
+                    placeholder="Ej. Juan Pérez / Buscar por RUC o DNI..."
                     value={nombreCliente}
-                    onChange={(e) => setNombreCliente(e.target.value)}
+                    onChange={(e) => handleNombreClienteChange(e.target.value)}
+                    onFocus={() => {
+                      if (sugerenciasClientes.length > 0) setMostrarSugerencias(true);
+                    }}
                     style={inputStyle}
                   />
+
+                  {/* Lista desplegable flotante del Minibuscador */}
+                  {mostrarSugerencias && sugerenciasClientes.length > 0 && (
+                    <div style={dropdownContainerStyle}>
+                      {sugerenciasClientes.map((c) => (
+                        <div
+                          key={c.id_cliente}
+                          onClick={() => seleccionarClienteExistente(c)}
+                          style={dropdownItemStyle}
+                          onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#334155')}
+                          onMouseLeave={(e) =>
+                            (e.currentTarget.style.backgroundColor = 'transparent')
+                          }
+                        >
+                          <div style={{ fontWeight: '700', color: '#F8FAFC', fontSize: '13px' }}>
+                            {c.nombre_razon_social}
+                          </div>
+                          <div style={{ fontSize: '11px', color: '#38BDF8' }}>
+                            {c.tipo_documento}: {c.numero_documento}{' '}
+                            {c.telefono ? `| Tel: ${c.telefono}` : ''}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
+
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.5fr 1fr', gap: '10px' }}>
                   <div>
                     <label style={labelStyle}>Tipo Doc. *</label>
@@ -281,6 +362,7 @@ export const ModalVehiculo: React.FC<ModalVehiculoProps> = ({
                     />
                   </div>
                 </div>
+
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
                   <div>
                     <label style={labelStyle}>Correo Electrónico</label>
@@ -582,4 +664,26 @@ const btnSecondaryStyle: React.CSSProperties = {
   color: '#CBD5E1',
   borderRadius: '8px',
   cursor: 'pointer',
+};
+
+const dropdownContainerStyle: React.CSSProperties = {
+  position: 'absolute',
+  top: '100%',
+  left: 0,
+  right: 0,
+  backgroundColor: '#1E293B',
+  border: '1px solid #334155',
+  borderRadius: '8px',
+  marginTop: '4px',
+  maxHeight: '180px',
+  overflowY: 'auto',
+  zIndex: 1100,
+  boxShadow: '0 10px 25px rgba(0,0,0,0.5)',
+};
+
+const dropdownItemStyle: React.CSSProperties = {
+  padding: '8px 12px',
+  cursor: 'pointer',
+  borderBottom: '1px solid #334155',
+  transition: 'background-color 0.15s ease',
 };

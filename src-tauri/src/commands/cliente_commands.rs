@@ -111,6 +111,27 @@ pub fn buscar_cliente_por_doc_cmd(
 }
 
 #[tauri::command]
+pub fn buscar_clientes_por_termino_cmd(
+    db_state: State<'_, Mutex<Connection>>,
+    session_state: State<'_, Mutex<SessionState>>,
+    termino: String,
+) -> Result<Vec<ClienteDto>, AppError> {
+    let mut session = session_state
+        .lock()
+        .map_err(|_| AppError::Validation("Fallo sesión".into()))?;
+    let conn = db_state
+        .lock()
+        .map_err(|_| AppError::Validation("Fallo BD".into()))?;
+
+    let (_, _, rol) = verificar_permiso_sesion(
+        &mut session,
+        &conn,
+        &["ADMINISTRADOR", "CAJERO", "MECANICO"],
+    )?;
+    ClienteService::buscar_clientes_por_termino(&conn, &termino, Some(&rol))
+}
+
+#[tauri::command]
 pub fn registrar_vehiculo_cmd(
     db_state: State<'_, Mutex<Connection>>,
     session_state: State<'_, Mutex<SessionState>>,

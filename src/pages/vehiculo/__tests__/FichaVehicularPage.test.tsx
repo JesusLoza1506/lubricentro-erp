@@ -37,7 +37,7 @@ describe('FichaVehicularPage - Pruebas de Integración Frontend (FASE 4)', () =>
   it('1. Renderiza correctamente el estado inicial vacío de búsqueda', () => {
     render(<FichaVehicularPage />);
     expect(screen.getByPlaceholderText(/Ej\. ABC123/i)).toBeDefined();
-    expect(screen.getByText(/Consulta la Hoja de Vida Vehicular/i)).toBeDefined();
+    expect(screen.getByText(/Consulta vehículos y su historial de mantenimiento/i)).toBeDefined();
   });
 
   it('2. Muestra estado de carga y renderiza la ficha vehicular cuando la búsqueda es exitosa', async () => {

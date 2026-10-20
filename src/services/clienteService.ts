@@ -22,4 +22,11 @@ export const clienteService = {
       numeroDocumento: numeroDocumento.trim(),
     });
   },
+
+  // Buscar clientes por coincidencia predictiva de término (Nombre / RUC / DNI)
+  buscarClientesPorTermino: async (termino: string): Promise<ClienteDTO[]> => {
+    return await invoke<ClienteDTO[]>('buscar_clientes_por_termino_cmd', {
+      termino: termino.trim(),
+    });
+  },
 };

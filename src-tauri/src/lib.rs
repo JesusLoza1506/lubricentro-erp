@@ -63,6 +63,7 @@ pub fn run() {
             registrar_cliente_cmd,
             actualizar_cliente_cmd,
             buscar_cliente_por_doc_cmd,
+            buscar_clientes_por_termino_cmd,
             registrar_vehiculo_cmd,
             actualizar_vehiculo_cmd,
             cambiar_estado_vehiculo_cmd,
