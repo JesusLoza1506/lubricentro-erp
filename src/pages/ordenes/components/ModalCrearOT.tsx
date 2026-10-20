@@ -36,25 +36,23 @@ export const ModalCrearOT: React.FC<ModalCrearOTProps> = ({
   // Carga de mecánicos dinámicos
   const [mecanicos, setMecanicos] = useState<MecanicoDTO[]>([]);
   const [cargandoMecanicos, setCargandoMecanicos] = useState(false);
-  const [idMecanico, setIdMecanico] = useState<number>(0);
 
-  // Verificación de ocupación de zanjas (1 y 2)
+  // Mecánico opcional (0 = sin asignar)
+  const [idMecanico, setIdMecanico] = useState<number>(idMecanicoDefault || 0);
+
+  // Verificación de ocupación de zanjas
   const zanja1Ocupada = zanjasOcupadas.includes(1);
   const zanja2Ocupada = zanjasOcupadas.includes(2);
-  const sinZanjasDisponibles = zanja1Ocupada && zanja2Ocupada;
 
-  const obtenerZanjaInicialValida = (): number => {
-    if (zanjaInicial && !zanjasOcupadas.includes(zanjaInicial)) {
-      return zanjaInicial;
-    }
-    if (!zanja1Ocupada) return 1;
-    if (!zanja2Ocupada) return 2;
-    return 1;
-  };
+  // FASE 1: Recepción debe iniciar SIEMPRE sin zanja por defecto (Atención Libre / NULL)
+  const zanjaPorDefecto =
+    zanjaInicial && !zanjasOcupadas.includes(zanjaInicial) ? zanjaInicial : null;
 
-  const [zanja, setZanja] = useState<number>(obtenerZanjaInicialValida());
+  const [zanja, setZanja] = useState<number | null>(zanjaPorDefecto);
   const [kilometrajeIngreso, setKilometrajeIngreso] = useState<string>('');
-  const [tipoAceite, setTipoAceite] = useState<TipoAceiteOT>('MINERAL');
+
+  // Tipo de aceite opcional (permite cadena vacía)
+  const [tipoAceite, setTipoAceite] = useState<TipoAceiteOT | ''>('');
   const [observaciones, setObservaciones] = useState('');
 
   // Vehículo seleccionado / Estado
@@ -73,9 +71,6 @@ export const ModalCrearOT: React.FC<ModalCrearOTProps> = ({
         setCargandoMecanicos(true);
         const lista = await ordenesService.listarMecanicos();
         setMecanicos(lista);
-        if (lista.length > 0) {
-          setIdMecanico(lista[0].id_usuario);
-        }
       } catch (err) {
         console.error('Error al cargar la lista de mecánicos:', err);
       } finally {
@@ -116,7 +111,11 @@ export const ModalCrearOT: React.FC<ModalCrearOTProps> = ({
   }, [idMecanicoDefault, placaInicial]);
 
   useEffect(() => {
-    setZanja(obtenerZanjaInicialValida());
+    if (zanjaInicial && !zanjasOcupadas.includes(zanjaInicial)) {
+      setZanja(zanjaInicial);
+    } else {
+      setZanja(null);
+    }
   }, [zanjaInicial, zanjasOcupadas]);
 
   useEffect(() => {
@@ -132,7 +131,7 @@ export const ModalCrearOT: React.FC<ModalCrearOTProps> = ({
   const seleccionarVehiculoReal = (vehiculo: VehiculoCompletoDTO) => {
     setVehiculoSeleccionado(vehiculo);
     setBusqueda(vehiculo.placa);
-    setKilometrajeIngreso(''); // Sin auto-relleno
+    setKilometrajeIngreso('');
     setMostrarDropdown(false);
     setErrorMsg('');
   };
@@ -179,18 +178,8 @@ export const ModalCrearOT: React.FC<ModalCrearOTProps> = ({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (sinZanjasDisponibles) {
-      setErrorMsg('No hay zanjas disponibles en este momento.');
-      return;
-    }
-
     if (!vehiculoSeleccionado) {
       setErrorMsg('Debe seleccionar un vehículo válido registrado en la base de datos.');
-      return;
-    }
-
-    if (!idMecanico || idMecanico === 0) {
-      setErrorMsg('Debe seleccionar un mecánico válido.');
       return;
     }
 
@@ -213,10 +202,10 @@ export const ModalCrearOT: React.FC<ModalCrearOTProps> = ({
       setErrorMsg('');
       await onSubmit({
         placa: vehiculoSeleccionado.placa,
-        id_mecanico: Number(idMecanico),
-        zanja: Number(zanja),
+        id_mecanico: Number(idMecanico) || 0,
+        zanja: zanja ? Number(zanja) : undefined,
         kilometraje_ingreso: kmIngresadoNum,
-        tipo_aceite: tipoAceite,
+        tipo_aceite: tipoAceite as TipoAceiteOT,
         observaciones: observaciones.trim() || undefined,
       });
       onClose();
@@ -228,7 +217,12 @@ export const ModalCrearOT: React.FC<ModalCrearOTProps> = ({
   };
 
   const ultimoKm = vehiculoSeleccionado?.kilometraje_actual || 0;
-  const estimadoProximo = ultimoKm + (tipoAceite === 'SINTETICO' ? 10000 : 5000);
+  const estimadoProximo =
+    tipoAceite === 'SINTETICO'
+      ? ultimoKm + 10000
+      : tipoAceite === 'MINERAL'
+        ? ultimoKm + 5000
+        : null;
 
   return (
     <div
@@ -257,28 +251,10 @@ export const ModalCrearOT: React.FC<ModalCrearOTProps> = ({
         }}
       >
         <h2 style={{ marginTop: 0, fontSize: '20px', color: '#F8FAFC' }}>
-          Nueva Orden de Trabajo {zanjaInicial ? `- Zanja ${zanjaInicial}` : ''}
+          Nueva Orden de Trabajo {zanja ? `- Zanja ${zanja}` : '(Atención Libre)'}
         </h2>
 
-        {sinZanjasDisponibles && (
-          <div
-            style={{
-              padding: '12px',
-              backgroundColor: '#7F1D1D',
-              border: '1px solid #EF4444',
-              color: '#FCA5A5',
-              borderRadius: '6px',
-              marginBottom: '16px',
-              fontSize: '14px',
-              fontWeight: 600,
-              textAlign: 'center',
-            }}
-          >
-            🚫 No hay zanjas disponibles. Libere una zanja finalizando o cancelando una OT activa.
-          </div>
-        )}
-
-        {errorMsg && !sinZanjasDisponibles && (
+        {errorMsg && (
           <div
             style={{
               padding: '10px',
@@ -325,7 +301,6 @@ export const ModalCrearOT: React.FC<ModalCrearOTProps> = ({
               <input
                 type="text"
                 required
-                disabled={sinZanjasDisponibles}
                 placeholder={
                   cargandoVehiculos
                     ? 'Cargando vehículos...'
@@ -350,7 +325,7 @@ export const ModalCrearOT: React.FC<ModalCrearOTProps> = ({
                 style={{
                   width: '100%',
                   padding: '10px 36px 10px 12px',
-                  backgroundColor: sinZanjasDisponibles ? '#1E293B' : '#0F172A',
+                  backgroundColor: '#0F172A',
                   border: vehiculoSeleccionado ? '1px solid #10B981' : '1px solid #334155',
                   borderRadius: '6px',
                   color: '#F8FAFC',
@@ -359,7 +334,7 @@ export const ModalCrearOT: React.FC<ModalCrearOTProps> = ({
                 }}
               />
               <span
-                onClick={() => !sinZanjasDisponibles && setMostrarDropdown(!mostrarDropdown)}
+                onClick={() => setMostrarDropdown(!mostrarDropdown)}
                 style={{
                   position: 'absolute',
                   right: '12px',
@@ -374,7 +349,7 @@ export const ModalCrearOT: React.FC<ModalCrearOTProps> = ({
               </span>
             </div>
 
-            {mostrarDropdown && !sinZanjasDisponibles && (
+            {mostrarDropdown && (
               <div
                 style={{
                   position: 'absolute',
@@ -497,22 +472,22 @@ export const ModalCrearOT: React.FC<ModalCrearOTProps> = ({
                   marginBottom: '6px',
                 }}
               >
-                Asignar Zanja *
+                Asignar Zanja (Opcional)
               </label>
               <select
-                disabled={sinZanjasDisponibles}
-                value={zanja}
-                onChange={(e) => setZanja(Number(e.target.value))}
+                value={zanja ?? ''}
+                onChange={(e) => setZanja(e.target.value === '' ? null : Number(e.target.value))}
                 style={{
                   width: '100%',
                   padding: '10px',
-                  backgroundColor: sinZanjasDisponibles ? '#1E293B' : '#0F172A',
+                  backgroundColor: '#0F172A',
                   border: '1px solid #334155',
                   borderRadius: '6px',
                   color: '#F8FAFC',
                   boxSizing: 'border-box',
                 }}
               >
+                <option value="">Sin Zanja (Atención Libre / Estacionamiento)</option>
                 <option value={1} disabled={zanja1Ocupada}>
                   Zanja 1 {zanja1Ocupada ? '(Ocupada)' : ''}
                 </option>
@@ -531,32 +506,33 @@ export const ModalCrearOT: React.FC<ModalCrearOTProps> = ({
                   marginBottom: '6px',
                 }}
               >
-                Mecánico Asignado *
+                Mecánico Asignado (Opcional)
               </label>
               <select
-                disabled={sinZanjasDisponibles || cargandoMecanicos || mecanicos.length === 0}
+                disabled={cargandoMecanicos}
                 value={idMecanico}
                 onChange={(e) => setIdMecanico(Number(e.target.value))}
                 style={{
                   width: '100%',
                   padding: '10px',
-                  backgroundColor: sinZanjasDisponibles ? '#1E293B' : '#0F172A',
+                  backgroundColor: '#0F172A',
                   border: '1px solid #334155',
                   borderRadius: '6px',
                   color: '#F8FAFC',
                   boxSizing: 'border-box',
                 }}
               >
+                <option value={0}>Sin Asignar (Mecánico Opcional)</option>
                 {cargandoMecanicos ? (
-                  <option value={0}>Cargando mecánicos...</option>
-                ) : mecanicos.length > 0 ? (
+                  <option value={0} disabled>
+                    Cargando mecánicos...
+                  </option>
+                ) : (
                   mecanicos.map((m) => (
                     <option key={m.id_usuario} value={m.id_usuario}>
                       {m.nombre_completo}
                     </option>
                   ))
-                ) : (
-                  <option value={0}>No hay mecánicos registrados</option>
                 )}
               </select>
             </div>
@@ -572,7 +548,6 @@ export const ModalCrearOT: React.FC<ModalCrearOTProps> = ({
               type="number"
               required
               min={0}
-              disabled={sinZanjasDisponibles}
               placeholder="Ej. 65200"
               value={kilometrajeIngreso}
               onChange={(e) => {
@@ -582,7 +557,7 @@ export const ModalCrearOT: React.FC<ModalCrearOTProps> = ({
               style={{
                 width: '100%',
                 padding: '10px',
-                backgroundColor: sinZanjasDisponibles ? '#1E293B' : '#0F172A',
+                backgroundColor: '#0F172A',
                 border: '1px solid #334155',
                 borderRadius: '6px',
                 color: '#F8FAFC',
@@ -602,8 +577,13 @@ export const ModalCrearOT: React.FC<ModalCrearOTProps> = ({
               >
                 <span>💡</span>
                 <span>
-                  Último ingreso: <strong>{ultimoKm.toLocaleString()} km</strong> | Estimado actual:{' '}
-                  <strong>{estimadoProximo.toLocaleString()} km</strong>
+                  Último ingreso: <strong>{ultimoKm.toLocaleString()} km</strong>
+                  {estimadoProximo && (
+                    <>
+                      {' '}
+                      | Estimado actual: <strong>{estimadoProximo.toLocaleString()} km</strong>
+                    </>
+                  )}
                 </span>
               </div>
             )}
@@ -613,22 +593,22 @@ export const ModalCrearOT: React.FC<ModalCrearOTProps> = ({
             <label
               style={{ display: 'block', fontSize: '13px', color: '#94A3B8', marginBottom: '6px' }}
             >
-              Tipo de Aceite a Aplicar *
+              Tipo de Aceite a Aplicar (Opcional)
             </label>
             <select
-              disabled={sinZanjasDisponibles}
               value={tipoAceite}
-              onChange={(e) => setTipoAceite(e.target.value as TipoAceiteOT)}
+              onChange={(e) => setTipoAceite(e.target.value as TipoAceiteOT | '')}
               style={{
                 width: '100%',
                 padding: '10px',
-                backgroundColor: sinZanjasDisponibles ? '#1E293B' : '#0F172A',
+                backgroundColor: '#0F172A',
                 border: '1px solid #334155',
                 borderRadius: '6px',
                 color: '#F8FAFC',
                 boxSizing: 'border-box',
               }}
             >
+              <option value="">Sin Aceite Específico / Mantenimiento General</option>
               <option value="MINERAL">Mineral (+5,000 km próx. mantenimiento)</option>
               <option value="SINTETICO">Sintético (+10,000 km próx. mantenimiento)</option>
             </select>
@@ -638,18 +618,17 @@ export const ModalCrearOT: React.FC<ModalCrearOTProps> = ({
             <label
               style={{ display: 'block', fontSize: '13px', color: '#94A3B8', marginBottom: '6px' }}
             >
-              Observaciones
+              Observaciones / Pedido del Cliente
             </label>
             <textarea
               rows={3}
-              disabled={sinZanjasDisponibles}
               placeholder="Detalle los requerimientos del cliente..."
               value={observaciones}
               onChange={(e) => setObservaciones(e.target.value)}
               style={{
                 width: '100%',
                 padding: '10px',
-                backgroundColor: sinZanjasDisponibles ? '#1E293B' : '#0F172A',
+                backgroundColor: '#0F172A',
                 border: '1px solid #334155',
                 borderRadius: '6px',
                 color: '#F8FAFC',
@@ -676,21 +655,15 @@ export const ModalCrearOT: React.FC<ModalCrearOTProps> = ({
             </button>
             <button
               type="submit"
-              disabled={loading || sinZanjasDisponibles || !vehiculoSeleccionado || !idMecanico}
+              disabled={loading || !vehiculoSeleccionado}
               style={{
                 padding: '10px 18px',
-                backgroundColor:
-                  sinZanjasDisponibles || !vehiculoSeleccionado || !idMecanico
-                    ? '#475569'
-                    : '#2563EB',
+                backgroundColor: !vehiculoSeleccionado ? '#475569' : '#2563EB',
                 color: '#FFFFFF',
                 border: 'none',
                 borderRadius: '6px',
                 fontWeight: '600',
-                cursor:
-                  sinZanjasDisponibles || !vehiculoSeleccionado || !idMecanico
-                    ? 'not-allowed'
-                    : 'pointer',
+                cursor: !vehiculoSeleccionado ? 'not-allowed' : 'pointer',
               }}
             >
               {loading ? 'Guardando...' : 'Crear OT'}

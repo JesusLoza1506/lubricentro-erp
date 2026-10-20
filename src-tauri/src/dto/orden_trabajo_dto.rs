@@ -16,16 +16,23 @@ pub struct OrdenTrabajoHistorialDto {
     pub codigo_ot: String,
     pub placa: String,
     pub id_mecanico: i64,
-    pub nombre_mecanico: Option<String>,
     pub zanja: Option<i32>,
     pub estado: String,
     pub kilometraje_ingreso: i64,
-    pub proximo_kilometraje: Option<i64>, // ✅ Cambiado a Option<i64> para admitir NULL en la BD
+    pub proximo_kilometraje: Option<i64>,
     pub observaciones: Option<String>,
     pub fecha_ingreso: Option<String>,
+    pub nombre_mecanico: Option<String>,
     pub tipo_aceite: Option<String>,
     pub detalles: Vec<DetalleItemOtDto>,
     pub corregido: Option<i32>,
+
+    // Campos para snapshots de Cliente y Vehículo
+    pub nombre_cliente: Option<String>,
+    pub documento_cliente: Option<String>,
+    pub tipo_documento_cliente: Option<String>,
+    pub marca_vehiculo: Option<String>,
+    pub modelo_vehiculo: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]

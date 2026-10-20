@@ -1,0 +1,105 @@
+﻿include!("vehiculo_tests.rs");
+use lubricentro_erp_lib::services::ordenes_service::OrdenesService;
+use lubricentro_erp_lib::dto::orden_trabajo_dto::CrearOrdenTrabajoDto;
+
+fn seed_finished(oil: bool, material: bool) -> Connection {
+    seed_finished_snapshot(oil, material, r#"{"nombre":"Cliente historico","documento":"12345678","tipo_documento":"DNI"}"#)
+}
+fn seed_finished_snapshot(oil: bool, material: bool, snapshot: &str) -> Connection {
+    let c = setup_test_db();
+    c.execute("INSERT INTO servicios(codigo,nombre,precio_venta_cent,es_cambio_aceite) VALUES('TMP','Servicio prueba',1500,?1)", [oil as i32]).unwrap();
+    c.execute("INSERT INTO ordenes_trabajo(id_operacion,codigo_ot,id_vehiculo,id_cliente_atendido,placa_snapshot,cliente_snapshot,id_creador,estado,kilometraje_ingreso) VALUES('TMP','OT-TMP',1,2,'ABC123',?1,1,'EN_ESPERA',50000)",[snapshot]).unwrap();
+    c.execute_batch("UPDATE ordenes_trabajo SET estado='EN_PROCESO',id_mecanico=3,id_zanja_ejecucion=1,fecha_inicio=datetime('now','-5 hours') WHERE id_ot=1;").unwrap();
+    c.execute("INSERT INTO detalle_ot_servicios(id_operacion,id_ot,id_servicio,codigo_snapshot,nombre_snapshot,cantidad,precio_unitario_cent,es_cambio_aceite,id_usuario) VALUES('TMP-S',1,1,'TMP','Servicio prueba',1,1500,?1,1)", [oil as i32]).unwrap();
+    if material { c.execute_batch("INSERT INTO productos(codigo,nombre,categoria,unidad_medida,stock_actual,stock_minimo,valor_stock_micro,precio_venta_cent,activo) VALUES('TMP-P','Aceite mineral','ACEITE','UND',0,2,0,5000,1); INSERT INTO detalle_ot_productos(id_operacion,id_ot,id_producto,codigo_snapshot,nombre_snapshot,unidad_medida,cantidad,precio_unitario_cent,costo_unitario_micro,valor_consumido_micro,id_usuario) VALUES('TMP-P',1,1,'TMP-P','Aceite mineral','UND',1,5000,10000,10000,1);").unwrap(); }
+    c.execute("UPDATE ordenes_trabajo SET estado='FINALIZADO',id_mecanico_terminal=3,kilometraje_salida=50010,tipo_aceite=?1,intervalo_aceite_km=?2,resumen_publico='Resumen publico',fecha_fin=datetime('now','-5 hours') WHERE id_ot=1", rusqlite::params![if oil {Some("SINTETICO")} else {None}, if oil {Some(10000)} else {None}]).unwrap();
+    c
+}
+#[test]
+fn quinta_historia_devuelve_cliente_snapshot() {
+    let c=seed_finished(false,false);
+    let f=ClienteService::obtener_ficha_vehicular_completa(&c,"ABC123",Some("ADMINISTRADOR")).unwrap();
+    let json=serde_json::to_string(&f.historial[0]).unwrap();
+    assert!(json.contains("Cliente historico"),"DTO real: {}",json);
+}
+#[test]
+fn quinta_material_no_inventa_cambio() {
+    let c=seed_finished(false,true);
+    let stored:Option<i64>=c.query_row("SELECT km_proximo FROM ordenes_trabajo WHERE id_ot=1",[],|r|r.get(0)).unwrap();
+    assert_eq!(stored,None);
+    let f=ClienteService::obtener_ficha_vehicular_completa(&c,"ABC123",Some("ADMINISTRADOR")).unwrap();
+    assert_eq!(f.historial[0].proximo_kilometraje,stored);
+}
+#[test]
+fn quinta_sin_aceite_null() { let c=seed_finished(false,false); let f=ClienteService::obtener_ficha_vehicular_completa(&c,"ABC123",Some("ADMINISTRADOR")).unwrap(); assert_eq!(f.historial[0].proximo_kilometraje,None); }
+#[test]
+fn quinta_sintetico_desde_salida() { let c=seed_finished(true,false); let f=ClienteService::obtener_ficha_vehicular_completa(&c,"ABC123",Some("ADMINISTRADOR")).unwrap(); assert_eq!(f.historial[0].proximo_kilometraje,Some(60010)); }
+#[test]
+fn septima_envio_actual_modal_con_zanja_rechazado() {
+    let mut c=setup_test_db();
+    let r=OrdenesService::crear_orden_trabajo(&mut c,CrearOrdenTrabajoDto { placa:"ABC123".into(),id_mecanico:0,zanja:Some(1),kilometraje_ingreso:50010,tipo_aceite:"".into(),observaciones:None },1);
+    let error=format!("{:?}",r.unwrap_err());
+    assert!(error.contains("OT nace en espera libre o asignada, sin ejecucion"),"{}",error);
+}
+#[test]
+fn quinta_login_mecanico_ficha_solo_lectura() {
+    use lubricentro_erp_lib::services::auth_service::AuthService;
+    use lubricentro_erp_lib::dto::usuario_dto::LoginRequestDto;
+    let c=setup_test_db();
+    let hash=AuthService::hash_password("Taller2026Clave").unwrap();
+    c.execute("UPDATE usuarios SET password_hash=?1 WHERE id_usuario=3",[hash]).unwrap();
+    let (r,_) = AuthService::login(&c,LoginRequestDto{username:"meca".into(),password:"Taller2026Clave".into()}).unwrap();
+    let p=r.permisos.iter().find(|p|p.modulo=="FICHA_VEHICULAR").unwrap();
+    assert!(p.puede_ver);
+    assert!(!p.puede_crear && !p.puede_editar && !p.puede_eliminar);
+}
+#[test]
+fn sexta_cliente_historico_no_cambia_al_editar_actual() {
+    let c=seed_finished(false,false);
+    let original=ClienteService::obtener_ficha_vehicular_completa(&c,"ABC123",Some("ADMINISTRADOR")).unwrap();
+    c.execute("UPDATE clientes SET nombre_razon_social='Cliente cambiado',numero_documento='87654321' WHERE id_cliente=2",[]).unwrap();
+    let despues=ClienteService::obtener_ficha_vehicular_completa(&c,"ABC123",Some("ADMINISTRADOR")).unwrap();
+    assert_eq!(despues.historial[0].nombre_cliente,original.historial[0].nombre_cliente,"El nombre historico cambio al editar cliente actual");
+    assert_eq!(despues.historial[0].documento_cliente,original.historial[0].documento_cliente);
+}
+#[test]
+fn sexta_recepcion_libre_con_snapshot() {
+    let mut c=setup_test_db();
+    let r=OrdenesService::crear_orden_trabajo(&mut c,CrearOrdenTrabajoDto{placa:"ABC123".into(),id_mecanico:0,zanja:None,kilometraje_ingreso:50000,tipo_aceite:"".into(),observaciones:Some("Revisar vehiculo".into())},1).unwrap();
+    assert_eq!(r.estado,"EN_ESPERA");
+    assert_eq!(r.id_mecanico,0);
+    assert_eq!(r.zanja,None);
+    assert_eq!(r.tipo_aceite,None);
+    let snapshot:String=c.query_row("SELECT cliente_snapshot FROM ordenes_trabajo WHERE id_ot=?1",[r.id_ot],|row|row.get(0)).unwrap();
+    let v:serde_json::Value=serde_json::from_str(&snapshot).unwrap();
+    assert_eq!(v["documento"],"12345678");
+    assert_eq!(v["tipo_documento"],"DNI");
+}
+#[test]
+fn sexta_error_candidatos_no_se_oculta() {
+    let c=setup_test_db();
+    c.execute_batch("DROP VIEW v_proximos_cambios; CREATE VIEW v_proximos_cambios AS SELECT 'TIPO_INVALIDO' AS id_vehiculo,'ABC123' AS placa,50000 AS kilometraje_actual,2 AS id_cliente,'Cliente' AS nombre_razon_social,NULL AS telefono,1 AS id_ot,'2026-01-01' AS fecha_servicio,'MINERAL' AS tipo_aceite,5000 AS intervalo_aceite_km,55000 AS km_proximo,'POR_FECHA' AS causa;").unwrap();
+    assert!(ClienteService::obtener_proximos_cambios_aceite(&c,Some("ADMINISTRADOR")).is_err());
+}
+#[test]
+fn septima_snapshot_antiguo_sin_documento_no_inventa_actual() {
+    let c=seed_finished_snapshot(false,false,r#"{"nombre":"Cliente historico"}"#);
+    c.execute("UPDATE clientes SET numero_documento='87654321' WHERE id_cliente=2",[]).unwrap();
+    let f=ClienteService::obtener_ficha_vehicular_completa(&c,"ABC123",Some("ADMINISTRADOR")).unwrap();
+    assert_eq!(f.historial[0].documento_cliente,None,"No hay documento historico guardado; no presentar el actual como historico");
+}
+#[test]
+fn septima_historial_reciente_primero_y_desempate() {
+    let c=seed_finished(false,false);
+    c.execute_batch("INSERT INTO ordenes_trabajo(id_operacion,codigo_ot,id_vehiculo,id_cliente_atendido,placa_snapshot,cliente_snapshot,id_creador,estado,kilometraje_ingreso) VALUES('TMP2','OT-TMP2',1,2,'ABC123','{\"nombre\":\"Cliente historico\"}',1,'EN_ESPERA',50010); UPDATE ordenes_trabajo SET estado='EN_PROCESO',id_mecanico=3,id_zanja_ejecucion=1,fecha_inicio=datetime('now','-5 hours') WHERE id_ot=2; INSERT INTO detalle_ot_servicios(id_operacion,id_ot,id_servicio,codigo_snapshot,nombre_snapshot,cantidad,precio_unitario_cent,es_cambio_aceite,id_usuario) VALUES('TMP-S2',2,1,'TMP','Servicio prueba',1,1500,0,1); UPDATE ordenes_trabajo SET estado='FINALIZADO',id_mecanico_terminal=3,kilometraje_salida=50010,resumen_publico='Resumen 2',fecha_fin=datetime('now','-5 hours') WHERE id_ot=2;").unwrap();
+    let f=ClienteService::obtener_ficha_vehicular_completa(&c,"ABC123",Some("ADMINISTRADOR")).unwrap();
+    assert_eq!(f.historial.iter().map(|o|o.id_ot).collect::<Vec<_>>(),vec![2,1]);
+}
+#[test]
+fn septima_tipo_aceite_sin_cambio_no_es_nombre_material() {
+    let c=seed_finished(false,true);
+    let f=ClienteService::obtener_ficha_vehicular_completa(&c,"ABC123",Some("ADMINISTRADOR")).unwrap();
+    assert_eq!(f.historial[0].proximo_kilometraje,None);
+    assert_eq!(f.historial[0].tipo_aceite,None,"Sin cambio no debe mostrar nombre del producto como tipo historico");
+}
+

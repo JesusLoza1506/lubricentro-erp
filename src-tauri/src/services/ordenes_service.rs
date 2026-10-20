@@ -4,7 +4,21 @@ use crate::dto::orden_trabajo_dto::{
 };
 use crate::errors::AppError;
 use rusqlite::{params, Connection, OptionalExtension};
+use serde_json::Value;
 use uuid::Uuid;
+
+// Struct auxiliar privado para evitar la tupla compleja en clippy::type_complexity
+struct DatosVehiculoCliente {
+    id_vehiculo: i64,
+    id_cliente_atendido: i64,
+    km_actual_ficha: i64,
+    nombre_cliente: String,
+    doc_cliente: Option<String>,
+    tel_cliente: Option<String>,
+    dir_cliente: Option<String>,
+    mail_cliente: Option<String>,
+    tipo_doc_cliente: Option<String>,
+}
 
 pub struct OrdenesService;
 
@@ -20,28 +34,20 @@ impl OrdenesService {
         Ok(format!("OT-{}-{:04}", anio_actual, max_id + 1))
     }
 
+    // FASE 4: Retornar únicamente el tipo_aceite asignado explícitamente a la OT (evitando falsos positivos de productos)
     fn obtener_tipo_aceite_ot(conn: &Connection, id_ot: i64) -> Result<Option<String>, AppError> {
         let sql = "SELECT tipo_aceite FROM ordenes_trabajo WHERE id_ot = ?1";
         if let Ok(Some(Some(t))) = conn
             .query_row(sql, [id_ot], |row| row.get::<_, Option<String>>(0))
             .optional()
         {
-            if !t.trim().is_empty() {
-                return Ok(Some(t));
+            let t_clean = t.trim();
+            if !t_clean.is_empty() {
+                return Ok(Some(t_clean.to_string()));
             }
         }
 
-        let sql_prod = "SELECT p.nombre
-                        FROM detalle_ot_productos dp
-                        JOIN productos p ON dp.id_producto = p.id_producto
-                        WHERE dp.id_ot = ?1
-                          AND (UPPER(p.categoria) = 'ACEITE' OR UPPER(p.categoria) = 'GRANEL')
-                        LIMIT 1";
-
-        let resultado = conn
-            .query_row(sql_prod, [id_ot], |row| row.get(0))
-            .optional()?;
-        Ok(resultado)
+        Ok(None)
     }
 
     fn tiene_cambio_aceite(conn: &Connection, id_ot: i64) -> bool {
@@ -53,22 +59,7 @@ impl OrdenesService {
             )
             .unwrap_or(0);
 
-        if serv_count > 0 {
-            return true;
-        }
-
-        let prod_count: i32 = conn
-            .query_row(
-                "SELECT COUNT(*) 
-                 FROM detalle_ot_productos dp
-                 JOIN productos p ON dp.id_producto = p.id_producto
-                 WHERE dp.id_ot = ?1 AND (UPPER(p.categoria) = 'ACEITE' OR UPPER(p.categoria) = 'GRANEL')",
-                [id_ot],
-                |row| row.get(0),
-            )
-            .unwrap_or(0);
-
-        prod_count > 0
+        serv_count > 0
     }
 
     fn calcular_proximo_kilometraje(
@@ -81,12 +72,48 @@ impl OrdenesService {
             return None;
         }
 
-        let intervalo = match tipo_aceite {
-            Some(t) if t.trim().eq_ignore_ascii_case("SINTETICO") => 10000,
+        let t_aceite = tipo_aceite?;
+        let t_clean = t_aceite.trim();
+        if t_clean.is_empty() {
+            return None;
+        }
+
+        let intervalo = match t_clean.to_uppercase().as_str() {
+            "SINTETICO" => 10000,
+            "MINERAL" => 5000,
             _ => 5000,
         };
 
         Some(km_base + intervalo)
+    }
+
+    // FASE 3: Si existe el JSON de snapshot histórico, no hacer fallback a la tabla de clientes actual cuando falten atributos
+    fn extraer_identidad_cliente_snapshot(
+        cliente_snapshot_raw: Option<String>,
+        nombre_relacional: Option<String>,
+        doc_relacional: Option<String>,
+        tipo_doc_relacional: Option<String>,
+    ) -> (Option<String>, Option<String>, Option<String>) {
+        if let Some(snapshot_str) = cliente_snapshot_raw {
+            if let Ok(v) = serde_json::from_str::<Value>(&snapshot_str) {
+                let nombre = v
+                    .get("nombre")
+                    .and_then(|s| s.as_str())
+                    .map(|s| s.to_string());
+                let documento = v
+                    .get("documento")
+                    .and_then(|s| s.as_str())
+                    .map(|s| s.to_string());
+                let tipo_doc = v
+                    .get("tipo_documento")
+                    .and_then(|s| s.as_str())
+                    .map(|s| s.to_string());
+
+                return (nombre, documento, tipo_doc);
+            }
+        }
+
+        (nombre_relacional, doc_relacional, tipo_doc_relacional)
     }
 
     fn recalcular_kilometraje_vehiculo(conn: &Connection, placa: &str) -> Result<(), AppError> {
@@ -109,6 +136,10 @@ impl OrdenesService {
     }
 
     fn validar_mecanico_activo(conn: &Connection, id_mecanico: i64) -> Result<(), AppError> {
+        if id_mecanico == 0 {
+            return Ok(());
+        }
+
         let es_mecanico_valido: Option<bool> = conn
             .query_row(
                 "SELECT (UPPER(rol) = 'MECANICO' AND activo = 1) FROM usuarios WHERE id_usuario = ?1",
@@ -188,7 +219,7 @@ impl OrdenesService {
                     AppError::NotFound(format!("No se encontró la OT con ID {}.", id_ot))
                 })?;
 
-            if id_mecanico_ot != Some(id_usuario) {
+            if id_mecanico_ot != Some(id_usuario) && id_mecanico_ot != Some(0) {
                 return Err(AppError::Validation(
                     "Acceso denegado: No tienes permiso para modificar la OT de otro mecánico."
                         .to_string(),
@@ -217,30 +248,56 @@ impl OrdenesService {
         }
 
         let tipo_aceite_upper = req.tipo_aceite.trim().to_uppercase();
-        if tipo_aceite_upper != "MINERAL" && tipo_aceite_upper != "SINTETICO" {
+        if !tipo_aceite_upper.is_empty()
+            && tipo_aceite_upper != "MINERAL"
+            && tipo_aceite_upper != "SINTETICO"
+        {
             return Err(AppError::Validation(format!(
                 "Tipo de aceite '{}' no válido. Solo se permite 'MINERAL' o 'SINTETICO'.",
                 req.tipo_aceite
             )));
         }
 
-        Self::validar_mecanico_activo(conn, req.id_mecanico)?;
+        let id_mecanico_final = if req.id_mecanico > 0 {
+            Self::validar_mecanico_activo(conn, req.id_mecanico)?;
+            Some(req.id_mecanico)
+        } else {
+            None
+        };
 
-        let (id_vehiculo, id_cliente_atendido, km_actual_ficha, nombre_cliente): (i64, i64, i64, String) = conn
+        let datos_vc = conn
             .query_row(
-                "SELECT v.id_vehiculo, v.id_cliente, COALESCE(v.kilometraje_actual, 0), c.nombre_razon_social
+                "SELECT v.id_vehiculo, v.id_cliente, COALESCE(v.kilometraje_actual, 0),
+                        c.nombre_razon_social, c.numero_documento, c.telefono, c.direccion, c.correo, c.tipo_documento
                  FROM vehiculos v
                  JOIN clientes c ON v.id_cliente = c.id_cliente
                  WHERE v.placa = ?1 AND v.activo = 1",
                 [&placa],
-                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
+                |row| {
+                    Ok(DatosVehiculoCliente {
+                        id_vehiculo: row.get(0)?,
+                        id_cliente_atendido: row.get(1)?,
+                        km_actual_ficha: row.get(2)?,
+                        nombre_cliente: row.get(3)?,
+                        doc_cliente: row.get(4)?,
+                        tel_cliente: row.get(5)?,
+                        dir_cliente: row.get(6)?,
+                        mail_cliente: row.get(7)?,
+                        tipo_doc_cliente: row.get(8)?,
+                    })
+                },
             )
-            .map_err(|_| AppError::NotFound(format!("El vehículo con placa {} no se encuentra registrado.", placa)))?;
+            .map_err(|_| {
+                AppError::NotFound(format!(
+                    "El vehículo con placa {} no se encuentra registrado o está desactivado.",
+                    placa
+                ))
+            })?;
 
-        if req.kilometraje_ingreso < km_actual_ficha {
+        if req.kilometraje_ingreso < datos_vc.km_actual_ficha {
             return Err(AppError::Validation(format!(
                 "El kilometraje de ingreso ({} km) no puede ser inferior al kilometraje actual registrado en la Ficha Vehicular ({} km).",
-                req.kilometraje_ingreso, km_actual_ficha
+                req.kilometraje_ingreso, datos_vc.km_actual_ficha
             )));
         }
 
@@ -267,7 +324,16 @@ impl OrdenesService {
 
         let codigo_ot = Self::generar_codigo_ot(conn)?;
         let id_operacion = Uuid::new_v4().to_string();
-        let cliente_snapshot = format!(r#"{{"nombre":"{}"}}"#, nombre_cliente);
+
+        let cliente_snapshot = serde_json::json!({
+            "nombre": datos_vc.nombre_cliente,
+            "documento": datos_vc.doc_cliente,
+            "tipo_documento": datos_vc.tipo_doc_cliente,
+            "telefono": datos_vc.tel_cliente,
+            "direccion": datos_vc.dir_cliente,
+            "correo": datos_vc.mail_cliente
+        })
+        .to_string();
 
         let tx = conn
             .transaction()
@@ -281,16 +347,16 @@ impl OrdenesService {
             params![
                 id_operacion,
                 codigo_ot,
-                id_vehiculo,
-                id_cliente_atendido,
+                datos_vc.id_vehiculo,
+                datos_vc.id_cliente_atendido,
                 placa,
                 cliente_snapshot,
                 id_creador,
-                req.id_mecanico,
+                id_mecanico_final,
                 req.zanja,
                 req.kilometraje_ingreso,
                 req.observaciones,
-                tipo_aceite_upper
+                if tipo_aceite_upper.is_empty() { None } else { Some(tipo_aceite_upper) }
             ],
         )?;
 
@@ -298,7 +364,7 @@ impl OrdenesService {
 
         tx.execute(
             "UPDATE vehiculos SET kilometraje_actual = ?1 WHERE id_vehiculo = ?2",
-            params![req.kilometraje_ingreso, id_vehiculo],
+            params![req.kilometraje_ingreso, datos_vc.id_vehiculo],
         )?;
 
         tx.commit()
@@ -342,7 +408,8 @@ impl OrdenesService {
             ));
         }
 
-        if rol_usuario == "MECANICO" && ot_actual.id_mecanico != id_u {
+        if rol_usuario == "MECANICO" && ot_actual.id_mecanico != id_u && ot_actual.id_mecanico != 0
+        {
             return Err(AppError::Validation(
                 "Acceso denegado: Solo puedes modificar las órdenes de trabajo asignadas a ti."
                     .to_string(),
@@ -451,9 +518,12 @@ impl OrdenesService {
             "SELECT
                 ot.id_ot, ot.codigo_ot, ot.placa_snapshot, ot.id_mecanico, ot.id_zanja_ejecucion, ot.estado,
                 COALESCE(ot.kilometraje_salida, ot.kilometraje_ingreso), COALESCE(ot.resumen_publico, ot.pedido_cliente), ot.fecha_ingreso,
-                u.nombre_completo, ot.corregido
+                u.nombre_completo, ot.corregido, c.nombre_razon_social, c.numero_documento, c.tipo_documento,
+                v.marca, v.modelo, ot.cliente_snapshot
              FROM ordenes_trabajo ot
-             LEFT JOIN usuarios u ON ot.id_mecanico = u.id_usuario",
+             LEFT JOIN usuarios u ON ot.id_mecanico = u.id_usuario
+             LEFT JOIN clientes c ON ot.id_cliente_atendido = c.id_cliente
+             LEFT JOIN vehiculos v ON ot.id_vehiculo = v.id_vehiculo",
         );
 
         if rol_usuario == "MECANICO" {
@@ -476,6 +546,12 @@ impl OrdenesService {
                 row.get::<_, String>(8)?,
                 row.get::<_, Option<String>>(9)?,
                 row.get::<_, Option<i32>>(10)?.unwrap_or(0),
+                row.get::<_, Option<String>>(11)?,
+                row.get::<_, Option<String>>(12)?,
+                row.get::<_, Option<String>>(13)?,
+                row.get::<_, Option<String>>(14)?,
+                row.get::<_, Option<String>>(15)?,
+                row.get::<_, Option<String>>(16)?,
             ))
         })?;
 
@@ -489,6 +565,13 @@ impl OrdenesService {
                 raw_data.0,
                 raw_data.6,
                 tipo_aceite.as_deref(),
+            );
+
+            let (nombre_cli, doc_cli, tipo_doc_cli) = Self::extraer_identidad_cliente_snapshot(
+                raw_data.16,
+                raw_data.11,
+                raw_data.12,
+                raw_data.13,
             );
 
             lista.push(OrdenTrabajoHistorialDto {
@@ -506,6 +589,11 @@ impl OrdenesService {
                 tipo_aceite,
                 detalles,
                 corregido: Some(raw_data.10),
+                nombre_cliente: nombre_cli,
+                documento_cliente: doc_cli,
+                tipo_documento_cliente: tipo_doc_cli,
+                marca_vehiculo: raw_data.14,
+                modelo_vehiculo: raw_data.15,
             });
         }
 
@@ -581,9 +669,12 @@ impl OrdenesService {
             "SELECT
                 ot.id_ot, ot.codigo_ot, ot.placa_snapshot, ot.id_mecanico, ot.id_zanja_ejecucion, ot.estado,
                 COALESCE(ot.kilometraje_salida, ot.kilometraje_ingreso), COALESCE(ot.resumen_publico, ot.pedido_cliente), ot.fecha_ingreso,
-                u.nombre_completo, ot.corregido
+                u.nombre_completo, ot.corregido, c.nombre_razon_social, c.numero_documento, c.tipo_documento,
+                v.marca, v.modelo, ot.cliente_snapshot
              FROM ordenes_trabajo ot
              LEFT JOIN usuarios u ON ot.id_mecanico = u.id_usuario
+             LEFT JOIN clientes c ON ot.id_cliente_atendido = c.id_cliente
+             LEFT JOIN vehiculos v ON ot.id_vehiculo = v.id_vehiculo
              WHERE ot.id_ot = ?1",
         )?;
 
@@ -601,6 +692,12 @@ impl OrdenesService {
                     row.get::<_, String>(8)?,
                     row.get::<_, Option<String>>(9)?,
                     row.get::<_, Option<i32>>(10)?.unwrap_or(0),
+                    row.get::<_, Option<String>>(11)?,
+                    row.get::<_, Option<String>>(12)?,
+                    row.get::<_, Option<String>>(13)?,
+                    row.get::<_, Option<String>>(14)?,
+                    row.get::<_, Option<String>>(15)?,
+                    row.get::<_, Option<String>>(16)?,
                 ))
             })
             .map_err(|_| AppError::NotFound(format!("No se encontró la OT con ID {}", id_ot)))?;
@@ -612,6 +709,13 @@ impl OrdenesService {
             raw_data.0,
             raw_data.6,
             tipo_aceite.as_deref(),
+        );
+
+        let (nombre_cli, doc_cli, tipo_doc_cli) = Self::extraer_identidad_cliente_snapshot(
+            raw_data.16,
+            raw_data.11,
+            raw_data.12,
+            raw_data.13,
         );
 
         Ok(OrdenTrabajoHistorialDto {
@@ -629,9 +733,15 @@ impl OrdenesService {
             tipo_aceite,
             detalles,
             corregido: Some(raw_data.10),
+            nombre_cliente: nombre_cli,
+            documento_cliente: doc_cli,
+            tipo_documento_cliente: tipo_doc_cli,
+            marca_vehiculo: raw_data.14,
+            modelo_vehiculo: raw_data.15,
         })
     }
 
+    // FASE 2: Historial Vehicular = Orden descendente (más reciente primero) con desempate id_ot DESC
     pub fn obtener_historial_por_id_vehiculo(
         conn: &Connection,
         id_vehiculo: i64,
@@ -640,9 +750,12 @@ impl OrdenesService {
             "SELECT
                 ot.id_ot, ot.codigo_ot, ot.placa_snapshot, ot.id_mecanico, ot.id_zanja_ejecucion, ot.estado,
                 COALESCE(ot.kilometraje_salida, ot.kilometraje_ingreso), COALESCE(ot.resumen_publico, ot.pedido_cliente), COALESCE(ot.fecha_fin, ot.fecha_ingreso),
-                u.nombre_completo, ot.corregido
+                u.nombre_completo, ot.corregido, c.nombre_razon_social, c.numero_documento, c.tipo_documento,
+                v.marca, v.modelo, ot.cliente_snapshot
              FROM ordenes_trabajo ot
              LEFT JOIN usuarios u ON ot.id_mecanico = u.id_usuario
+             LEFT JOIN clientes c ON ot.id_cliente_atendido = c.id_cliente
+             LEFT JOIN vehiculos v ON ot.id_vehiculo = v.id_vehiculo
              WHERE ot.id_vehiculo = ?1
                AND ot.estado = 'FINALIZADO'
              ORDER BY COALESCE(ot.fecha_fin, ot.fecha_ingreso) DESC, ot.id_ot DESC",
@@ -661,6 +774,12 @@ impl OrdenesService {
                 row.get::<_, String>(8)?,
                 row.get::<_, Option<String>>(9)?,
                 row.get::<_, Option<i32>>(10)?.unwrap_or(0),
+                row.get::<_, Option<String>>(11)?,
+                row.get::<_, Option<String>>(12)?,
+                row.get::<_, Option<String>>(13)?,
+                row.get::<_, Option<String>>(14)?,
+                row.get::<_, Option<String>>(15)?,
+                row.get::<_, Option<String>>(16)?,
             ))
         })?;
 
@@ -674,6 +793,13 @@ impl OrdenesService {
                 raw_data.0,
                 raw_data.6,
                 tipo_aceite.as_deref(),
+            );
+
+            let (nombre_cli, doc_cli, tipo_doc_cli) = Self::extraer_identidad_cliente_snapshot(
+                raw_data.16,
+                raw_data.11,
+                raw_data.12,
+                raw_data.13,
             );
 
             historial.push(OrdenTrabajoHistorialDto {
@@ -691,6 +817,11 @@ impl OrdenesService {
                 tipo_aceite,
                 detalles,
                 corregido: Some(raw_data.10),
+                nombre_cliente: nombre_cli,
+                documento_cliente: doc_cli,
+                tipo_documento_cliente: tipo_doc_cli,
+                marca_vehiculo: raw_data.14,
+                modelo_vehiculo: raw_data.15,
             });
         }
 
@@ -926,6 +1057,18 @@ impl OrdenesService {
         if ot.estado == "FINALIZADO" || ot.estado == "CANCELADO" {
             return Err(AppError::Validation(
                 "No se pueden eliminar servicios de una orden finalizada o cancelada.".to_string(),
+            ));
+        }
+
+        let cantidad_servicios: i64 = conn.query_row(
+            "SELECT COUNT(*) FROM detalle_ot_servicios WHERE id_ot = ?1",
+            [id_ot],
+            |row| row.get(0),
+        )?;
+
+        if cantidad_servicios <= 1 {
+            return Err(AppError::Validation(
+                "No se puede eliminar el servicio. Una Orden de Trabajo debe conservar al menos un servicio.".to_string(),
             ));
         }
 

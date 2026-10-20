@@ -1,5 +1,5 @@
 import React from 'react';
-import { User, Lock, Eye, EyeOff, ArrowRight } from 'lucide-react';
+import { User, Lock, Eye, EyeOff } from 'lucide-react';
 import { loginStyles as s } from '../../../styles/loginStyles';
 
 interface LoginFormProps {
@@ -33,16 +33,16 @@ export const LoginForm: React.FC<LoginFormProps> = ({
         <h2
           style={{
             fontSize: '24px',
-            fontWeight: '800',
+            fontWeight: '600',
             color: '#F8FAFC',
             marginBottom: '6px',
             letterSpacing: '-0.5px',
           }}
         >
-          Bienvenido de nuevo
+          Iniciar sesión
         </h2>
         <p style={{ fontSize: '14px', color: '#94A3B8', margin: 0 }}>
-          Introduce tus credenciales para iniciar sesión.
+          Ingresa tu usuario y contraseña.
         </p>
       </div>
 
@@ -106,22 +106,9 @@ export const LoginForm: React.FC<LoginFormProps> = ({
         </div>
 
         <button type="submit" disabled={isLoggingIn} style={s.submitButton}>
-          <span>{isLoggingIn ? 'Iniciando sesión...' : 'Ingresar al ERP'}</span>
-          <ArrowRight size={18} />
+          <span>{isLoggingIn ? 'Iniciando sesión...' : 'Ingresar'}</span>
         </button>
       </form>
-
-      <p
-        style={{
-          fontSize: '12px',
-          color: '#64748B',
-          textAlign: 'center',
-          marginTop: '16px',
-          marginBottom: '8px',
-        }}
-      >
-        Consulte con el administrador si no puede ingresar.
-      </p>
 
       <div
         style={{
@@ -136,10 +123,11 @@ export const LoginForm: React.FC<LoginFormProps> = ({
           type="button"
           disabled={isLoggingIn}
           onClick={onIrARecuperacion}
+          title="Recuperar acceso de administrador con el código de recuperación"
           style={{
             background: 'none',
             border: 'none',
-            color: '#38BDF8',
+            color: '#B5C4D8',
             fontSize: '13px',
             cursor: isLoggingIn ? 'not-allowed' : 'pointer',
             fontWeight: '500',
@@ -147,7 +135,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({
             outlineOffset: '2px',
           }}
         >
-          ¿Olvidaste la clave de Administrador?
+          ¿No puedes ingresar?
         </button>
       </div>
     </>

@@ -1,3 +1,4 @@
+import './loginVisual.css';
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { ShieldAlert } from 'lucide-react';
@@ -310,11 +311,12 @@ export const LoginPage: React.FC = () => {
   };
 
   return (
-    <div style={s.container}>
+    <div className="gloria-login" style={s.container}>
       <LoginBrandPanel appVersion={appVersion} />
 
-      <div style={s.rightPanel}>
-        <div style={s.card}>
+      <div className="gloria-access" style={s.rightPanel}>
+        <div className="gloria-access-card" style={s.card}>
+          {!esProdBD && (
           <div
             style={{
               display: 'flex',
@@ -336,6 +338,7 @@ export const LoginPage: React.FC = () => {
               ENTORNO: {ambienteActual.toUpperCase()}
             </span>
           </div>
+          )}
 
           {mensajeInactividad && (
             <div

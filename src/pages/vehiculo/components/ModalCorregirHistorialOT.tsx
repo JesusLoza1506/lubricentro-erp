@@ -17,7 +17,6 @@ export const ModalCorregirHistorialOT: React.FC<Props> = ({
   const tieneCambioAceite = ordenTrabajo.proximo_kilometraje !== null;
 
   const [resumen, setResumen] = useState(ordenTrabajo.observaciones || '');
-  // ✅ Corregido: se usa 'kilometraje_ingreso' que contiene el valor unificado desde el backend
   const [kilometrajeSalida, setKilometrajeSalida] = useState(ordenTrabajo.kilometraje_ingreso ?? 0);
   const [tipoAceite, setTipoAceite] = useState<string>(
     tieneCambioAceite ? ordenTrabajo.tipo_aceite || 'SINTETICO' : 'SIN_CAMBIO'
@@ -26,15 +25,12 @@ export const ModalCorregirHistorialOT: React.FC<Props> = ({
   const [cargando, setCargando] = useState(false);
   const [errorModal, setErrorModal] = useState<string | null>(null);
 
+  // Estado para el modal de confirmación
+  const [confirmModalOpen, setConfirmModalOpen] = useState(false);
+
   if (!modalAbierto) return null;
 
-  const onSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!motivo.trim() || motivo.trim().length < 5) {
-      setErrorModal('El motivo es obligatorio (mínimo 5 caracteres).');
-      return;
-    }
-
+  const ejecutarGuardado = async () => {
     setCargando(true);
     setErrorModal(null);
 
@@ -56,100 +52,171 @@ export const ModalCorregirHistorialOT: React.FC<Props> = ({
       }
     } finally {
       setCargando(false);
+      setConfirmModalOpen(false);
     }
   };
 
+  const onSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!motivo.trim() || motivo.trim().length < 5) {
+      setErrorModal('El motivo es obligatorio (mínimo 5 caracteres).');
+      return;
+    }
+
+    setConfirmModalOpen(true);
+  };
+
   return (
-    <div style={overlayStyle}>
-      <div style={modalBoxStyle}>
-        <h3 style={{ fontSize: '18px', fontWeight: '800', color: '#F8FAFC', margin: '0 0 16px 0' }}>
-          🛠️ Corregir Mantenimiento Finalizado (Administrador)
-        </h3>
+    <>
+      <div style={overlayStyle}>
+        <div style={modalBoxStyle}>
+          <h3
+            style={{ fontSize: '18px', fontWeight: '800', color: '#F8FAFC', margin: '0 0 16px 0' }}
+          >
+            🛠️ Corregir Mantenimiento Finalizado (Administrador)
+          </h3>
 
-        {errorModal && <div style={errorBoxStyle}>⚠️ {errorModal}</div>}
+          {errorModal && <div style={errorBoxStyle}>⚠️ {errorModal}</div>}
 
-        <form onSubmit={onSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-          <div>
-            <label style={labelStyle}>Resumen Público de Servicios *</label>
-            <textarea
-              required
-              rows={3}
-              value={resumen}
-              onChange={(e) => setResumen(e.target.value)}
-              style={{ ...inputStyle, fontFamily: 'inherit', resize: 'vertical' }}
-            />
-          </div>
-
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+          <form
+            onSubmit={onSubmit}
+            style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}
+          >
             <div>
-              <label style={labelStyle}>Kilometraje de Salida *</label>
-              <input
+              <label style={labelStyle}>Resumen Público de Servicios *</label>
+              <textarea
                 required
-                type="number"
-                value={kilometrajeSalida}
-                onChange={(e) => setKilometrajeSalida(Number(e.target.value))}
-                style={inputStyle}
+                rows={3}
+                value={resumen}
+                onChange={(e) => setResumen(e.target.value)}
+                style={{ ...inputStyle, fontFamily: 'inherit', resize: 'vertical' }}
               />
             </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+              <div>
+                <label style={labelStyle}>Kilometraje de Salida *</label>
+                <input
+                  required
+                  type="number"
+                  value={kilometrajeSalida}
+                  onChange={(e) => setKilometrajeSalida(Number(e.target.value))}
+                  style={inputStyle}
+                />
+              </div>
+              <div>
+                <label style={labelStyle}>Tipo de Aceite</label>
+                <select
+                  disabled={!tieneCambioAceite}
+                  value={tipoAceite}
+                  onChange={(e) => setTipoAceite(e.target.value)}
+                  style={{
+                    ...inputStyle,
+                    backgroundColor: !tieneCambioAceite ? '#0F172A' : '#1E293B',
+                    cursor: !tieneCambioAceite ? 'not-allowed' : 'pointer',
+                    opacity: !tieneCambioAceite ? 0.6 : 1,
+                  }}
+                >
+                  {!tieneCambioAceite ? (
+                    <option value="SIN_CAMBIO">SIN CAMBIO DE ACEITE</option>
+                  ) : (
+                    <>
+                      <option value="MINERAL">MINERAL (5,000 km)</option>
+                      <option value="SINTETICO">SINTÉTICO (10,000 km)</option>
+                    </>
+                  )}
+                </select>
+              </div>
+            </div>
+
+            {!tieneCambioAceite && (
+              <div style={warningBoxStyle}>
+                ℹ️ Esta OT no incluye servicio/producto de cambio de aceite. El próximo kilometraje
+                no será calculado automáticamente.
+              </div>
+            )}
+
             <div>
-              <label style={labelStyle}>Tipo de Aceite</label>
-              <select
-                disabled={!tieneCambioAceite}
-                value={tipoAceite}
-                onChange={(e) => setTipoAceite(e.target.value)}
-                style={{
-                  ...inputStyle,
-                  backgroundColor: !tieneCambioAceite ? '#0F172A' : '#1E293B',
-                  cursor: !tieneCambioAceite ? 'not-allowed' : 'pointer',
-                  opacity: !tieneCambioAceite ? 0.6 : 1,
-                }}
+              <label style={{ ...labelStyle, color: '#EF4444', fontWeight: '700' }}>
+                Motivo de Corrección Administrativa (Obligatorio, 5-250 chars) *
+              </label>
+              <input
+                required
+                type="text"
+                placeholder="Ej. Corrección por error de digitación en resumen público"
+                value={motivo}
+                onChange={(e) => setMotivo(e.target.value)}
+                style={{ ...inputStyle, borderColor: '#EF4444' }}
+              />
+            </div>
+
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'flex-end',
+                gap: '10px',
+                marginTop: '12px',
+              }}
+            >
+              <button
+                type="button"
+                onClick={() => setModalAbierto(false)}
+                style={btnSecondaryStyle}
               >
-                {!tieneCambioAceite ? (
-                  <option value="SIN_CAMBIO">SIN CAMBIO DE ACEITE</option>
-                ) : (
-                  <>
-                    <option value="MINERAL">MINERAL (5,000 km)</option>
-                    <option value="SINTETICO">SINTÉTICO (10,000 km)</option>
-                  </>
-                )}
-              </select>
+                Cancelar
+              </button>
+              <button type="submit" disabled={cargando} style={btnPrimaryStyle}>
+                {cargando ? 'Guardando...' : 'Aplicar Corrección'}
+              </button>
             </div>
-          </div>
-
-          {!tieneCambioAceite && (
-            <div style={warningBoxStyle}>
-              ℹ️ Esta OT no incluye servicio/producto de cambio de aceite. El próximo kilometraje no
-              será calculado automáticamente.
-            </div>
-          )}
-
-          <div>
-            <label style={{ ...labelStyle, color: '#EF4444', fontWeight: '700' }}>
-              Motivo de Corrección Administrativa (Obligatorio, 5-250 chars) *
-            </label>
-            <input
-              required
-              type="text"
-              placeholder="Ej. Corrección por error de digitación en resumen público"
-              value={motivo}
-              onChange={(e) => setMotivo(e.target.value)}
-              style={{ ...inputStyle, borderColor: '#EF4444' }}
-            />
-          </div>
-
-          <div
-            style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '12px' }}
-          >
-            <button type="button" onClick={() => setModalAbierto(false)} style={btnSecondaryStyle}>
-              Cancelar
-            </button>
-            <button type="submit" disabled={cargando} style={btnPrimaryStyle}>
-              {cargando ? 'Guardando...' : 'Aplicar Corrección'}
-            </button>
-          </div>
-        </form>
+          </form>
+        </div>
       </div>
-    </div>
+
+      {confirmModalOpen && (
+        <div style={overlayStyle}>
+          <div style={{ ...modalBoxStyle, width: '420px', textAlign: 'center' }}>
+            <h3
+              style={{
+                fontSize: '18px',
+                fontWeight: '800',
+                color: '#F8FAFC',
+                marginBottom: '12px',
+              }}
+            >
+              Confirmar Corrección de Historial
+            </h3>
+            <p
+              style={{
+                fontSize: '13px',
+                color: '#94A3B8',
+                marginBottom: '20px',
+                lineHeight: '1.5',
+              }}
+            >
+              ¿Está seguro de corregir la Orden de Trabajo {ordenTrabajo.codigo_ot}? Esta acción
+              modificará el historial público y registrará el motivo en los logs de auditoría.
+            </p>
+            <div style={{ display: 'flex', justifyContent: 'center', gap: '12px' }}>
+              <button
+                type="button"
+                onClick={() => setConfirmModalOpen(false)}
+                style={btnSecondaryStyle}
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={ejecutarGuardado}
+                style={{ ...btnPrimaryStyle, backgroundColor: '#D97706' }}
+              >
+                Sí, Corregir OT
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 };
 

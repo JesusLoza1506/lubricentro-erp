@@ -984,8 +984,8 @@ impl ClienteService {
         })?;
 
         let mut lista = Vec::new();
-        for r in rows.flatten() {
-            lista.push(r);
+        for r in rows {
+            lista.push(r?);
         }
 
         Ok(lista)

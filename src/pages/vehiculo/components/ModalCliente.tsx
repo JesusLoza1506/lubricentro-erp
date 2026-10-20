@@ -33,7 +33,7 @@ export const ModalCliente: React.FC<ModalClienteProps> = ({
     setMotivo('');
     if (modo === 'EDITAR' && clienteEditar) {
       setNombre(clienteEditar.nombre_razon_social || '');
-      setTipoDoc(clienteEditar.tipo_documento || 'DNI');
+      setTipoDoc((clienteEditar.tipo_documento as 'DNI' | 'RUC' | 'CE') || 'DNI');
       setNumDoc(clienteEditar.numero_documento || '');
       setTelefono(clienteEditar.telefono || '');
       setCorreo(clienteEditar.correo || '');
@@ -54,6 +54,16 @@ export const ModalCliente: React.FC<ModalClienteProps> = ({
     if (tipoDoc === 'DNI') setNumDoc(val.replace(/\D/g, '').slice(0, 8));
     else if (tipoDoc === 'RUC') setNumDoc(val.replace(/\D/g, '').slice(0, 11));
     else setNumDoc(val.replace(/[^a-zA-Z0-9]/g, '').slice(0, 12));
+  };
+
+  const handleTelefonoChange = (val: string) => {
+    let clean = val.trim().replace(/[\s-]/g, '');
+    if (clean.startsWith('+51')) {
+      clean = clean.slice(3);
+    } else if (clean.startsWith('51') && clean.length > 9) {
+      clean = clean.slice(2);
+    }
+    setTelefono(clean.replace(/\D/g, '').slice(0, 9));
   };
 
   const onSubmit = async (e: React.FormEvent) => {
@@ -156,7 +166,7 @@ export const ModalCliente: React.FC<ModalClienteProps> = ({
                 type="text"
                 placeholder="987654321"
                 value={telefono}
-                onChange={(e) => setTelefono(e.target.value.replace(/\D/g, '').slice(0, 9))}
+                onChange={(e) => handleTelefonoChange(e.target.value)}
                 style={inputStyle}
               />
             </div>

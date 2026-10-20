@@ -43,12 +43,12 @@
 
 ## 2. Estado del proyecto
 
-Desarrollo secuencial, módulo por módulo, conforme al alcance funcional v7. **Ficha Vehicular e Historial se encuentra al 80 %**. Inicio Dashboard se desarrollará al final para integrar los datos y resultados de los demás módulos.
+Desarrollo secuencial, módulo por módulo, conforme al alcance funcional v7. **Ficha Vehicular e Historial se encuentra al 95 %, en ajustes finales**. Inicio Dashboard se desarrollará al final para integrar los datos y resultados de los demás módulos.
 
 | Orden | Módulo | Estado | Avance |
 | --- | --- | --- | --- |
 | 01 | [Login y Sesión](#modulo-login-y-sesion) | 🟢 Ajustes finales | ~95 % |
-| 02 | [Ficha Vehicular e Historial](#modulo-ficha-vehicular-e-historial) | 🟡 En desarrollo | ~80 % |
+| 02 | [Ficha Vehicular e Historial](#modulo-ficha-vehicular-e-historial) | 🟢 Ajustes finales | ~95 % |
 | 03 | Órdenes de Trabajo Taller | ⚪ Pendiente de revisión y adaptación | — |
 | 04 | Inventario y Stock | ⚪ Pendiente de revisión y adaptación | — |
 | 05 | Punto de Venta POS | ⚪ Pendiente | — |
@@ -122,7 +122,7 @@ _Cambio de contraseña_
 <a id="modulo-ficha-vehicular-e-historial"></a>
 
 <details>
-<summary><b>02 · Ficha Vehicular e Historial</b> — 🟡 En desarrollo · ~80 %</summary>
+<summary><b>02 · Ficha Vehicular e Historial</b> — 🟢 Ajustes finales · ~95 %</summary>
 
 **Qué hace:** centraliza la identificación del vehículo, su propietario y las atenciones realizadas. Permite consultar la ficha y mantener sus datos relacionados con las órdenes del taller.
 
@@ -160,13 +160,13 @@ _Registro o edición del vehículo_
 
 **Validaciones relacionadas:** la ejecución de pruebas compartida registró seis casos satisfactorios en [vehiculo_tests.rs](src-tauri/tests/vehiculo_tests.rs), sobre registro, actualización, consulta de ficha, permisos y desactivación con o sin OT abierta.
 
-**Pendiente para cerrar:** completar las funciones restantes del alcance, revisar la interfaz y los mensajes, validar los flujos por rol e incorporar capturas y evidencias de uso.
+**Pendiente para cerrar:** reforzar las confirmaciones de guardado, ajustar la recepción de OT y priorizar las atenciones más antiguas en próximos cambios de aceite.
 
-**Estado:** avance aproximado del **80 %**, en desarrollo y validación. Este porcentaje expresa progreso de implementación, no cobertura de pruebas.
+**Estado:** avance aproximado del **95 %**, en fase de ajustes finales y validación antes de su cierre definitivo. Este porcentaje expresa progreso de implementación, no cobertura de pruebas.
 
 </details>
 
-**Trabajo actual:** completar Ficha Vehicular e Historial y los ajustes finales de Login y Sesión. **Siguiente módulo:** Órdenes de Trabajo Taller. El detalle de los demás módulos se incorporará conforme avancen en la secuencia definida.
+**Trabajo actual:** cerrar los ajustes finales de Ficha Vehicular e Historial y Login y Sesión, ambos con un avance aproximado del 95 %. **Siguiente módulo:** Órdenes de Trabajo Taller. El detalle de los demás módulos se incorporará conforme avancen en la secuencia definida.
 
 <a id="roles"></a>
 
@@ -331,7 +331,7 @@ El informe general y las diez especificaciones funcionales v7 son documentos de 
 La implementación seguirá este orden:
 
 1. **Login y Sesión (~95 %):** cerrar ajustes y validaciones finales.
-2. **Ficha Vehicular e Historial (~80 %, en curso):** completar funcionalidades, revisión de interfaz y evidencias.
+2. **Ficha Vehicular e Historial (~95 %, ajustes finales):** afinar las confirmaciones, la recepción de OT y el orden de próximos cambios de aceite.
 3. **Órdenes de Trabajo Taller:** continuar con la revisión y adaptación del flujo de recepción, ejecución y finalización.
 4. **Inventario y Stock:** revisar catálogos, entradas, consumos y ajustes.
 5. **Punto de Venta POS:** completar ventas, cobros y gestión de comprobantes.

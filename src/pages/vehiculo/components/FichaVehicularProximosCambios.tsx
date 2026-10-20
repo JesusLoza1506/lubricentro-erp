@@ -316,7 +316,6 @@ export const FichaVehicularProximosCambios: React.FC<Props> = ({ onSeleccionarPl
                   <span>
                     Km Actual: <strong>{(item.kilometraje_actual ?? 0).toLocaleString()} km</strong>
                   </span>
-                  {/* ✅ CORREGIDO (Punto 1 y 3): Manejo seguro de km_proximo */}
                   {item.km_proximo !== null && item.km_proximo !== undefined && (
                     <span style={{ color: '#94A3B8' }}>
                       (Próx: {item.km_proximo.toLocaleString()} km)

@@ -54,7 +54,6 @@ export const FichaVehicularPage: React.FC<FichaVehicularPageProps> = ({
   const esMecanico = usuario?.rol === 'MECANICO';
   const esAdmin = usuario?.rol === 'ADMINISTRADOR';
 
-  // ✅ CORREGIDO (Punto 4): Si es Mecánico, forzar false en creación y edición de ficha vehicular/cliente
   const puedeCrear = !esMecanico && tienePermiso('FICHA_VEHICULAR', 'crear');
   const puedeEditar = !esMecanico && tienePermiso('FICHA_VEHICULAR', 'editar');
   const puedeEliminar = !esMecanico && tienePermiso('FICHA_VEHICULAR', 'eliminar');
@@ -134,7 +133,14 @@ export const FichaVehicularPage: React.FC<FichaVehicularPageProps> = ({
       setOrdenesTodas(listaOTs);
     } catch (err: unknown) {
       if (currentRequestId !== busquedaRequestIdRef.current) return;
-      setError(extraerMensaje(err));
+      const msg = extraerMensaje(err);
+
+      // Si el error es de "No encontrado", mostramos el EmptyState limpio
+      if (msg.toLowerCase().includes('no se encontró vehículo registrado')) {
+        setError(null);
+      } else {
+        setError(msg);
+      }
     } finally {
       if (currentRequestId === busquedaRequestIdRef.current) {
         setCargando(false);
@@ -396,9 +402,9 @@ export const FichaVehicularPage: React.FC<FichaVehicularPageProps> = ({
             onAbrirCrearCliente={handleAbrirCrearCliente}
           />
 
-          {error && <div style={errorStyle}>{error}</div>}
+          {error && <div style={errorStyle}>⚠️ Error del Sistema: {error}</div>}
 
-          {!vehiculo && !cargando && (
+          {!vehiculo && !cargando && !error && (
             <FichaVehicularEmptyState
               buscado={buscado}
               placaBusqueda={placaBusqueda}
@@ -465,6 +471,7 @@ export const FichaVehicularPage: React.FC<FichaVehicularPageProps> = ({
           modo={modoModalVehiculo}
           vehiculoEditar={vehiculo}
           handleGuardar={handleGuardarVehiculo}
+          esAdmin={esAdmin}
         />
       )}
 

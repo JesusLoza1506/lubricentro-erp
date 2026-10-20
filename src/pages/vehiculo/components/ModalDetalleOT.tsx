@@ -21,6 +21,13 @@ export const ModalDetalleOT: React.FC<ModalDetalleOTProps> = ({
     return isNaN(fecha.getTime()) ? 'N/A' : fecha.toLocaleDateString('es-PE');
   };
 
+  // Lectura directa desde el DTO aplanado (resuelve los errores TS2339)
+  const nombreClienteAtendido = ordenTrabajo.nombre_cliente || 'Cliente Varios / No especificado';
+
+  const docClienteAtendido = ordenTrabajo.documento_cliente;
+
+  const tipoDocClienteAtendido = ordenTrabajo.tipo_documento_cliente || 'DOC';
+
   return (
     <div
       style={{
@@ -93,7 +100,7 @@ export const ModalDetalleOT: React.FC<ModalDetalleOTProps> = ({
           </button>
         </div>
 
-        {/* ✅ CORREGIDO (Punto 2): SECCIÓN DE IDENTIDAD HISTÓRICA (CLIENTE Y VEHÍCULO AL MOMENTO DE LA OT) */}
+        {/* SECCIÓN DE IDENTIDAD HISTÓRICA (CLIENTE Y VEHÍCULO AL MOMENTO DE LA OT) */}
         <div
           style={{
             display: 'grid',
@@ -109,7 +116,7 @@ export const ModalDetalleOT: React.FC<ModalDetalleOTProps> = ({
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#CBD5E1' }}>
             <Car size={16} color="#38BDF8" />
             <span>
-              Placa / Vehículo: <strong>{ordenTrabajo.placa}</strong>
+              Placa: <strong>{ordenTrabajo.placa}</strong>
               {ordenTrabajo.marca_vehiculo &&
                 ` (${ordenTrabajo.marca_vehiculo} ${ordenTrabajo.modelo_vehiculo || ''})`}
             </span>
@@ -117,9 +124,8 @@ export const ModalDetalleOT: React.FC<ModalDetalleOTProps> = ({
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#CBD5E1' }}>
             <User size={16} color="#34D399" />
             <span>
-              Cliente: <strong>{ordenTrabajo.nombre_cliente || 'N/A'}</strong>
-              {ordenTrabajo.documento_cliente &&
-                ` [${ordenTrabajo.tipo_documento_cliente || 'DOC'}: ${ordenTrabajo.documento_cliente}]`}
+              Cliente: <strong>{nombreClienteAtendido}</strong>
+              {docClienteAtendido && ` [${tipoDocClienteAtendido}: ${docClienteAtendido}]`}
             </span>
           </div>
         </div>

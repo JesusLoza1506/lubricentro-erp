@@ -4,6 +4,7 @@ use lubricentro_erp_lib::dto::vehiculo_dto::{
 };
 use lubricentro_erp_lib::services::cliente_service::ClienteService;
 use rusqlite::Connection;
+use std::time::Instant;
 
 const DUMMY_ARGON2_HASH: &str =
     "$argon2id$v=19$m=19456,t=2,p=1$Z3VpZGVsaW5lc3NhbHQ$5Vw5O7hK5W9u8P0s5vX+A1B2C3D4E5F6G7H8I9J0K1L";
@@ -11,7 +12,12 @@ const DUMMY_ARGON2_HASH: &str =
 /// Configura una base de datos SQLite en memoria utilizando el esquema real V7 de producción
 fn setup_test_db() -> Connection {
     let conn = Connection::open_in_memory().unwrap();
-    conn.execute_batch("PRAGMA foreign_keys = ON;").unwrap();
+    conn.execute_batch(
+        "PRAGMA foreign_keys = ON;
+         PRAGMA busy_timeout = 5000;
+         PRAGMA journal_mode = WAL;",
+    )
+    .unwrap();
 
     let initial_schema = include_str!("../migrations/0001_initial_schema_v7.sql");
     conn.execute_batch(initial_schema).unwrap();
@@ -514,4 +520,79 @@ fn test_autorizacion_rol_mecanico_bloqueado() {
 
     let roles_escritura = ["ADMINISTRADOR", "CAJERO"];
     assert!(!roles_escritura.contains(&rol.as_str()));
+}
+
+// =========================================================================
+// FASE 4: PRUEBAS DE ESTRÉS Y COBERTURA (1,000 VEHÍCULOS SIMULADOS)
+// =========================================================================
+
+#[test]
+fn test_estres_masivo_1000_vehiculos_y_rendimiento_busqueda() {
+    let mut conn = setup_test_db();
+
+    let inicio_insercion = Instant::now();
+
+    // 1. Inserción masiva atómica de 1,000 clientes y 1,000 vehículos
+    let tx = conn.transaction().unwrap();
+
+    for i in 1..=1000 {
+        let dni = format!("{:08}", 10000000 + i);
+        let nombre_cliente = format!("Cliente Simulado {}", i);
+        let placa = format!("STR{:03}", i % 1000); // Placas desde STR000 hasta STR999
+
+        tx.execute(
+            "INSERT INTO clientes (tipo_documento, numero_documento, nombre_razon_social, telefono, es_varios)
+             VALUES ('DNI', ?1, ?2, '900000000', 0)",
+            [&dni, &nombre_cliente],
+        )
+        .unwrap();
+
+        let id_cliente_nuevo = tx.last_insert_rowid();
+
+        tx.execute(
+            "INSERT INTO vehiculos (placa, id_cliente, marca, modelo, anio, tipo_motor, kilometraje_actual, activo)
+             VALUES (?1, ?2, 'Nissan', 'Versa', 2022, 'GASOLINA', ?3, 1)",
+            rusqlite::params![placa, id_cliente_nuevo, (i * 100) as i64],
+        )
+        .unwrap();
+    }
+
+    tx.commit().unwrap();
+
+    let duracion_insercion = inicio_insercion.elapsed();
+    println!(
+        "FASE 4: Tiempo de inserción masiva de 1,000 vehículos: {:?}",
+        duracion_insercion
+    );
+
+    // 2. Verificación de contrato de la base de datos (Totalidad de registros)
+    let total_vehiculos: i64 = conn
+        .query_row("SELECT COUNT(*) FROM vehiculos", [], |row| row.get(0))
+        .unwrap();
+    assert_eq!(total_vehiculos, 1001); // 1 inicial de setup_test_db + 1,000 simulados
+
+    // 3. Prueba de rendimiento de búsqueda individual por placa sobre el volumen masivo
+    let placa_prueba = "STR500";
+    let inicio_busqueda = Instant::now();
+
+    let vehiculo_res =
+        ClienteService::obtener_vehiculo_por_placa(&conn, placa_prueba, Some("ADMINISTRADOR"));
+
+    let duracion_busqueda = inicio_busqueda.elapsed();
+
+    assert!(vehiculo_res.is_ok());
+    let v = vehiculo_res.unwrap();
+    assert_eq!(v.placa, placa_prueba);
+    assert_eq!(v.kilometraje_actual, 50000); // (500 * 100)
+
+    println!(
+        "FASE 4: Tiempo de consulta de un vehículo entre 1,000 registros: {:?}",
+        duracion_busqueda
+    );
+
+    // Validación de rendimiento: la consulta indexada por placa debe demorar menos de 10ms
+    assert!(
+        duracion_busqueda.as_millis() < 10,
+        "La búsqueda por placa excedió el tiempo límite esperado para un entorno indexado."
+    );
 }
