@@ -101,7 +101,7 @@ export const FichaVehicularProximosCambios: React.FC<Props> = ({ onSeleccionarPl
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+    <section className="fv-upcoming" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
       {/* HEADER DE LA SECCIÓN */}
       <div
         style={{
@@ -141,7 +141,7 @@ export const FichaVehicularProximosCambios: React.FC<Props> = ({ onSeleccionarPl
       </div>
 
       {/* BARRA DE FILTROS Y BÚSQUEDA */}
-      <div
+      <div className="fv-upcoming-filters"
         style={{
           display: 'flex',
           justifyContent: 'space-between',
@@ -186,7 +186,7 @@ export const FichaVehicularProximosCambios: React.FC<Props> = ({ onSeleccionarPl
         </div>
 
         {/* BOTONES DE FILTRO CAUSA */}
-        <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+        <div className="fv-filter-buttons" style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
           <Filter size={14} color="#94A3B8" />
           {(['TODOS', 'POR_KM', 'POR_FECHA', 'AMBOS'] as TipoFiltroCausa[]).map((causa) => (
             <button
@@ -224,7 +224,7 @@ export const FichaVehicularProximosCambios: React.FC<Props> = ({ onSeleccionarPl
             padding: '32px',
             textAlign: 'center',
             backgroundColor: 'rgba(15, 23, 42, 0.4)',
-            border: '1px dashed #334155',
+            border: '1px solid #334155',
             borderRadius: '16px',
             color: '#94A3B8',
             fontSize: '14px',
@@ -236,21 +236,22 @@ export const FichaVehicularProximosCambios: React.FC<Props> = ({ onSeleccionarPl
         <div
           style={{
             display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 340px), 1fr))',
             gap: '16px',
           }}
         >
           {listaPaginada.map((item) => (
             <div
+              className="fv-upcoming-card"
               key={`${item.id_vehiculo}-${item.id_ot}`}
               style={{
-                padding: '18px',
+                padding: '16px',
                 backgroundColor: 'rgba(15, 23, 42, 0.6)',
                 border: '1px solid #334155',
                 borderRadius: '14px',
                 display: 'flex',
                 flexDirection: 'column',
-                gap: '12px',
+                gap: '10px',
               }}
             >
               <div
@@ -258,10 +259,12 @@ export const FichaVehicularProximosCambios: React.FC<Props> = ({ onSeleccionarPl
                   display: 'flex',
                   justifyContent: 'space-between',
                   alignItems: 'flex-start',
+                  flexWrap: 'wrap',
+                  gap: '8px',
                 }}
               >
                 <div>
-                  <span style={{ fontSize: '18px', fontWeight: '800', color: '#F8FAFC' }}>
+                  <span style={{ fontSize: '18px', fontWeight: '700', color: '#F8FAFC' }}>
                     {item.placa}
                   </span>
                   <p
@@ -310,9 +313,9 @@ export const FichaVehicularProximosCambios: React.FC<Props> = ({ onSeleccionarPl
                 }}
               >
                 <div
-                  style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#CBD5E1' }}
+                  style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '6px', color: '#CBD5E1' }}
                 >
-                  <Gauge size={14} color="#FBBF24" />
+                  <Gauge size={14} color="#94A3B8" />
                   <span>
                     Km Actual: <strong>{(item.kilometraje_actual ?? 0).toLocaleString()} km</strong>
                   </span>
@@ -324,9 +327,9 @@ export const FichaVehicularProximosCambios: React.FC<Props> = ({ onSeleccionarPl
                 </div>
 
                 <div
-                  style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#CBD5E1' }}
+                  style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '6px', color: '#CBD5E1' }}
                 >
-                  <Calendar size={14} color="#38BDF8" />
+                  <Calendar size={14} color="#94A3B8" />
                   <span>
                     Último Servicio:{' '}
                     {item.fecha_servicio
@@ -337,9 +340,9 @@ export const FichaVehicularProximosCambios: React.FC<Props> = ({ onSeleccionarPl
 
                 {item.tipo_aceite && (
                   <div
-                    style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#CBD5E1' }}
+                    style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '6px', color: '#CBD5E1' }}
                   >
-                    <Droplet size={14} color="#A855F7" />
+                    <Droplet size={14} color="#94A3B8" />
                     <span>
                       Aceite: {item.tipo_aceite} ({item.intervalo_aceite_km || 0} km)
                     </span>
@@ -348,7 +351,7 @@ export const FichaVehicularProximosCambios: React.FC<Props> = ({ onSeleccionarPl
 
                 {item.telefono && (
                   <div
-                    style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#34D399' }}
+                    style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '6px', color: '#CBD5E1' }}
                   >
                     <Phone size={14} />
                     <span>Teléfono: {item.telefono}</span>
@@ -365,9 +368,9 @@ export const FichaVehicularProximosCambios: React.FC<Props> = ({ onSeleccionarPl
                   gap: '6px',
                   width: '100%',
                   padding: '8px 12px',
-                  backgroundColor: '#2563EB',
-                  color: '#FFFFFF',
-                  border: 'none',
+                  backgroundColor: '#1B2A40',
+                  color: '#BDD5F4',
+                  border: '1px solid #35465D',
                   borderRadius: '8px',
                   fontSize: '13px',
                   fontWeight: '700',
@@ -425,6 +428,6 @@ export const FichaVehicularProximosCambios: React.FC<Props> = ({ onSeleccionarPl
           </button>
         </div>
       )}
-    </div>
+    </section>
   );
 };

@@ -22,122 +22,40 @@ export const FichaVehicularHeader: React.FC<Props> = ({
   onAbrirCrearCliente,
 }) => {
   return (
-    <div
-      style={{
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        flexWrap: 'wrap',
-        gap: '16px',
-        paddingBottom: '8px',
-        borderBottom: '1px solid rgba(51, 65, 85, 0.4)',
-      }}
-    >
-      <div>
-        <h2 style={{ fontSize: '26px', fontWeight: '800', color: '#F8FAFC', margin: '0 0 4px 0' }}>
-          Ficha Vehicular
-        </h2>
-        <p style={{ color: '#94A3B8', fontSize: '14px', margin: 0 }}>
-          Consulta las especificaciones, propietario y hoja de vida de mantenimientos por placa.
-        </p>
+    <header className="fv-header">
+      <div className="fv-heading">
+        <h2>Ficha vehicular</h2>
+        <p>Consulta vehículos y su historial de mantenimiento.</p>
       </div>
-
-      <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
-        <form onSubmit={onBuscar} style={{ display: 'flex', gap: '10px' }}>
-          <div style={{ position: 'relative' }}>
-            <input
-              type="text"
-              placeholder="Ej. ABC123"
-              maxLength={6}
-              value={placaBusqueda}
-              onChange={(e) =>
-                setPlacaBusqueda(e.target.value.replace(/[^a-zA-Z0-9]/g, '').toUpperCase())
-              }
-              style={inputBusquedaStyle}
-            />
-            <Search
-              size={18}
-              color="#94A3B8"
-              style={{
-                position: 'absolute',
-                left: '14px',
-                top: '50%',
-                transform: 'translateY(-50%)',
-              }}
-            />
-          </div>
-          <button
-            type="submit"
-            disabled={cargando}
-            style={{
-              backgroundColor: '#2563EB',
-              color: '#FFFFFF',
-              border: 'none',
-              borderRadius: '12px',
-              padding: '0 20px',
-              fontSize: '14px',
-              fontWeight: '700',
-              cursor: 'pointer',
-              transition: 'background 0.2s',
-            }}
-          >
+      <div className="fv-toolbar">
+        <form onSubmit={onBuscar} className="fv-search-form">
+          <label className="fv-search-label">
+            <span>Placa</span>
+            <span className="fv-search-input">
+              <Search size={17} aria-hidden="true" />
+              <input type="text" placeholder="Ej. ABC123" maxLength={6}
+                value={placaBusqueda}
+                onChange={(e) => setPlacaBusqueda(e.target.value.replace(/[^a-zA-Z0-9]/g, '').toUpperCase())}
+                style={inputBusquedaStyle} />
+            </span>
+          </label>
+          <button type="submit" disabled={cargando} className="fv-button fv-primary">
             {cargando ? 'Buscando...' : 'Buscar'}
           </button>
         </form>
-
         {puedeCrear && (
-          <div
-            style={{
-              display: 'flex',
-              gap: '10px',
-              borderLeft: '1px solid #334155',
-              paddingLeft: '12px',
-            }}
-          >
+          <div className="fv-new-actions">
             {onAbrirCrearCliente && (
-              <button
-                onClick={onAbrirCrearCliente}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  backgroundColor: 'rgba(37, 99, 235, 0.15)',
-                  color: '#60A5FA',
-                  border: '1px solid rgba(37, 99, 235, 0.4)',
-                  borderRadius: '12px',
-                  padding: '10px 16px',
-                  fontSize: '13px',
-                  fontWeight: '700',
-                  cursor: 'pointer',
-                }}
-              >
-                <UserPlus size={16} />
-                Nuevo Cliente
+              <button onClick={onAbrirCrearCliente} className="fv-button">
+                <UserPlus size={16} /> Nuevo cliente
               </button>
             )}
-
-            <button
-              onClick={onAbrirCrear}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                backgroundColor: 'rgba(16, 185, 129, 0.15)',
-                color: '#34D399',
-                border: '1px solid rgba(16, 185, 129, 0.4)',
-                borderRadius: '12px',
-                padding: '10px 16px',
-                fontSize: '13px',
-                fontWeight: '700',
-                cursor: 'pointer',
-              }}
-            >
-              <Plus size={16} />
-              Nuevo Vehículo
+            <button onClick={onAbrirCrear} className="fv-button">
+              <Plus size={16} /> Nuevo vehículo
             </button>
           </div>
         )}
       </div>
-    </div>
+    </header>
   );
 };

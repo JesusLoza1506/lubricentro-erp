@@ -1,3 +1,4 @@
+import './vehiculoVisual.css';
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { vehiculoService } from '../../services/vehiculoService';
@@ -316,7 +317,7 @@ export const FichaVehicularPage: React.FC<FichaVehicularPageProps> = ({
     .map((ot) => Number(ot.zanja));
 
   return (
-    <div style={pageContainerStyle}>
+    <div className="fv-page" style={pageContainerStyle}>
       {notificacion && (
         <ToastNotification
           mensaje={notificacion.mensaje}
@@ -329,10 +330,10 @@ export const FichaVehicularPage: React.FC<FichaVehicularPageProps> = ({
       <div
         style={{
           display: 'flex',
-          gap: '12px',
-          marginBottom: '16px',
+          gap: '6px',
+          marginBottom: '0px',
           borderBottom: '1px solid #334155',
-          paddingBottom: '8px',
+          paddingBottom: '0px',
         }}
       >
         <button
@@ -342,10 +343,11 @@ export const FichaVehicularPage: React.FC<FichaVehicularPageProps> = ({
             alignItems: 'center',
             gap: '8px',
             padding: '10px 18px',
-            backgroundColor: pestanaActiva === 'FICHA' ? '#2563EB' : 'transparent',
+            backgroundColor: 'transparent',
+            borderBottom: pestanaActiva === 'FICHA' ? '2px solid #6DA5F0' : '2px solid transparent',
             color: pestanaActiva === 'FICHA' ? '#FFFFFF' : '#94A3B8',
-            border: 'none',
-            borderRadius: '8px',
+            borderTop: 'none', borderLeft: 'none', borderRight: 'none',
+            borderRadius: '0px',
             fontWeight: '700',
             fontSize: '13px',
             cursor: 'pointer',
@@ -362,10 +364,11 @@ export const FichaVehicularPage: React.FC<FichaVehicularPageProps> = ({
               alignItems: 'center',
               gap: '8px',
               padding: '10px 18px',
-              backgroundColor: pestanaActiva === 'PROXIMOS_CAMBIOS' ? '#2563EB' : 'transparent',
+              backgroundColor: 'transparent',
+              borderBottom: pestanaActiva === 'PROXIMOS_CAMBIOS' ? '2px solid #6DA5F0' : '2px solid transparent',
               color: pestanaActiva === 'PROXIMOS_CAMBIOS' ? '#FFFFFF' : '#94A3B8',
-              border: 'none',
-              borderRadius: '8px',
+              borderTop: 'none', borderLeft: 'none', borderRight: 'none',
+              borderRadius: '0px',
               fontWeight: '700',
               fontSize: '13px',
               cursor: 'pointer',
@@ -431,6 +434,17 @@ export const FichaVehicularPage: React.FC<FichaVehicularPageProps> = ({
                 }}
               >
                 <FichaVehicularInfo
+                  accionesVehiculo={
+                    <>
+                      {puedeCrearOT && vehiculo.activo === 1 && (
+                <div className="fv-create-order">
+                  <button onClick={() => setModalCrearOTAbierto(true)} style={btnCrearOTStyle}>
+                    + Crear OT para {vehiculo.placa}
+                  </button>
+                </div>
+              )}
+                    </>
+                  }
                   vehiculo={vehiculo}
                   puedeEditar={puedeEditar}
                   puedeEliminar={puedeEliminar}
@@ -444,13 +458,7 @@ export const FichaVehicularPage: React.FC<FichaVehicularPageProps> = ({
                 />
               </div>
 
-              {puedeCrearOT && vehiculo.activo === 1 && (
-                <div style={{ display: 'flex', justifyContent: 'flex-end', margin: '4px 0 8px 0' }}>
-                  <button onClick={() => setModalCrearOTAbierto(true)} style={btnCrearOTStyle}>
-                    + Crear OT para {vehiculo.placa}
-                  </button>
-                </div>
-              )}
+
 
               <FichaVehicularHistorial
                 historial={historial}
@@ -570,5 +578,5 @@ const btnCrearOTStyle: React.CSSProperties = {
   fontWeight: '700',
   fontSize: '13px',
   cursor: 'pointer',
-  boxShadow: '0 4px 12px rgba(37, 99, 235, 0.3)',
+  boxShadow: 'none',
 };

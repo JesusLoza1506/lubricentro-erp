@@ -25,6 +25,7 @@ interface Props {
   onAbrirEliminar: () => void;
   onAbrirReactivar: () => void;
   onAbrirModalCliente?: () => void;
+  accionesVehiculo?: React.ReactNode;
 }
 
 export const FichaVehicularInfo: React.FC<Props> = ({
@@ -35,6 +36,7 @@ export const FichaVehicularInfo: React.FC<Props> = ({
   onAbrirEliminar,
   onAbrirReactivar,
   onAbrirModalCliente,
+  accionesVehiculo,
 }) => {
   const tipoDoc = vehiculo.cliente?.tipo_documento || vehiculo.tipo_documento_cliente || 'DNI';
   const numDoc = vehiculo.cliente?.numero_documento || vehiculo.documento_cliente;
@@ -44,345 +46,59 @@ export const FichaVehicularInfo: React.FC<Props> = ({
   const esActivo = vehiculo.activo === 1;
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', width: '100%' }}>
-      {/* BANNER DE ESTADO INACTIVO */}
+    <section className="fv-info">
       {!esActivo && (
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '12px',
-            padding: '12px 18px',
-            backgroundColor: 'rgba(239, 68, 68, 0.15)',
-            border: '1px solid rgba(239, 68, 68, 0.4)',
-            borderRadius: '12px',
-            color: '#FCA5A5',
-          }}
-        >
-          <ShieldAlert size={20} color="#EF4444" />
-          <span style={{ fontSize: '13px', fontWeight: '600' }}>
-            Este vehículo se encuentra actualmente <strong>DESACTIVADO</strong>. No se pueden
-            generar nuevas Órdenes de Trabajo hasta que un Administrador lo reactive.
-          </span>
+        <div className="fv-inactive" role="status">
+          <ShieldAlert size={20} />
+          <span>Este vehículo se encuentra actualmente <strong>DESACTIVADO</strong>. No se pueden
+            generar nuevas Órdenes de Trabajo hasta que un Administrador lo reactive.</span>
         </div>
       )}
-
-      {/* TARJETA UNIFICADA DE PROPIETARIO Y ACCIONES */}
-      <div
-        style={{
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '14px',
-          padding: '18px 22px',
-          backgroundColor: 'rgba(15, 23, 42, 0.7)',
-          border: '1px solid #334155',
-          borderRadius: '16px',
-        }}
-      >
-        <div
-          style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            flexWrap: 'wrap',
-            gap: '12px',
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <div
-              style={{
-                padding: '8px',
-                backgroundColor: 'rgba(56, 189, 248, 0.1)',
-                borderRadius: '10px',
-              }}
-            >
-              <User size={18} color="#38BDF8" />
-            </div>
+      <div className="fv-summary">
+        <div className="fv-vehicle-heading">
+          <div className="fv-vehicle-identity">
+            <span className="fv-vehicle-icon"><Car size={24} /></span>
             <div>
-              <span
-                style={{
-                  fontSize: '11px',
-                  color: '#94A3B8',
-                  fontWeight: '600',
-                  textTransform: 'uppercase',
-                }}
-              >
-                Propietario Registrado
-              </span>
-              <h4
-                style={{
-                  fontSize: '15px',
-                  fontWeight: '800',
-                  color: '#F8FAFC',
-                  margin: '2px 0 0 0',
-                }}
-              >
-                {vehiculo.cliente?.nombre_razon_social ||
-                  vehiculo.nombre_cliente ||
-                  'Sin Cliente Asociado'}
-              </h4>
+              <span className="fv-eyebrow">Vehículo</span>
+              <h3><span className="fv-plate">{vehiculo.placa}</span><span className="fv-vehicle-model">{vehiculo.marca} {vehiculo.modelo}</span></h3>
             </div>
           </div>
-
-          {/* DATOS DE CONTACTO EN FILA LIMPIA */}
-          <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
-            {numDoc && (
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  fontSize: '13px',
-                  color: '#CBD5E1',
-                }}
-              >
-                <FileText size={14} color="#C084FC" />
-                <span>
-                  {tipoDoc}: <strong>{numDoc}</strong>
-                </span>
-              </div>
-            )}
-            {telefono && (
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  fontSize: '13px',
-                  color: '#34D399',
-                }}
-              >
-                <Phone size={14} />
-                <span>{telefono}</span>
-              </div>
-            )}
-            {correo && (
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  fontSize: '13px',
-                  color: '#38BDF8',
-                }}
-              >
-                <Mail size={14} />
-                <span>{correo}</span>
-              </div>
-            )}
-          </div>
+          {accionesVehiculo}
         </div>
-
-        {direccion && (
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              fontSize: '13px',
-              color: '#FBBF24',
-              paddingTop: '4px',
-              borderTop: '1px dashed rgba(51, 65, 85, 0.6)',
-            }}
-          >
-            <MapPin size={14} />
-            <span>Dirección: {direccion}</span>
+        <div className="fv-specs">
+          <div><Gauge size={17} /><span>Kilometraje actual</span><strong>{(vehiculo.kilometraje_actual ?? 0).toLocaleString()} km</strong></div>
+          <div><Wrench size={17} /><span>Motor</span><strong>{vehiculo.tipo_motor || 'No especificado'}</strong></div>
+          <div><Calendar size={17} /><span>Año</span><strong>{vehiculo.anio || 'N/A'}</strong></div>
+        </div>
+        <div className="fv-owner">
+          <div className="fv-owner-name">
+            <User size={18} />
+            <div><span className="fv-eyebrow">Propietario registrado</span>
+              <h4>{vehiculo.cliente?.nombre_razon_social || vehiculo.nombre_cliente || 'Sin Cliente Asociado'}</h4>
+            </div>
           </div>
-        )}
-
-        {/* BOTONES DE GESTIÓN DEL CLIENTE / FICHA */}
-        <div
-          style={{
-            display: 'flex',
-            gap: '10px',
-            justifyContent: 'flex-end',
-            paddingTop: '8px',
-            borderTop: '1px solid rgba(51, 65, 85, 0.5)',
-          }}
-        >
+          <div className="fv-contact">
+            {numDoc && (<span><FileText size={14} />{tipoDoc}: <strong>{numDoc}</strong></span>)}
+            {telefono && (<span><Phone size={14} />{telefono}</span>)}
+            {correo && (<span><Mail size={14} />{correo}</span>)}
+          </div>
+          {direccion && (<p className="fv-address"><MapPin size={14} /><span>Dirección: {direccion}</span></p>)}
+        </div>
+        <div className="fv-record-actions">
           {puedeEditar && esActivo && onAbrirModalCliente && (
-            <button
-              onClick={onAbrirModalCliente}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-                padding: '7px 12px',
-                backgroundColor: 'rgba(56, 189, 248, 0.1)',
-                color: '#38BDF8',
-                border: '1px solid rgba(56, 189, 248, 0.3)',
-                borderRadius: '8px',
-                fontSize: '12px',
-                fontWeight: '700',
-                cursor: 'pointer',
-              }}
-            >
-              <UserCheck size={14} /> Gestión Cliente
-            </button>
+            <button onClick={onAbrirModalCliente} className="fv-button fv-small"><UserCheck size={14} />Gestionar cliente</button>
           )}
-
           {puedeEditar && esActivo && (
-            <button
-              onClick={onAbrirEditar}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-                padding: '7px 12px',
-                backgroundColor: 'rgba(251, 191, 36, 0.1)',
-                color: '#FBBF24',
-                border: '1px solid rgba(251, 191, 36, 0.3)',
-                borderRadius: '8px',
-                fontSize: '12px',
-                fontWeight: '700',
-                cursor: 'pointer',
-              }}
-            >
-              <Pencil size={14} /> Editar Ficha
-            </button>
+            <button onClick={onAbrirEditar} className="fv-button fv-small"><Pencil size={14} />Editar ficha</button>
           )}
-
           {puedeEliminar && esActivo && (
-            <button
-              onClick={onAbrirEliminar}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-                padding: '7px 12px',
-                backgroundColor: 'rgba(239, 68, 68, 0.1)',
-                color: '#EF4444',
-                border: '1px solid rgba(239, 68, 68, 0.3)',
-                borderRadius: '8px',
-                fontSize: '12px',
-                fontWeight: '700',
-                cursor: 'pointer',
-              }}
-            >
-              <Trash2 size={14} /> Desactivar
-            </button>
+            <button onClick={onAbrirEliminar} className="fv-button fv-small fv-danger"><Trash2 size={14} />Desactivar</button>
           )}
-
           {puedeEliminar && !esActivo && (
-            <button
-              onClick={onAbrirReactivar}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-                padding: '7px 12px',
-                backgroundColor: 'rgba(52, 211, 153, 0.1)',
-                color: '#34D399',
-                border: '1px solid rgba(52, 211, 153, 0.3)',
-                borderRadius: '8px',
-                fontSize: '12px',
-                fontWeight: '700',
-                cursor: 'pointer',
-              }}
-            >
-              <RotateCcw size={14} /> Reactivar Vehículo
-            </button>
+            <button onClick={onAbrirReactivar} className="fv-button fv-small fv-positive"><RotateCcw size={14} />Reactivar vehículo</button>
           )}
         </div>
       </div>
-
-      {/* TARJETAS TÉCNICAS DEL VEHÍCULO */}
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-          gap: '16px',
-          padding: '20px 24px',
-          backgroundColor: 'rgba(15, 23, 42, 0.6)',
-          border: '1px solid #334155',
-          borderRadius: '16px',
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-          <div
-            style={{
-              padding: '12px',
-              backgroundColor: 'rgba(56, 189, 248, 0.1)',
-              borderRadius: '12px',
-            }}
-          >
-            <Car size={22} color="#38BDF8" />
-          </div>
-          <div>
-            <span style={{ fontSize: '12px', color: '#94A3B8', fontWeight: '600' }}>Vehículo</span>
-            <h4
-              style={{ fontSize: '16px', fontWeight: '800', color: '#F8FAFC', margin: '2px 0 0 0' }}
-            >
-              {vehiculo.marca} {vehiculo.modelo}
-            </h4>
-            <span style={{ fontSize: '12px', color: '#C084FC', fontWeight: '700' }}>
-              Placa: {vehiculo.placa}
-            </span>
-          </div>
-        </div>
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-          <div
-            style={{
-              padding: '12px',
-              backgroundColor: 'rgba(251, 191, 36, 0.1)',
-              borderRadius: '12px',
-            }}
-          >
-            <Gauge size={22} color="#FBBF24" />
-          </div>
-          <div>
-            <span style={{ fontSize: '12px', color: '#94A3B8', fontWeight: '600' }}>
-              Kilometraje Actual
-            </span>
-            <h4
-              style={{ fontSize: '16px', fontWeight: '800', color: '#F8FAFC', margin: '2px 0 0 0' }}
-            >
-              {(vehiculo.kilometraje_actual ?? 0).toLocaleString()} km
-            </h4>
-          </div>
-        </div>
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-          <div
-            style={{
-              padding: '12px',
-              backgroundColor: 'rgba(52, 211, 153, 0.1)',
-              borderRadius: '12px',
-            }}
-          >
-            <Wrench size={22} color="#34D399" />
-          </div>
-          <div>
-            <span style={{ fontSize: '12px', color: '#94A3B8', fontWeight: '600' }}>Motor</span>
-            <h4
-              style={{ fontSize: '16px', fontWeight: '800', color: '#F8FAFC', margin: '2px 0 0 0' }}
-            >
-              {vehiculo.tipo_motor || 'No especificado'}
-            </h4>
-          </div>
-        </div>
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-          <div
-            style={{
-              padding: '12px',
-              backgroundColor: 'rgba(168, 85, 247, 0.1)',
-              borderRadius: '12px',
-            }}
-          >
-            <Calendar size={22} color="#A855F7" />
-          </div>
-          <div>
-            <span style={{ fontSize: '12px', color: '#94A3B8', fontWeight: '600' }}>Año</span>
-            <h4
-              style={{ fontSize: '16px', fontWeight: '800', color: '#F8FAFC', margin: '2px 0 0 0' }}
-            >
-              {vehiculo.anio || 'N/A'}
-            </h4>
-          </div>
-        </div>
-      </div>
-    </div>
+    </section>
   );
 };

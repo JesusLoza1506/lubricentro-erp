@@ -41,71 +41,37 @@ export const FichaVehicularHistorial: React.FC<Props> = ({
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', marginTop: '8px' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <h3 style={{ fontSize: '18px', fontWeight: '700', color: '#F8FAFC', margin: 0 }}>
-          Historial de Mantenimientos ({historial.length})
-        </h3>
-        {totalPaginas > 1 && (
-          <span style={{ fontSize: '12px', color: '#94A3B8', fontWeight: '600' }}>
-            Página {paginaActual} de {totalPaginas}
-          </span>
-        )}
-      </div>
-
+    <section className="fv-history">
+      <div className="fv-section-title"><h3>Historial de mantenimientos <span>({historial.length})</span></h3><span className="fv-page-size">20 registros por página</span></div>
       {historial.length === 0 ? (
-        <div
-          style={{
-            padding: '32px',
-            textAlign: 'center',
-            backgroundColor: 'rgba(15, 23, 42, 0.4)',
-            border: '1px dashed #334155',
-            borderRadius: '16px',
-            color: '#94A3B8',
-            fontSize: '14px',
-          }}
-        >
-          Este vehículo no tiene mantenimientos registrados.
-        </div>
+        <div className="fv-list-empty">Este vehículo no tiene mantenimientos registrados.</div>
       ) : (
         <>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            {historialPaginado.map((ot) => (
-              <div
-                key={ot.id_ot}
-                style={{
-                  padding: '18px 22px',
-                  backgroundColor: 'rgba(15, 23, 42, 0.6)',
-                  border: '1px solid #334155',
-                  borderRadius: '14px',
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  flexWrap: 'wrap',
-                  gap: '16px',
-                }}
-              >
-                <div
-                  style={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '6px',
-                    flex: '1',
-                    minWidth: '260px',
-                  }}
-                >
-                  <div
-                    style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}
-                  >
-                    <span style={{ fontSize: '15px', fontWeight: '800', color: '#38BDF8' }}>
-                      {ot.codigo_ot}
-                    </span>
-                    <span
-                      style={{
-                        fontSize: '11px',
-                        fontWeight: '700',
-                        padding: '2px 8px',
-                        borderRadius: '8px',
+          <div className="fv-pagination">
+              <span>Mostrando {inicioIndice + 1}–{Math.min(inicioIndice + ELEMENTOS_POR_PAGINA, historial.length)} de {historial.length}</span>
+              {totalPaginas > 1 && (
+                <div className="fv-pagination-controls">
+                  <button onClick={handlePaginaAnterior} disabled={paginaActual === 1} className="fv-button fv-small"><ChevronLeft size={16} />Anterior</button>
+                  <span>Página <strong>{paginaActual}</strong> de <strong>{totalPaginas}</strong></span>
+                  <button onClick={handlePaginaSiguiente} disabled={paginaActual === totalPaginas} className="fv-button fv-small">Siguiente<ChevronRight size={16} /></button>
+                </div>
+              )}
+            </div>
+          <div className="fv-table-scroll">
+            <table className="fv-history-table">
+              <thead><tr><th scope="col">Fecha / Orden</th><th scope="col">Observaciones / Aceite</th><th scope="col">Kilometraje</th><th scope="col">Estado</th><th scope="col">Acciones</th></tr></thead>
+              <tbody>
+                {historialPaginado.map((ot) => (
+                  <tr key={ot.id_ot}>
+                    <td><strong className="fv-order-code">{ot.codigo_ot}</strong><span className="fv-date"><Clock size={13} />{ot.fecha_ingreso ? new Date(ot.fecha_ingreso).toLocaleDateString('es-PE') : 'N/A'}</span></td>
+                    <td><p className="fv-observation" title={ot.observaciones || 'Sin observaciones registradas.'}>{ot.observaciones || 'Sin observaciones registradas.'}</p>
+                      <div className="fv-inline-badges">
+                        {ot.tipo_aceite && (<span className="fv-oil"><Droplet size={12} />{ot.tipo_aceite}</span>)}
+                        {ot.corregido === 1 && (<span className="fv-corrected"><FilePenLine size={12} />CORREGIDO</span>)}
+                      </div>
+                    </td>
+                    <td className="fv-km-cell"><span>Ingreso: <strong>{(ot.kilometraje_ingreso ?? 0).toLocaleString()} km</strong></span><span>Próximo servicio: {ot.proximo_kilometraje !== null && ot.proximo_kilometraje !== undefined ? `${ot.proximo_kilometraje.toLocaleString()} km` : 'Sin cambio'}</span></td>
+                    <td><span className="fv-status" style={{
                         backgroundColor:
                           ot.estado === 'FINALIZADO'
                             ? 'rgba(52, 211, 153, 0.2)'
@@ -118,197 +84,30 @@ export const FichaVehicularHistorial: React.FC<Props> = ({
                             : ot.estado === 'EN_PROCESO'
                               ? '#FBBF24'
                               : '#94A3B8',
-                      }}
-                    >
-                      {ot.estado}
-                    </span>
-
-                    {ot.tipo_aceite && (
-                      <span
-                        style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '4px',
-                          fontSize: '11px',
-                          fontWeight: '600',
-                          padding: '2px 8px',
-                          borderRadius: '8px',
-                          backgroundColor: 'rgba(56, 189, 248, 0.15)',
-                          color: '#38BDF8',
-                          border: '1px solid rgba(56, 189, 248, 0.3)',
-                        }}
-                      >
-                        <Droplet size={12} />
-                        {ot.tipo_aceite}
-                      </span>
-                    )}
-
-                    {ot.corregido === 1 && (
-                      <span
-                        style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '4px',
-                          fontSize: '11px',
-                          fontWeight: '700',
-                          padding: '2px 8px',
-                          borderRadius: '8px',
-                          backgroundColor: 'rgba(239, 68, 68, 0.15)',
-                          color: '#FCA5A5',
-                          border: '1px solid rgba(239, 68, 68, 0.3)',
-                        }}
-                      >
-                        <FilePenLine size={12} />
-                        CORREGIDO
-                      </span>
-                    )}
-                  </div>
-
-                  <p style={{ fontSize: '13px', color: '#E2E8F0', margin: 0 }}>
-                    {ot.observaciones || 'Sin observaciones registradas.'}
-                  </p>
-
-                  <div
-                    style={{
-                      display: 'flex',
-                      gap: '12px',
-                      fontSize: '12px',
-                      color: '#94A3B8',
-                      marginTop: '2px',
-                    }}
-                  >
-                    <span>Ingreso: {(ot.kilometraje_ingreso ?? 0).toLocaleString()} km</span>
-                    <span>•</span>
-                    <span>
-                      Próximo servicio:{' '}
-                      {ot.proximo_kilometraje !== null && ot.proximo_kilometraje !== undefined
-                        ? `${ot.proximo_kilometraje.toLocaleString()} km`
-                        : 'Sin cambio'}
-                    </span>
-                  </div>
-                </div>
-
-                <div
-                  style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}
-                >
-                  <div
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '6px',
-                      color: '#94A3B8',
-                      fontSize: '12px',
-                    }}
-                  >
-                    <Clock size={14} />
-                    {ot.fecha_ingreso
-                      ? new Date(ot.fecha_ingreso).toLocaleDateString('es-PE')
-                      : 'N/A'}
-                  </div>
-
-                  <button
-                    onClick={() => onVerDetalleOT(ot)}
-                    title="Ver Insumos / Detalle OT"
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '6px',
-                      padding: '7px 12px',
-                      backgroundColor: 'rgba(30, 41, 59, 0.8)',
-                      border: '1px solid #334155',
-                      borderRadius: '8px',
-                      color: '#38BDF8',
-                      fontSize: '12px',
-                      fontWeight: '600',
-                      cursor: 'pointer',
-                    }}
-                  >
-                    <Eye size={14} /> Detalle
-                  </button>
-
-                  {puedeCorregirOT && ot.estado === 'FINALIZADO' && onCorregirOT && (
-                    <button
-                      onClick={() => onCorregirOT(ot)}
-                      title="Corregir Historial de OT (Administrador)"
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '6px',
-                        padding: '7px 12px',
-                        backgroundColor: 'rgba(239, 68, 68, 0.15)',
-                        border: '1px solid rgba(239, 68, 68, 0.4)',
-                        borderRadius: '8px',
-                        color: '#FCA5A5',
-                        fontSize: '12px',
-                        fontWeight: '600',
-                        cursor: 'pointer',
-                      }}
-                    >
-                      <Wrench size={14} /> Corregir
-                    </button>
-                  )}
-                </div>
-              </div>
-            ))}
+                    }}>{ot.estado}</span></td>
+                    <td><div className="fv-row-actions">
+                      <button onClick={() => onVerDetalleOT(ot)} title="Ver Insumos / Detalle OT" className="fv-button fv-small"><Eye size={14} />Detalle</button>
+                      {puedeCorregirOT && ot.estado === 'FINALIZADO' && onCorregirOT && (
+                        <button onClick={() => onCorregirOT(ot)} title="Corregir Historial de OT (Administrador)" className="fv-button fv-small"><Wrench size={14} />Corregir</button>
+                      )}
+                    </div></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
-
-          {/* BARRA DE PAGINACIÓN */}
-          {totalPaginas > 1 && (
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'center',
-                alignItems: 'center',
-                gap: '16px',
-                marginTop: '12px',
-              }}
-            >
-              <button
-                onClick={handlePaginaAnterior}
-                disabled={paginaActual === 1}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '4px',
-                  padding: '6px 14px',
-                  backgroundColor: 'rgba(30, 41, 59, 0.8)',
-                  border: '1px solid #334155',
-                  borderRadius: '8px',
-                  color: paginaActual === 1 ? '#64748B' : '#F8FAFC',
-                  fontSize: '12px',
-                  fontWeight: '600',
-                  cursor: paginaActual === 1 ? 'not-allowed' : 'pointer',
-                }}
-              >
-                <ChevronLeft size={16} /> Anterior
-              </button>
-              <span style={{ fontSize: '13px', color: '#94A3B8' }}>
-                Página <strong style={{ color: '#F8FAFC' }}>{paginaActual}</strong> de{' '}
-                <strong style={{ color: '#F8FAFC' }}>{totalPaginas}</strong>
-              </span>
-              <button
-                onClick={handlePaginaSiguiente}
-                disabled={paginaActual === totalPaginas}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '4px',
-                  padding: '6px 14px',
-                  backgroundColor: 'rgba(30, 41, 59, 0.8)',
-                  border: '1px solid #334155',
-                  borderRadius: '8px',
-                  color: paginaActual === totalPaginas ? '#64748B' : '#F8FAFC',
-                  fontSize: '12px',
-                  fontWeight: '600',
-                  cursor: paginaActual === totalPaginas ? 'not-allowed' : 'pointer',
-                }}
-              >
-                Siguiente <ChevronRight size={16} />
-              </button>
+          <div className="fv-pagination">
+              <span>Mostrando {inicioIndice + 1}–{Math.min(inicioIndice + ELEMENTOS_POR_PAGINA, historial.length)} de {historial.length}</span>
+              {totalPaginas > 1 && (
+                <div className="fv-pagination-controls">
+                  <button onClick={handlePaginaAnterior} disabled={paginaActual === 1} className="fv-button fv-small"><ChevronLeft size={16} />Anterior</button>
+                  <span>Página <strong>{paginaActual}</strong> de <strong>{totalPaginas}</strong></span>
+                  <button onClick={handlePaginaSiguiente} disabled={paginaActual === totalPaginas} className="fv-button fv-small">Siguiente<ChevronRight size={16} /></button>
+                </div>
+              )}
             </div>
-          )}
         </>
       )}
-    </div>
+    </section>
   );
 };

@@ -158,6 +158,10 @@ _Registro o edición del vehículo_
 
 ![Formulario de registro o edición del vehículo](docs/images/ficha-vehicular-registro.png)
 
+_Próximos cambios de aceite_
+
+![Próximos cambios de aceite](docs/images/ficha-vehicular-proximos-cambios-aceite.png)
+
 **Validaciones relacionadas:** la ejecución de pruebas compartida registró seis casos satisfactorios en [vehiculo_tests.rs](src-tauri/tests/vehiculo_tests.rs), sobre registro, actualización, consulta de ficha, permisos y desactivación con o sin OT abierta.
 
 **Pendiente para cerrar:** reforzar las confirmaciones de guardado, ajustar la recepción de OT y priorizar las atenciones más antiguas en próximos cambios de aceite.
