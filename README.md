@@ -45,18 +45,18 @@
 
 Desarrollo secuencial, módulo por módulo, conforme al alcance funcional v7. La última revisión sitúa **Login y Sesión en 95/100** y **Ficha Vehicular e Historial en 93/100**, ambos en ajustes finales. **El siguiente foco de desarrollo es Órdenes de Trabajo Taller, con un avance estimado del 45 %.** Inicio Dashboard se desarrollará al final para integrar datos de los demás módulos.
 
-| Orden | Módulo | Estado | Evaluación | Avance estimado |
-| --- | --- | --- | --- | --- |
-| 01 | [Login y Sesión](#modulo-login-y-sesion) | 🟢 Ajustes finales | 95/100 | — |
-| 02 | [Ficha Vehicular e Historial](#modulo-ficha-vehicular-e-historial) | 🟢 Ajustes finales | 93/100 | — |
-| 03 | Órdenes de Trabajo Taller | 🟡 En curso · siguiente foco | — | ~45 % |
-| 04 | Inventario y Stock | ⚪ Pendiente de revisión y adaptación | — | — |
-| 05 | Punto de Venta POS | ⚪ Pendiente | — | — |
-| 06 | Caja Chica | ⚪ Pendiente | — | — |
-| 07 | Backup y Copias | ⚪ Pendiente | — | — |
-| 08 | Administración | ⚪ Pendiente | — | — |
-| 09 | Reportes | ⚪ Pendiente | — | — |
-| 10 | Inicio Dashboard | ⚪ Pendiente; se desarrollará al final | — | — |
+| Orden | Módulo                                                             | Estado                                 | Evaluación | Avance estimado |
+| ----- | ------------------------------------------------------------------ | -------------------------------------- | ---------- | --------------- |
+| 01    | [Login y Sesión](#modulo-login-y-sesion)                           | 🟢 Ajustes finales                     | 95/100     | —               |
+| 02    | [Ficha Vehicular e Historial](#modulo-ficha-vehicular-e-historial) | 🟢 Ajustes finales                     | 93/100     | —               |
+| 03    | Órdenes de Trabajo Taller                                          | 🟡 En curso · siguiente foco           | —          | ~45 %           |
+| 04    | Inventario y Stock                                                 | ⚪ Pendiente de revisión y adaptación  | —          | —               |
+| 05    | Punto de Venta POS                                                 | ⚪ Pendiente                           | —          | —               |
+| 06    | Caja Chica                                                         | ⚪ Pendiente                           | —          | —               |
+| 07    | Backup y Copias                                                    | ⚪ Pendiente                           | —          | —               |
+| 08    | Administración                                                     | ⚪ Pendiente                           | —          | —               |
+| 09    | Reportes                                                           | ⚪ Pendiente                           | —          | —               |
+| 10    | Inicio Dashboard                                                   | ⚪ Pendiente; se desarrollará al final | —          | —               |
 
 **Leyenda:** ⚪ Pendiente · 🟡 En curso · 🟢 Ajustes finales · ✅ Completado.
 
@@ -99,7 +99,7 @@ Desarrollo secuencial, módulo por módulo, conforme al alcance funcional v7. La
 | Cajero                  | Sesión propia, cambio de clave y módulos autorizados.                                                   |
 | Instalación sin cuentas | Creación exclusiva del primer administrador.                                                            |
 
-Se requiere cuenta activa y completar el cambio obligatorio antes de operar. Las contraseñas se protegen mediante hashes Argon2id.
+Se requiere una cuenta activa y completar el cambio obligatorio antes de operar. Las contraseñas se protegen mediante hashes Argon2id.
 
 **Capturas:**
 
@@ -158,11 +158,11 @@ _Cambio de contraseña_
 
 **Acceso por rol:**
 
-| Rol | Alcance |
-| --- | --- |
+| Rol           | Alcance                                                                                                                          |
+| ------------- | -------------------------------------------------------------------------------------------------------------------------------- |
 | Administrador | Gestión de ficha, cambio de placa o propietario, reducción de kilometraje, correcciones y desactivación/reactivación con motivo. |
-| Cajero | Registro, edición de datos comunes y consulta autorizada. |
-| Mecánico | Consulta de información pública del vehículo y sus atenciones, sin contactos del propietario. |
+| Cajero        | Registro, edición de datos comunes y consulta autorizada.                                                                        |
+| Mecánico      | Consulta de información pública del vehículo y sus atenciones, sin contactos del propietario.                                    |
 
 **Capturas:**
 
