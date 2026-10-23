@@ -107,23 +107,13 @@ export const FichaVehicularInfo: React.FC<Props> = ({
 
         {/* TARJETAS DE RESUMEN RÁPIDO */}
         {(ultimoServicio || ultimoCambioAceite) && (
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: '1fr 1fr',
-              gap: '12px',
-              padding: '12px',
-              backgroundColor: 'rgba(15, 23, 42, 0.6)',
-              borderRadius: '12px',
-              border: '1px solid #334155',
-            }}
-          >
+          <div className="fv-recent-summary">
             {ultimoServicio && (
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                 <CheckCircle2 size={20} color="#34D399" />
                 <div>
                   <span style={{ fontSize: '11px', color: '#94A3B8', display: 'block' }}>
-                    Último Servicio
+                    Última atención
                   </span>
                   <strong style={{ fontSize: '13px', color: '#F8FAFC' }}>
                     {ultimoServicio.codigo_ot} (
@@ -137,7 +127,7 @@ export const FichaVehicularInfo: React.FC<Props> = ({
                 <Droplet size={20} color="#38BDF8" />
                 <div>
                   <span style={{ fontSize: '11px', color: '#94A3B8', display: 'block' }}>
-                    Último Cambio de Aceite
+                    Próximo cambio de aceite
                   </span>
                   <strong style={{ fontSize: '13px', color: '#F8FAFC' }}>
                     {ultimoCambioAceite.tipo_aceite || 'APLICADO'} (

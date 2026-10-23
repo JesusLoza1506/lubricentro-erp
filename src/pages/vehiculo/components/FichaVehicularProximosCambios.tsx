@@ -3,7 +3,6 @@ import { ProximoCambioAceiteDTO } from '../../../types/vehiculo';
 import { vehiculoService } from '../../../services/vehiculoService';
 import {
   Calendar,
-  Gauge,
   Phone,
   Droplet,
   ArrowRight,
@@ -257,169 +256,23 @@ export const FichaVehicularProximosCambios: React.FC<Props> = ({
           }}
         >
           {lista.map((item) => (
-            <div
-              className="fv-upcoming-card"
-              key={`${item.id_vehiculo}-${item.id_ot}`}
-              style={{
-                padding: '16px',
-                backgroundColor: 'rgba(15, 23, 42, 0.6)',
-                border: '1px solid #334155',
-                borderRadius: '14px',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '10px',
-              }}
-            >
-              <div
-                style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'flex-start',
-                  flexWrap: 'wrap',
-                  gap: '8px',
-                }}
-              >
-                <div>
-                  <span style={{ fontSize: '18px', fontWeight: '700', color: '#F8FAFC' }}>
-                    {item.placa}
-                  </span>
-                  <p
-                    style={{
-                      margin: '2px 0 0 0',
-                      fontSize: '13px',
-                      color: '#94A3B8',
-                      fontWeight: '600',
-                    }}
-                  >
-                    {item.nombre_razon_social}
-                  </p>
-                </div>
-                <span
-                  style={{
-                    fontSize: '11px',
-                    fontWeight: '700',
-                    padding: '3px 8px',
-                    borderRadius: '8px',
-                    backgroundColor:
-                      item.causa === 'AMBOS' ? 'rgba(239, 68, 68, 0.2)' : 'rgba(251, 191, 36, 0.2)',
-                    color: item.causa === 'AMBOS' ? '#EF4444' : '#FBBF24',
-                    border:
-                      item.causa === 'AMBOS'
-                        ? '1px solid rgba(239, 68, 68, 0.4)'
-                        : '1px solid rgba(251, 191, 36, 0.4)',
-                  }}
-                >
-                  {item.causa === 'POR_KM'
-                    ? 'VENCIMIENTO KM'
-                    : item.causa === 'POR_FECHA'
-                      ? 'VENCIMIENTO FECHA'
-                      : 'KM Y FECHA CRÍTICOS'}
-                </span>
+            <article className="fv-upcoming-card" key={`${item.id_vehiculo}-${item.id_ot}`}>
+              <div className="fv-upcoming-card-heading">
+                <div><strong className="fv-upcoming-plate">{item.placa}</strong><p>{item.nombre_razon_social}</p></div>
+                <span className="fv-upcoming-cause">{item.causa === 'POR_KM' ? 'Por kilometraje' : item.causa === 'POR_FECHA' ? 'Por fecha' : 'Por km y fecha'}</span>
               </div>
-
-              <div
-                style={{
-                  padding: '10px 12px',
-                  backgroundColor: 'rgba(30, 41, 59, 0.5)',
-                  borderRadius: '10px',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '6px',
-                  fontSize: '12px',
-                }}
-              >
-                <div
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    flexWrap: 'wrap',
-                    gap: '6px',
-                    color: '#CBD5E1',
-                  }}
-                >
-                  <Gauge size={14} color="#94A3B8" />
-                  <span>
-                    Km Actual: <strong>{(item.kilometraje_actual ?? 0).toLocaleString()} km</strong>
-                  </span>
-                  {item.km_proximo !== null && item.km_proximo !== undefined && (
-                    <span style={{ color: '#94A3B8' }}>
-                      (Próx: {item.km_proximo.toLocaleString()} km)
-                    </span>
-                  )}
-                </div>
-
-                <div
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    flexWrap: 'wrap',
-                    gap: '6px',
-                    color: '#CBD5E1',
-                  }}
-                >
-                  <Calendar size={14} color="#94A3B8" />
-                  <span>
-                    Último Servicio:{' '}
-                    {item.fecha_servicio
-                      ? new Date(item.fecha_servicio).toLocaleDateString('es-PE')
-                      : 'N/A'}
-                  </span>
-                </div>
-
-                {item.tipo_aceite && (
-                  <div
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      flexWrap: 'wrap',
-                      gap: '6px',
-                      color: '#CBD5E1',
-                    }}
-                  >
-                    <Droplet size={14} color="#94A3B8" />
-                    <span>
-                      Aceite: {item.tipo_aceite} ({item.intervalo_aceite_km || 0} km)
-                    </span>
-                  </div>
-                )}
-
-                {item.telefono && (
-                  <div
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      flexWrap: 'wrap',
-                      gap: '6px',
-                      color: '#CBD5E1',
-                    }}
-                  >
-                    <Phone size={14} />
-                    <span>Teléfono: {item.telefono}</span>
-                  </div>
-                )}
+              <div className="fv-upcoming-mileage">
+                <div><span>Km actual</span><strong>{(item.kilometraje_actual ?? 0).toLocaleString()} <small>km</small></strong></div>
+                <ArrowRight size={16} aria-hidden="true" />
+                <div><span>Próximo cambio</span><strong>{item.km_proximo !== null && item.km_proximo !== undefined ? `${item.km_proximo.toLocaleString()} km` : 'No registrado'}</strong></div>
               </div>
-
-              <button
-                onClick={() => onSeleccionarPlaca(item.placa)}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '6px',
-                  width: '100%',
-                  padding: '8px 12px',
-                  backgroundColor: '#1B2A40',
-                  color: '#BDD5F4',
-                  border: '1px solid #35465D',
-                  borderRadius: '8px',
-                  fontSize: '13px',
-                  fontWeight: '700',
-                  cursor: 'pointer',
-                }}
-              >
-                Ver Ficha Vehicular <ArrowRight size={14} />
-              </button>
-            </div>
+              <div className="fv-upcoming-meta">
+                <span><Calendar size={14} />Fecha de servicio: {item.fecha_servicio ? new Date(item.fecha_servicio).toLocaleDateString('es-PE') : 'N/A'}</span>
+                {item.tipo_aceite && <span><Droplet size={14} />{item.tipo_aceite} · Intervalo: {item.intervalo_aceite_km || 0} km</span>}
+                {item.telefono && <span><Phone size={14} />{item.telefono}</span>}
+              </div>
+              <button onClick={() => onSeleccionarPlaca(item.placa)} className="fv-button fv-open-record">Ver ficha vehicular <ArrowRight size={15} /></button>
+            </article>
           ))}
         </div>
       )}

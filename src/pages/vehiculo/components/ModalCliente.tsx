@@ -124,8 +124,8 @@ export const ModalCliente: React.FC<ModalClienteProps> = ({
   };
 
   return (
-    <div style={overlayStyle}>
-      <div style={modalBoxStyle}>
+    <div className="fv-modal-overlay fv-existing-overlay" style={overlayStyle}>
+      <div className="fv-existing-form" style={modalBoxStyle}>
         <div
           style={{
             display: 'flex',

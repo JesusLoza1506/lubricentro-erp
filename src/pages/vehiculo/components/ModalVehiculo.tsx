@@ -272,8 +272,8 @@ export const ModalVehiculo: React.FC<ModalVehiculoProps> = ({
 
   return (
     <>
-      <div style={overlayStyle}>
-        <div style={modalBoxStyle}>
+      <div className="fv-modal-overlay fv-existing-overlay" style={overlayStyle}>
+        <div className="fv-existing-form" style={modalBoxStyle}>
           <div
             style={{
               display: 'flex',
@@ -607,8 +607,8 @@ export const ModalVehiculo: React.FC<ModalVehiculoProps> = ({
       </div>
 
       {confirmModalOpen && (
-        <div style={overlayStyle}>
-          <div style={{ ...modalBoxStyle, width: '420px', textAlign: 'center' }}>
+        <div className="fv-modal-overlay fv-existing-overlay" style={overlayStyle}>
+          <div className="fv-existing-form" style={{ ...modalBoxStyle, width: '420px', textAlign: 'center' }}>
             <h3
               style={{
                 fontSize: '18px',

@@ -5,7 +5,7 @@ import {
   Eye,
   Droplet,
   FilePenLine,
-  Wrench,
+  Pencil,
   ChevronLeft,
   ChevronRight,
   User,
@@ -101,16 +101,15 @@ export const FichaVehicularHistorial: React.FC<Props> = ({
               </div>
             )}
           </div>
-          <div className="fv-table-scroll" style={{ opacity: cargando ? 0.6 : 1 }}>
+          <div className="fv-table-scroll" aria-busy={cargando} tabIndex={0} role="region" aria-label="Historial de mantenimientos" style={{ opacity: cargando ? 0.6 : 1 }}>
             <table className="fv-history-table">
               <thead>
                 <tr>
-                  <th scope="col">Fecha Fin / Orden</th>
-                  <th scope="col">Resumen Público / Aceite</th>
-                  <th scope="col">Cliente Atendido</th>
+                  <th scope="col">Atención</th>
+                  <th scope="col">Trabajo realizado</th>
+                  <th scope="col">Cliente atendido</th>
                   <th scope="col">Kilometraje</th>
-                  <th scope="col">Estado</th>
-                  <th scope="col">Acciones</th>
+                  <th scope="col">Consultar / editar</th>
                 </tr>
               </thead>
               <tbody>
@@ -132,6 +131,7 @@ export const FichaVehicularHistorial: React.FC<Props> = ({
                           <Clock size={13} />
                           {formatearFechaHora(fechaAtencion)}
                         </span>
+                        <span className="fv-state-caption" data-state={ot.estado || 'FINALIZADO'}>{ot.estado || 'FINALIZADO'}</span>
                       </td>
                       <td>
                         <p className="fv-observation" title={resumenTexto}>
@@ -147,38 +147,20 @@ export const FichaVehicularHistorial: React.FC<Props> = ({
                           {ot.corregido === 1 && (
                             <span
                               className="fv-corrected"
-                              style={{ color: '#F59E0B', fontWeight: '700' }}
                             >
                               <FilePenLine size={12} />
-                              CORREGIDO
+                              Corregido
                             </span>
                           )}
                         </div>
                       </td>
                       <td>
-                        <div
-                          style={{
-                            display: 'flex',
-                            flexDirection: 'column',
-                            gap: '2px',
-                            fontSize: '12px',
-                          }}
-                        >
-                          <span
-                            style={{
-                              fontWeight: '600',
-                              color: '#F8FAFC',
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '4px',
-                            }}
-                          >
+                        <div className="fv-history-client">
+                          <span>
                             <User size={13} color="#94A3B8" /> {nombreClienteAtendido}
                           </span>
                           {docClienteAtendido && (
-                            <span
-                              style={{ color: '#94A3B8', fontSize: '11px', paddingLeft: '17px' }}
-                            >
+                            <span className="fv-client-document">
                               Doc: {docClienteAtendido}
                             </span>
                           )}
@@ -189,53 +171,32 @@ export const FichaVehicularHistorial: React.FC<Props> = ({
                           Salida: <strong>{kmSalida.toLocaleString()} km</strong>
                         </span>
                         <span>
-                          Próximo servicio:{' '}
+                          Próximo cambio:{' '}
                           {kmProx !== null && kmProx !== undefined
                             ? `${kmProx.toLocaleString()} km`
-                            : 'Sin cambio'}
-                        </span>
-                      </td>
-                      <td>
-                        <span
-                          className="fv-status"
-                          style={{
-                            backgroundColor:
-                              ot.estado === 'FINALIZADO' || !ot.estado
-                                ? 'rgba(52, 211, 153, 0.2)'
-                                : ot.estado === 'EN_PROCESO'
-                                  ? 'rgba(251, 191, 36, 0.2)'
-                                  : 'rgba(148, 163, 184, 0.2)',
-                            color:
-                              ot.estado === 'FINALIZADO' || !ot.estado
-                                ? '#34D399'
-                                : ot.estado === 'EN_PROCESO'
-                                  ? '#FBBF24'
-                                  : '#94A3B8',
-                          }}
-                        >
-                          {ot.estado || 'FINALIZADO'}
+                            : 'No registrado'}
                         </span>
                       </td>
                       <td>
                         <div className="fv-row-actions">
                           <button
                             onClick={() => onVerDetalleOT(ot)}
-                            title="Ver Insumos / Detalle Público OT"
-                            className="fv-button fv-small"
+                            title={`Ver atención ${ot.codigo_ot}`}
+                            className="fv-button fv-small fv-view-attention"
                           >
                             <Eye size={14} />
-                            Detalle
+                            Ver atención
                           </button>
                           {puedeCorregirOT &&
                             (ot.estado === 'FINALIZADO' || !ot.estado) &&
                             onCorregirOT && (
                               <button
                                 onClick={() => onCorregirOT(ot)}
-                                title="Corregir Historial de OT (Administrador)"
-                                className="fv-button fv-small"
+                                title="Corregir datos de esta atención (Administrador)"
+                                aria-label={`Corregir datos de ${ot.codigo_ot}`}
+                                className="fv-button fv-small fv-edit-attention"
                               >
-                                <Wrench size={14} />
-                                Corregir
+                                <Pencil size={14} />
                               </button>
                             )}
                         </div>

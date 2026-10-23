@@ -43,24 +43,24 @@
 
 ## 2. Estado del proyecto
 
-Desarrollo secuencial, módulo por módulo, conforme al alcance funcional v7. **Ficha Vehicular e Historial se encuentra al 95 %, en ajustes finales**. Inicio Dashboard se desarrollará al final para integrar los datos y resultados de los demás módulos.
+Desarrollo secuencial, módulo por módulo, conforme al alcance funcional v7. La última revisión sitúa **Login y Sesión en 95/100** y **Ficha Vehicular e Historial en 93/100**, ambos en ajustes finales. **El siguiente foco de desarrollo es Órdenes de Trabajo Taller, con un avance estimado del 45 %.** Inicio Dashboard se desarrollará al final para integrar datos de los demás módulos.
 
-| Orden | Módulo | Estado | Avance |
-| --- | --- | --- | --- |
-| 01 | [Login y Sesión](#modulo-login-y-sesion) | 🟢 Ajustes finales | ~95 % |
-| 02 | [Ficha Vehicular e Historial](#modulo-ficha-vehicular-e-historial) | 🟢 Ajustes finales | ~95 % |
-| 03 | Órdenes de Trabajo Taller | ⚪ Pendiente de revisión y adaptación | — |
-| 04 | Inventario y Stock | ⚪ Pendiente de revisión y adaptación | — |
-| 05 | Punto de Venta POS | ⚪ Pendiente | — |
-| 06 | Caja Chica | ⚪ Pendiente | — |
-| 07 | Backup y Copias | ⚪ Pendiente | — |
-| 08 | Administración | ⚪ Pendiente | — |
-| 09 | Reportes | ⚪ Pendiente | — |
-| 10 | Inicio Dashboard | ⚪ Pendiente; se desarrollará al final | — |
+| Orden | Módulo | Estado | Evaluación | Avance estimado |
+| --- | --- | --- | --- | --- |
+| 01 | [Login y Sesión](#modulo-login-y-sesion) | 🟢 Ajustes finales | 95/100 | — |
+| 02 | [Ficha Vehicular e Historial](#modulo-ficha-vehicular-e-historial) | 🟢 Ajustes finales | 93/100 | — |
+| 03 | Órdenes de Trabajo Taller | 🟡 En curso · siguiente foco | — | ~45 % |
+| 04 | Inventario y Stock | ⚪ Pendiente de revisión y adaptación | — | — |
+| 05 | Punto de Venta POS | ⚪ Pendiente | — | — |
+| 06 | Caja Chica | ⚪ Pendiente | — | — |
+| 07 | Backup y Copias | ⚪ Pendiente | — | — |
+| 08 | Administración | ⚪ Pendiente | — | — |
+| 09 | Reportes | ⚪ Pendiente | — | — |
+| 10 | Inicio Dashboard | ⚪ Pendiente; se desarrollará al final | — | — |
 
 **Leyenda:** ⚪ Pendiente · 🟡 En curso · 🟢 Ajustes finales · ✅ Completado.
 
-> El porcentaje estima implementación, no cobertura de pruebas. Las filas pendientes indican trabajo por completar o validar; puede existir código previo. Los roles, flujos y diagramas describen el alcance definido y no certifican que todo el sistema esté terminado.
+> **Evaluación**: los puntajes 95/100 y 93/100 reflejan implementación y alineación con los PDF de los módulos; no son porcentajes de avance ni acreditan la aprobación de todos los recorridos en escritorio. **Avance estimado**: el 45 % de Taller indica progreso de implementación, no cobertura de pruebas. Las filas pendientes pueden tener código previo. Los roles, flujos y diagramas describen el alcance definido.
 
 <a id="modulos"></a>
 
@@ -69,20 +69,26 @@ Desarrollo secuencial, módulo por módulo, conforme al alcance funcional v7. **
 <a id="modulo-login-y-sesion"></a>
 
 <details>
-<summary><b>01 · Login y Sesión</b> — 🟢 Ajustes finales · ~95 %</summary>
+<summary><b>01 · Login y Sesión</b> — 🟢 Ajustes finales · Evaluación: 95/100</summary>
 
 **Qué hace:** controla el acceso mediante cuentas individuales y mantiene la sesión del trabajador. Identifica su rol y reúne los flujos de primera instalación, cambio y recuperación de contraseña.
 
 **Funciones principales:**
 
-- Ingreso con usuario y contraseña y acceso al Dashboard según el rol.
-- Creación del primer administrador solo en una instalación sin cuentas, con código de recuperación.
-- Menú y operaciones autorizados para Administrador, Mecánico o Cajero, validados en backend.
-- Cambio voluntario de clave y cambio obligatorio de temporal por nueva contraseña y confirmación.
-- Recuperación administrativa con código; recuperación de trabajadores mediante administrador autorizado.
-- Bloqueo temporal de Login: cinco fallos consecutivos de una cuenta existente, durante 15 minutos.
-- Una sesión por aplicación y vencimiento tras 15 minutos de inactividad humana.
-- Cierre de sesión con aviso por captura sin guardar, sin cerrar caja ni cancelar trabajos automáticamente.
+- **Acceso individual:** identifica al trabajador, habilita los accesos de Administrador, Cajero o Mecánico y rechaza cuentas inactivas o bloqueadas.
+- **Primer administrador:** permite crearlo únicamente cuando no existen cuentas, con contraseña definitiva y código de recuperación.
+- **Cambio de contraseña:** admite cambio voluntario con la clave actual y exige reemplazar las temporales antes de operar, sin volver a pedir la temporal ya autenticada.
+- **Recuperación administrativa:** verifica el código vigente, cambia la contraseña y renueva el código para invalidar el anterior.
+- **Control de sesión:** una sesión por aplicación, vencimiento tras 15 minutos de inactividad y rechazo de acceso si la cuenta pierde vigencia. Salir no cierra caja ni cancela órdenes automáticamente.
+- **Protección de acceso:** bloqueo de 15 minutos tras cinco fallos consecutivos de una cuenta existente.
+- **Autorización administrativa:** comprueba credenciales desde la operación que las requiere y conserva la sesión del trabajador solicitante.
+
+**Fortalezas de implementación:**
+
+- Rust valida identidad, estado de sesión y restricciones; el control no depende solo de la interfaz.
+- Contraseñas protegidas con hashes **Argon2id**, sin almacenar claves en texto.
+- Instalación, cambio de contraseña y recuperación coordinados mediante transacciones y auditoría para evitar éxitos parciales.
+- **30 pruebas de autenticación aprobadas** en la última revisión reportada, incluyendo bloqueo, recuperación, revocación y fallos de escritura.
 
 **Acceso por rol:**
 
@@ -113,36 +119,50 @@ _Cambio de contraseña_
 
 ![Cambio de contraseña](docs/images/01-login-cambio-clave.png)
 
-**Pendiente para cerrar:** mejoras menores, validaciones complementarias y consolidación de evidencias de prueba.
+**Pendiente para cerrar:**
 
-**Estado:** desarrollo completado aproximadamente al **95 %**, en fase de ajustes finales antes de su cierre definitivo.
+- Mostrar un error claro y permitir reintentar si falla la comprobación inicial de instalación.
+- Activar el aviso de captura pendiente únicamente cuando existan modificaciones sin guardar.
+- Completar evidencia de navegación por teclado, recorridos en escritorio y mediciones de tiempo de ingreso exigidas.
+
+**Estado:** **95/100 en la última revisión**, con ajustes y validación de escritorio pendientes antes del cierre.
 
 </details>
 
 <a id="modulo-ficha-vehicular-e-historial"></a>
 
 <details>
-<summary><b>02 · Ficha Vehicular e Historial</b> — 🟢 Ajustes finales · ~95 %</summary>
+<summary><b>02 · Ficha Vehicular e Historial</b> — 🟢 Ajustes finales · Evaluación: 93/100</summary>
 
 **Qué hace:** centraliza la identificación del vehículo, su propietario y las atenciones realizadas. Permite consultar la ficha y mantener sus datos relacionados con las órdenes del taller.
 
 **Funciones principales:**
 
-- Búsqueda y consulta de la ficha vehicular.
-- Registro de clientes y vehículos, vinculando cada vehículo con su propietario identificado.
-- Actualización de datos del vehículo y de su propietario según los permisos del usuario.
-- Consulta del historial de atenciones finalizadas, kilometraje y datos de cambio de aceite cuando corresponda.
-- Desactivación lógica de vehículos con motivo, conservando el historial.
-- Bloqueo de la desactivación cuando el vehículo tiene una orden de trabajo abierta.
-- Restricción de acciones e información según el rol, con validación en backend.
+- **Buscar vehículos:** normaliza la placa y muestra vehículo, propietario, kilometraje y estado; permite limpiar la selección y reintentar consultas fallidas.
+- **Registrar clientes y vehículos:** admite clientes sin vehículo, reutiliza clientes existentes y permite el registro conjunto de forma atómica.
+- **Editar información:** administrador y cajero modifican datos comunes; cambiar placa, propietario o reducir kilometraje exige administrador y motivo.
+- **Desactivar y reactivar:** conserva el historial, bloquea la desactivación si existe una OT abierta e impide recibir en Taller un vehículo inactivo.
+- **Consultar mantenimientos:** muestra OT finalizadas, aunque estén pendientes de cobro, con **20 registros por página**, servicios, insumos, resumen, kilometraje, aceite y cliente histórico. «Ver atención» abre el detalle completo.
+- **Corregir datos públicos:** el administrador puede ajustar kilometraje de atención, resumen o aceite cuando corresponde; la atención queda marcada como corregida y se registra auditoría.
+- **Consultar próximos cambios:** búsqueda por placa o cliente, filtros por kilometraje, fecha o ambos, teléfono y acceso a la ficha. No registra llamadas ni oculta candidatos.
+- **Abrir recepción:** lleva el vehículo seleccionado al formulario de OT y comprueba su actividad y la existencia de otra orden abierta.
+
+**Fortalezas de implementación:**
+
+- Historial vinculado al **ID del vehículo**: corregir la placa no desvincula las atenciones anteriores.
+- Respuestas públicas específicas, sin notas técnicas ni costos; el mecánico tampoco recibe contactos del propietario.
+- Paginación, filtros y conteos en SQLite, con orden definido.
+- Restricciones persistentes, transacciones y auditoría para altas y cambios administrativos.
+- Corregir una atención no modifica automáticamente el kilometraje actual ni mueve stock o dinero.
+- **16 pruebas de vehículos aprobadas** en la última revisión reportada, además de comprobaciones adicionales de las correcciones recientes.
 
 **Acceso por rol:**
 
 | Rol | Alcance |
 | --- | --- |
-| Administrador | Gestión de la ficha y correcciones autorizadas. |
+| Administrador | Gestión de ficha, cambio de placa o propietario, reducción de kilometraje, correcciones y desactivación/reactivación con motivo. |
 | Cajero | Registro, edición de datos comunes y consulta autorizada. |
-| Mecánico | Consulta de información pública del vehículo y sus atenciones. |
+| Mecánico | Consulta de información pública del vehículo y sus atenciones, sin contactos del propietario. |
 
 **Capturas:**
 
@@ -162,15 +182,18 @@ _Próximos cambios de aceite_
 
 ![Próximos cambios de aceite](docs/images/ficha-vehicular-proximos-cambios-aceite.png)
 
-**Validaciones relacionadas:** la ejecución de pruebas compartida registró seis casos satisfactorios en [vehiculo_tests.rs](src-tauri/tests/vehiculo_tests.rs), sobre registro, actualización, consulta de ficha, permisos y desactivación con o sin OT abierta.
+**Pendiente para cerrar:**
 
-**Pendiente para cerrar:** reforzar las confirmaciones de guardado, ajustar la recepción de OT y priorizar las atenciones más antiguas en próximos cambios de aceite.
+- Activar el indicador de captura pendiente al modificar datos, no al abrir el formulario.
+- Distinguir un error al consultar el último aceite de la ausencia de un mantenimiento registrado.
+- Incorporar a las pruebas permanentes los casos recientes de filtros, paginación, resumen y recepción.
+- Completar los recorridos en escritorio y las cinco mediciones con el volumen de prueba definido.
 
-**Estado:** avance aproximado del **95 %**, en fase de ajustes finales y validación antes de su cierre definitivo. Este porcentaje expresa progreso de implementación, no cobertura de pruebas.
+**Estado:** **93/100 en la última revisión**. Las funciones principales están alineadas; el cierre se concentra en precisión de estados, tratamiento de errores y evidencia de validación.
 
 </details>
 
-**Trabajo actual:** cerrar los ajustes finales de Ficha Vehicular e Historial y Login y Sesión, ambos con un avance aproximado del 95 %. **Siguiente módulo:** Órdenes de Trabajo Taller. El detalle de los demás módulos se incorporará conforme avancen en la secuencia definida.
+**Trabajo actual:** continuar con **Órdenes de Trabajo Taller (~45 % de implementación)** como siguiente módulo de la secuencia, manteniendo el seguimiento de los pendientes de cierre de Login y Ficha Vehicular. El detalle funcional de Taller se incorporará conforme avance su revisión y adaptación.
 
 <a id="roles"></a>
 
@@ -296,7 +319,7 @@ La configuración actual de Tauri invoca `npm run dev` antes del desarrollo y `n
 
 ### 8.1. Qué se verifica
 
-Sesiones y permisos; estados de OT; stock sin duplicaciones; ventas, devoluciones y cierre; documentos inciertos y reenvío; recuperación, numeración y fechas de Lima.
+En Login: acceso, sesiones, permisos, bloqueo, recuperación, revocación y consistencia ante fallos. En Ficha Vehicular: registro, edición, identidad histórica, permisos, correcciones, consultas y paginación. Durante el avance de Taller y los demás módulos se validarán también estados de OT, stock sin duplicaciones, ventas, devoluciones, cierre, comprobantes, recuperación, numeración y fechas de Lima.
 
 ### 8.2. Cómo ejecutarlas
 
@@ -312,7 +335,11 @@ Las pruebas de integración externas deben usar datos y credenciales de Prueba. 
 
 ### 8.3. Estado de la validación
 
-**Esquema verificado en SQLite:** 27 casos satisfactorios sobre creación, restricciones, relaciones y flujos seleccionados. Esta evidencia corresponde al esquema revisado, no a la ejecución completa del código ni de NubeFact. Las revisiones de Login disponibles se enlazan en Documentación.
+La última revisión reportó **30 pruebas de autenticación** y **16 de vehículos aprobadas**. Estos resultados corresponden a los casos automatizados ejecutados; no representan cobertura total ni aprobación completa en escritorio. Los casos recientes de Ficha todavía deben consolidarse en la suite permanente.
+
+**Evaluación de implementación y alineación con los PDF:** Login **95/100** y Ficha Vehicular **93/100**. Quedan pendientes las verificaciones de interfaz, teclado y rendimiento indicadas en cada módulo. El **45 % de Taller** es una estimación de avance y no implica una evaluación equivalente.
+
+**Esquema verificado en SQLite:** 27 casos satisfactorios sobre creación, restricciones, relaciones y flujos seleccionados, correspondientes al esquema revisado. Esta evidencia se distingue de las pruebas de los módulos y no acredita la integración completa con NubeFact. Las revisiones de Login disponibles se enlazan en Documentación.
 
 <a id="documentacion"></a>
 
@@ -334,9 +361,9 @@ El informe general y las diez especificaciones funcionales v7 son documentos de 
 
 La implementación seguirá este orden:
 
-1. **Login y Sesión (~95 %):** cerrar ajustes y validaciones finales.
-2. **Ficha Vehicular e Historial (~95 %, ajustes finales):** afinar las confirmaciones, la recepción de OT y el orden de próximos cambios de aceite.
-3. **Órdenes de Trabajo Taller:** continuar con la revisión y adaptación del flujo de recepción, ejecución y finalización.
+1. **Login y Sesión (evaluación: 95/100):** cerrar el manejo de errores iniciales, el aviso de cambios pendientes y las evidencias de escritorio.
+2. **Ficha Vehicular e Historial (evaluación: 93/100):** afinar estados y errores de consulta; consolidar pruebas y mediciones.
+3. **Órdenes de Trabajo Taller (~45 % de implementación):** siguiente foco de desarrollo; revisar y adaptar recepción, ejecución y finalización.
 4. **Inventario y Stock:** revisar catálogos, entradas, consumos y ajustes.
 5. **Punto de Venta POS:** completar ventas, cobros y gestión de comprobantes.
 6. **Caja Chica:** completar aperturas, movimientos y cierres.

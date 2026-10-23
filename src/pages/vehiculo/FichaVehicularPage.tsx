@@ -557,7 +557,7 @@ export const FichaVehicularPage: React.FC<FichaVehicularPageProps> = ({
                       {puedeCrearOT && (
                         <div className="fv-create-order">
                           <button onClick={handleAbrirCrearOTDirecta} style={btnCrearOTStyle}>
-                            + Recepcionar / Crear OT para {vehiculo.placa}
+                            + Crear OT
                           </button>
                         </div>
                       )}
