@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState } from 'react';
 import { ProximoCambioAceiteDTO } from '../../../types/vehiculo';
 import { vehiculoService } from '../../../services/vehiculoService';
 import {
@@ -12,29 +12,57 @@ import {
   Filter,
 } from 'lucide-react';
 
-interface Props {
-  onSeleccionarPlaca: (placa: string) => void;
+export type TipoFiltroCausa = 'TODOS' | 'POR_KM' | 'POR_FECHA' | 'AMBOS';
+
+export interface FiltrosProximosCambiosState {
+  busqueda: string;
+  filtroCausa: TipoFiltroCausa;
+  paginaActual: number;
 }
 
-type TipoFiltroCausa = 'TODOS' | 'POR_KM' | 'POR_FECHA' | 'AMBOS';
+interface Props {
+  onSeleccionarPlaca: (placa: string) => void;
+  filtrosIniciales?: FiltrosProximosCambiosState;
+  onFiltrosChange?: (filtros: FiltrosProximosCambiosState) => void;
+}
 
-export const FichaVehicularProximosCambios: React.FC<Props> = ({ onSeleccionarPlaca }) => {
+export const FichaVehicularProximosCambios: React.FC<Props> = ({
+  onSeleccionarPlaca,
+  filtrosIniciales,
+  onFiltrosChange,
+}) => {
   const [lista, setLista] = useState<ProximoCambioAceiteDTO[]>([]);
+  const [totalRegistros, setTotalRegistros] = useState<number>(0);
+  const [totalPaginas, setTotalPaginas] = useState<number>(1);
   const [cargando, setCargando] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Filtros UI y Paginación
-  const [busqueda, setBusqueda] = useState<string>('');
-  const [filtroCausa, setFiltroCausa] = useState<TipoFiltroCausa>('TODOS');
-  const [paginaActual, setPaginaActual] = useState<number>(1);
+  const [busqueda, setBusqueda] = useState<string>(filtrosIniciales?.busqueda || '');
+  const [filtroCausa, setFiltroCausa] = useState<TipoFiltroCausa>(
+    filtrosIniciales?.filtroCausa || 'TODOS'
+  );
+  const [paginaActual, setPaginaActual] = useState<number>(filtrosIniciales?.paginaActual || 1);
   const elementosPorPagina = 20;
+
+  useEffect(() => {
+    if (onFiltrosChange) {
+      onFiltrosChange({ busqueda, filtroCausa, paginaActual });
+    }
+  }, [busqueda, filtroCausa, paginaActual, onFiltrosChange]);
 
   const cargarProximosCambios = async () => {
     setCargando(true);
     setError(null);
     try {
-      const data = await vehiculoService.obtenerProximosCambiosAceite();
-      setLista(data);
+      const data = await vehiculoService.obtenerProximosCambiosAceite(
+        paginaActual,
+        elementosPorPagina,
+        busqueda,
+        filtroCausa
+      );
+      setLista(data.items || []);
+      setTotalRegistros(data.total_registros || 0);
+      setTotalPaginas(data.total_paginas || 1);
     } catch (err: unknown) {
       if (typeof err === 'string') setError(err);
       else if (err && typeof err === 'object' && 'message' in err) {
@@ -49,31 +77,17 @@ export const FichaVehicularProximosCambios: React.FC<Props> = ({ onSeleccionarPl
 
   useEffect(() => {
     cargarProximosCambios();
-  }, []);
+  }, [paginaActual, busqueda, filtroCausa]);
 
-  // Filtrado reactivo en cliente
-  const listaFiltrada = useMemo(() => {
-    return lista.filter((item) => {
-      const coincideBusqueda =
-        item.placa.toLowerCase().includes(busqueda.toLowerCase()) ||
-        item.nombre_razon_social.toLowerCase().includes(busqueda.toLowerCase());
-
-      const coincideCausa = filtroCausa === 'TODOS' || item.causa === filtroCausa;
-
-      return coincideBusqueda && coincideCausa;
-    });
-  }, [lista, busqueda, filtroCausa]);
-
-  // Paginación
-  const totalPaginas = Math.ceil(listaFiltrada.length / elementosPorPagina) || 1;
-  const listaPaginada = useMemo(() => {
-    const inicio = (paginaActual - 1) * elementosPorPagina;
-    return listaFiltrada.slice(inicio, inicio + elementosPorPagina);
-  }, [listaFiltrada, paginaActual]);
-
-  useEffect(() => {
+  const handleBusquedaChange = (val: string) => {
+    setBusqueda(val);
     setPaginaActual(1);
-  }, [busqueda, filtroCausa]);
+  };
+
+  const handleCausaChange = (causa: TipoFiltroCausa) => {
+    setFiltroCausa(causa);
+    setPaginaActual(1);
+  };
 
   if (cargando) {
     return (
@@ -101,8 +115,10 @@ export const FichaVehicularProximosCambios: React.FC<Props> = ({ onSeleccionarPl
   }
 
   return (
-    <section className="fv-upcoming" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-      {/* HEADER DE LA SECCIÓN */}
+    <section
+      className="fv-upcoming"
+      style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}
+    >
       <div
         style={{
           display: 'flex',
@@ -114,7 +130,7 @@ export const FichaVehicularProximosCambios: React.FC<Props> = ({ onSeleccionarPl
       >
         <div>
           <h3 style={{ fontSize: '18px', fontWeight: '700', color: '#F8FAFC', margin: 0 }}>
-            Próximos Cambios de Aceite ({listaFiltrada.length})
+            Próximos Cambios de Aceite ({totalRegistros})
           </h3>
           <p style={{ color: '#94A3B8', fontSize: '13px', margin: '4px 0 0 0' }}>
             Vehículos próximos a cumplir o vencidos en su intervalo de mantenimiento preventivo.
@@ -140,8 +156,8 @@ export const FichaVehicularProximosCambios: React.FC<Props> = ({ onSeleccionarPl
         </button>
       </div>
 
-      {/* BARRA DE FILTROS Y BÚSQUEDA */}
-      <div className="fv-upcoming-filters"
+      <div
+        className="fv-upcoming-filters"
         style={{
           display: 'flex',
           justifyContent: 'space-between',
@@ -154,7 +170,6 @@ export const FichaVehicularProximosCambios: React.FC<Props> = ({ onSeleccionarPl
           flexWrap: 'wrap',
         }}
       >
-        {/* BUSCADOR */}
         <div style={{ position: 'relative', flex: '1', minWidth: '220px' }}>
           <Search
             size={16}
@@ -170,7 +185,7 @@ export const FichaVehicularProximosCambios: React.FC<Props> = ({ onSeleccionarPl
             type="text"
             placeholder="Buscar por placa o cliente..."
             value={busqueda}
-            onChange={(e) => setBusqueda(e.target.value)}
+            onChange={(e) => handleBusquedaChange(e.target.value)}
             style={{
               width: '100%',
               padding: '8px 12px 8px 36px',
@@ -185,13 +200,15 @@ export const FichaVehicularProximosCambios: React.FC<Props> = ({ onSeleccionarPl
           />
         </div>
 
-        {/* BOTONES DE FILTRO CAUSA */}
-        <div className="fv-filter-buttons" style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+        <div
+          className="fv-filter-buttons"
+          style={{ display: 'flex', gap: '6px', alignItems: 'center' }}
+        >
           <Filter size={14} color="#94A3B8" />
           {(['TODOS', 'POR_KM', 'POR_FECHA', 'AMBOS'] as TipoFiltroCausa[]).map((causa) => (
             <button
               key={causa}
-              onClick={() => setFiltroCausa(causa)}
+              onClick={() => handleCausaChange(causa)}
               style={{
                 padding: '6px 12px',
                 borderRadius: '6px',
@@ -217,8 +234,7 @@ export const FichaVehicularProximosCambios: React.FC<Props> = ({ onSeleccionarPl
         </div>
       </div>
 
-      {/* GRILLA DE TARJETAS */}
-      {listaPaginada.length === 0 ? (
+      {lista.length === 0 ? (
         <div
           style={{
             padding: '32px',
@@ -240,7 +256,7 @@ export const FichaVehicularProximosCambios: React.FC<Props> = ({ onSeleccionarPl
             gap: '16px',
           }}
         >
-          {listaPaginada.map((item) => (
+          {lista.map((item) => (
             <div
               className="fv-upcoming-card"
               key={`${item.id_vehiculo}-${item.id_ot}`}
@@ -313,7 +329,13 @@ export const FichaVehicularProximosCambios: React.FC<Props> = ({ onSeleccionarPl
                 }}
               >
                 <div
-                  style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '6px', color: '#CBD5E1' }}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    flexWrap: 'wrap',
+                    gap: '6px',
+                    color: '#CBD5E1',
+                  }}
                 >
                   <Gauge size={14} color="#94A3B8" />
                   <span>
@@ -327,7 +349,13 @@ export const FichaVehicularProximosCambios: React.FC<Props> = ({ onSeleccionarPl
                 </div>
 
                 <div
-                  style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '6px', color: '#CBD5E1' }}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    flexWrap: 'wrap',
+                    gap: '6px',
+                    color: '#CBD5E1',
+                  }}
                 >
                   <Calendar size={14} color="#94A3B8" />
                   <span>
@@ -340,7 +368,13 @@ export const FichaVehicularProximosCambios: React.FC<Props> = ({ onSeleccionarPl
 
                 {item.tipo_aceite && (
                   <div
-                    style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '6px', color: '#CBD5E1' }}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      flexWrap: 'wrap',
+                      gap: '6px',
+                      color: '#CBD5E1',
+                    }}
                   >
                     <Droplet size={14} color="#94A3B8" />
                     <span>
@@ -351,7 +385,13 @@ export const FichaVehicularProximosCambios: React.FC<Props> = ({ onSeleccionarPl
 
                 {item.telefono && (
                   <div
-                    style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '6px', color: '#CBD5E1' }}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      flexWrap: 'wrap',
+                      gap: '6px',
+                      color: '#CBD5E1',
+                    }}
                   >
                     <Phone size={14} />
                     <span>Teléfono: {item.telefono}</span>
@@ -384,7 +424,6 @@ export const FichaVehicularProximosCambios: React.FC<Props> = ({ onSeleccionarPl
         </div>
       )}
 
-      {/* CONTROLES DE PAGINACIÓN */}
       {totalPaginas > 1 && (
         <div
           style={{

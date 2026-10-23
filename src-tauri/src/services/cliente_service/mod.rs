@@ -117,8 +117,10 @@ impl ClienteService {
         conn: &Connection,
         placa: &str,
         rol_ejecutor: Option<&str>,
+        pagina: u32,
+        limite: u32,
     ) -> Result<FichaVehicularCompletaDto, AppError> {
-        ficha_vehicular::obtener_ficha_vehicular_completa(conn, placa, rol_ejecutor)
+        ficha_vehicular::obtener_ficha_vehicular_completa(conn, placa, rol_ejecutor, pagina, limite)
     }
 
     pub fn obtener_proximos_cambios_aceite(

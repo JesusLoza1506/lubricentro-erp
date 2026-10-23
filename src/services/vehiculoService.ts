@@ -7,13 +7,20 @@ import {
   CambiarEstadoVehiculoPayloadDTO,
   CorregirHistorialOtPayloadDTO,
   ProximoCambioAceiteDTO,
+  ResultadoPaginadoDTO,
 } from '../types/vehiculo';
 
 export const vehiculoService = {
-  // 1. Obtener Ficha Vehicular e Historial en consulta atómica
-  obtenerFichaVehicularCompleta: async (placa: string): Promise<FichaVehicularCompletaDTO> => {
+  // 1. Obtener Ficha Vehicular e Historial Paginado en BD
+  obtenerFichaVehicularCompleta: async (
+    placa: string,
+    pagina = 1,
+    limite = 20
+  ): Promise<FichaVehicularCompletaDTO> => {
     return await invoke<FichaVehicularCompletaDTO>('obtener_ficha_vehicular_completa_cmd', {
       placa: placa.replace(/[^a-zA-Z0-9]/g, '').toUpperCase(),
+      pagina,
+      limite,
     });
   },
 
@@ -24,10 +31,18 @@ export const vehiculoService = {
     });
   },
 
-  // 3. Listar Vehículos Candidates (Compatibilidad Modal OT)
+  // 3. Listar Vehículos Candidatos (Compatibilidad Modal OT)
   listarVehiculos: async (): Promise<VehiculoCompletoDTO[]> => {
-    const proximos = await invoke<ProximoCambioAceiteDTO[]>('obtener_proximos_cambios_aceite_cmd');
-    return proximos.map((p) => ({
+    const res = await invoke<ResultadoPaginadoDTO<ProximoCambioAceiteDTO>>(
+      'obtener_proximos_cambios_aceite_cmd',
+      {
+        pagina: 1,
+        limite: 100,
+        busqueda: null,
+        filtroCausa: null,
+      }
+    );
+    return (res.items || []).map((p) => ({
       id_vehiculo: p.id_vehiculo,
       placa: p.placa,
       id_cliente: p.id_cliente,
@@ -68,8 +83,21 @@ export const vehiculoService = {
     });
   },
 
-  // 8. Consultar Próximos Cambios de Aceite (Admins y Cajeros)
-  obtenerProximosCambiosAceite: async (): Promise<ProximoCambioAceiteDTO[]> => {
-    return await invoke<ProximoCambioAceiteDTO[]>('obtener_proximos_cambios_aceite_cmd');
+  // 8. Consultar Próximos Cambios de Aceite (Admins y Cajeros) - Paginado y Filtrado en BD
+  obtenerProximosCambiosAceite: async (
+    pagina = 1,
+    limite = 20,
+    busqueda?: string,
+    filtroCausa?: string
+  ): Promise<ResultadoPaginadoDTO<ProximoCambioAceiteDTO>> => {
+    return await invoke<ResultadoPaginadoDTO<ProximoCambioAceiteDTO>>(
+      'obtener_proximos_cambios_aceite_cmd',
+      {
+        pagina,
+        limite,
+        busqueda: busqueda && busqueda.trim().length > 0 ? busqueda.trim() : null,
+        filtroCausa: filtroCausa && filtroCausa !== 'TODOS' ? filtroCausa : null,
+      }
+    );
   },
 };

@@ -1,122 +1,84 @@
 import React, { useState, useEffect, useRef } from 'react';
-import {
-  CrearOrdenTrabajoPayload,
-  TipoAceiteOT,
-  OrdenTrabajoHistorialDTO,
-} from '../../../types/ordenTrabajo';
+import { CrearOrdenTrabajoPayload, ServicioInicialDTO } from '../../../types/ordenTrabajo';
 import { vehiculoService } from '../../../services/vehiculoService';
-import { ordenesService, MecanicoDTO } from '../../../services/ordenesService';
+import { ordenesService, MecanicoDTO, ServicioResumenDTO } from '../../../services/ordenesService';
 import { VehiculoCompletoDTO } from '../../../types/vehiculo';
 
 interface ModalCrearOTProps {
-  ordenesExistentes?: OrdenTrabajoHistorialDTO[];
-  zanjaInicial?: number;
-  zanjasOcupadas?: number[];
   idMecanicoDefault: number;
   placaInicial?: string;
+  vehiculoDirecto?: VehiculoCompletoDTO;
   onClose: () => void;
   onSubmit: (payload: CrearOrdenTrabajoPayload) => Promise<void>;
   onIrARegistrarVehiculo?: () => void;
 }
 
 export const ModalCrearOT: React.FC<ModalCrearOTProps> = ({
-  zanjaInicial,
-  zanjasOcupadas = [],
   idMecanicoDefault,
   placaInicial,
+  vehiculoDirecto,
   onClose,
   onSubmit,
   onIrARegistrarVehiculo,
 }) => {
   const [listaVehiculosBD, setListaVehiculosBD] = useState<VehiculoCompletoDTO[]>([]);
-  const [cargandoVehiculos, setCargandoVehiculos] = useState(false);
-  const [busqueda, setBusqueda] = useState(placaInicial ? placaInicial.toUpperCase() : '');
+  const [_cargandoVehiculos, setCargandoVehiculos] = useState(false);
+  const [busqueda, setBusqueda] = useState(
+    vehiculoDirecto ? vehiculoDirecto.placa : placaInicial ? placaInicial.toUpperCase() : ''
+  );
   const [mostrarDropdown, setMostrarDropdown] = useState(false);
 
-  // Carga de mecánicos dinámicos
   const [mecanicos, setMecanicos] = useState<MecanicoDTO[]>([]);
-  const [cargandoMecanicos, setCargandoMecanicos] = useState(false);
+  const [serviciosDisponibles, setServiciosDisponibles] = useState<ServicioResumenDTO[]>([]);
 
-  // Mecánico opcional (0 = sin asignar)
   const [idMecanico, setIdMecanico] = useState<number>(idMecanicoDefault || 0);
+  const [kilometrajeIngreso, setKilometrajeIngreso] = useState<string>(
+    vehiculoDirecto?.kilometraje_actual ? String(vehiculoDirecto.kilometraje_actual) : ''
+  );
+  const [pedidoCliente, setPedidoCliente] = useState('');
+  const [idServicioInicial, setIdServicioInicial] = useState<number>(0);
 
-  // Verificación de ocupación de zanjas
-  const zanja1Ocupada = zanjasOcupadas.includes(1);
-  const zanja2Ocupada = zanjasOcupadas.includes(2);
-
-  // FASE 1: Recepción debe iniciar SIEMPRE sin zanja por defecto (Atención Libre / NULL)
-  const zanjaPorDefecto =
-    zanjaInicial && !zanjasOcupadas.includes(zanjaInicial) ? zanjaInicial : null;
-
-  const [zanja, setZanja] = useState<number | null>(zanjaPorDefecto);
-  const [kilometrajeIngreso, setKilometrajeIngreso] = useState<string>('');
-
-  // Tipo de aceite opcional (permite cadena vacía)
-  const [tipoAceite, setTipoAceite] = useState<TipoAceiteOT | ''>('');
-  const [observaciones, setObservaciones] = useState('');
-
-  // Vehículo seleccionado / Estado
   const [vehiculoSeleccionado, setVehiculoSeleccionado] = useState<VehiculoCompletoDTO | null>(
-    null
+    vehiculoDirecto || null
   );
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
 
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  // 1. Cargar mecánicos dinámicamente desde la BD
   useEffect(() => {
-    const cargarMecanicos = async () => {
-      try {
-        setCargandoMecanicos(true);
-        const lista = await ordenesService.listarMecanicos();
-        setMecanicos(lista);
-      } catch (err) {
-        console.error('Error al cargar la lista de mecánicos:', err);
-      } finally {
-        setCargandoMecanicos(false);
-      }
-    };
-
-    cargarMecanicos();
-  }, []);
-
-  // 2. Cargar TODOS los vehículos directamente de la BD SQLite
-  useEffect(() => {
-    const cargarVehiculosDeBD = async () => {
+    const init = async () => {
       try {
         setCargandoVehiculos(true);
-        const listaBD = await vehiculoService.listarVehiculos();
-        if (Array.isArray(listaBD)) {
-          setListaVehiculosBD(listaBD);
-          if (placaInicial) {
-            const encontrado = listaBD.find(
-              (v) => v.placa.toUpperCase() === placaInicial.toUpperCase()
-            );
-            if (encontrado) {
-              seleccionarVehiculoReal(encontrado);
-            } else {
-              consultarPlacaEspecificaBD(placaInicial);
-            }
-          }
+        const [mecanicosList, serviciosList, vehiculosList] = await Promise.all([
+          ordenesService.listarMecanicos(),
+          ordenesService.listarServicios(),
+          vehiculoService.listarVehiculos(),
+        ]);
+        setMecanicos(mecanicosList);
+        setServiciosDisponibles(serviciosList);
+        if (serviciosList.length > 0) setIdServicioInicial(serviciosList[0].id_servicio);
+
+        let combinados = [...vehiculosList];
+        if (vehiculoDirecto && !combinados.some((v) => v.placa === vehiculoDirecto.placa)) {
+          combinados.unshift(vehiculoDirecto);
+        }
+        setListaVehiculosBD(combinados);
+
+        if (vehiculoDirecto) {
+          seleccionarVehiculoReal(vehiculoDirecto);
+        } else if (placaInicial) {
+          const enc = combinados.find((v) => v.placa.toUpperCase() === placaInicial.toUpperCase());
+          if (enc) seleccionarVehiculoReal(enc);
         }
       } catch (err) {
-        console.error('Error al obtener los vehículos:', err);
+        console.error('Error inicializando modal crear OT:', err);
       } finally {
         setCargandoVehiculos(false);
       }
     };
-
-    cargarVehiculosDeBD();
-  }, [idMecanicoDefault, placaInicial]);
-
-  useEffect(() => {
-    if (zanjaInicial && !zanjasOcupadas.includes(zanjaInicial)) {
-      setZanja(zanjaInicial);
-    } else {
-      setZanja(null);
-    }
-  }, [zanjaInicial, zanjasOcupadas]);
+    init();
+  }, [placaInicial, vehiculoDirecto]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -128,101 +90,63 @@ export const ModalCrearOT: React.FC<ModalCrearOTProps> = ({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const seleccionarVehiculoReal = (vehiculo: VehiculoCompletoDTO) => {
-    setVehiculoSeleccionado(vehiculo);
-    setBusqueda(vehiculo.placa);
-    setKilometrajeIngreso('');
+  const seleccionarVehiculoReal = (v: VehiculoCompletoDTO) => {
+    setVehiculoSeleccionado(v);
+    setBusqueda(v.placa);
+    setKilometrajeIngreso(v.kilometraje_actual ? String(v.kilometraje_actual) : '');
     setMostrarDropdown(false);
     setErrorMsg('');
-  };
-
-  const consultarPlacaEspecificaBD = async (placaATipear: string) => {
-    const placaLimpia = placaATipear.toUpperCase().trim();
-    if (!placaLimpia) return;
-
-    try {
-      setLoading(true);
-      setErrorMsg('');
-      const data = await vehiculoService.obtenerVehiculoPorPlaca(placaLimpia);
-      if (data && data.placa) {
-        seleccionarVehiculoReal(data);
-      } else {
-        setVehiculoSeleccionado(null);
-        setErrorMsg(
-          `El vehículo con placa "${placaLimpia}" no está registrado en la base de datos.`
-        );
-      }
-    } catch {
-      setVehiculoSeleccionado(null);
-      setErrorMsg(`No se encontró el vehículo con placa "${placaLimpia}".`);
-    } finally {
-      setLoading(false);
-      setMostrarDropdown(false);
-    }
-  };
-
-  const opcionesFiltradas = listaVehiculosBD.filter(
-    (v) =>
-      v.placa.toLowerCase().includes(busqueda.toLowerCase()) ||
-      (v.marca && v.marca.toLowerCase().includes(busqueda.toLowerCase())) ||
-      (v.modelo && v.modelo.toLowerCase().includes(busqueda.toLowerCase()))
-  );
-
-  const handleIrARegistrar = () => {
-    onClose();
-    if (onIrARegistrarVehiculo) {
-      onIrARegistrarVehiculo();
-    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!vehiculoSeleccionado) {
-      setErrorMsg('Debe seleccionar un vehículo válido registrado en la base de datos.');
+      setErrorMsg('Debe seleccionar un vehículo válido registrado.');
       return;
     }
 
-    const kmIngresadoNum = Number(kilometrajeIngreso);
-    if (isNaN(kmIngresadoNum) || kmIngresadoNum <= 0) {
-      setErrorMsg('Debe ingresar un kilometraje válido.');
+    const kmNum = Number(kilometrajeIngreso);
+    if (isNaN(kmNum) || kmNum <= 0) {
+      setErrorMsg('El kilometraje de ingreso debe ser mayor a 0.');
       return;
     }
 
-    const ultimoKmBD = vehiculoSeleccionado.kilometraje_actual || 0;
-    if (kmIngresadoNum < ultimoKmBD) {
-      setErrorMsg(
-        `El kilometraje de ingreso (${kmIngresadoNum.toLocaleString()} km) debe ser mayor o igual al último registrado (${ultimoKmBD.toLocaleString()} km).`
-      );
+    if (!idServicioInicial) {
+      setErrorMsg('Debe seleccionar al menos un servicio inicial para aperturar la OT.');
       return;
     }
 
     try {
       setLoading(true);
       setErrorMsg('');
+
+      const serviciosIniciales: ServicioInicialDTO[] = [
+        { id_servicio: idServicioInicial, cantidad: 1 },
+      ];
+
       await onSubmit({
-        placa: vehiculoSeleccionado.placa,
-        id_mecanico: Number(idMecanico) || 0,
-        zanja: zanja ? Number(zanja) : undefined,
-        kilometraje_ingreso: kmIngresadoNum,
-        tipo_aceite: tipoAceite as TipoAceiteOT,
-        observaciones: observaciones.trim() || undefined,
+        id_vehiculo: vehiculoSeleccionado.id_vehiculo,
+        id_cliente_atendido: vehiculoSeleccionado.id_cliente,
+        kilometraje_ingreso: kmNum,
+        id_mecanico: idMecanico > 0 ? idMecanico : undefined,
+        pedido_cliente: pedidoCliente.trim() || undefined,
+        servicios_iniciales: serviciosIniciales,
       });
+
       onClose();
     } catch (err: any) {
-      setErrorMsg(typeof err === 'string' ? err : err?.message || 'Error al crear la OT.');
+      setErrorMsg(typeof err === 'string' ? err : err?.message || 'Error al recepcionar OT.');
     } finally {
       setLoading(false);
     }
   };
 
-  const ultimoKm = vehiculoSeleccionado?.kilometraje_actual || 0;
-  const estimadoProximo =
-    tipoAceite === 'SINTETICO'
-      ? ultimoKm + 10000
-      : tipoAceite === 'MINERAL'
-        ? ultimoKm + 5000
-        : null;
+  const opcionesFiltradas = listaVehiculosBD.filter(
+    (v) =>
+      v.placa.toLowerCase().includes(busqueda.toLowerCase()) ||
+      (v.marca && v.marca.toLowerCase().includes(busqueda.toLowerCase()))
+  );
 
   return (
     <div
@@ -251,7 +175,7 @@ export const ModalCrearOT: React.FC<ModalCrearOTProps> = ({
         }}
       >
         <h2 style={{ marginTop: 0, fontSize: '20px', color: '#F8FAFC' }}>
-          Nueva Orden de Trabajo {zanja ? `- Zanja ${zanja}` : '(Atención Libre)'}
+          Nueva Orden de Trabajo (Recepción)
         </h2>
 
         {errorMsg && (
@@ -262,93 +186,42 @@ export const ModalCrearOT: React.FC<ModalCrearOTProps> = ({
               color: '#FCA5A5',
               borderRadius: '6px',
               marginBottom: '16px',
-              fontSize: '14px',
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
+              fontSize: '13px',
             }}
           >
-            <span>{errorMsg}</span>
-            {!vehiculoSeleccionado && busqueda.trim() && (
-              <button
-                type="button"
-                onClick={handleIrARegistrar}
-                style={{
-                  backgroundColor: '#D97706',
-                  color: '#FFF',
-                  border: 'none',
-                  padding: '4px 8px',
-                  borderRadius: '4px',
-                  cursor: 'pointer',
-                  fontWeight: 600,
-                  fontSize: '11px',
-                }}
-              >
-                Registrar ↗
-              </button>
-            )}
+            {errorMsg}
           </div>
         )}
 
         <form onSubmit={handleSubmit}>
+          {/* Búsqueda de Vehículo */}
           <div style={{ marginBottom: '16px', position: 'relative' }} ref={dropdownRef}>
             <label
               style={{ display: 'block', fontSize: '13px', color: '#94A3B8', marginBottom: '6px' }}
             >
-              Seleccionar Placa *
+              Placa Vehículo *
             </label>
-            <div style={{ position: 'relative' }}>
-              <input
-                type="text"
-                required
-                placeholder={
-                  cargandoVehiculos
-                    ? 'Cargando vehículos...'
-                    : 'Seleccione o escriba la placa a buscar...'
-                }
-                value={busqueda}
-                onFocus={() => setMostrarDropdown(true)}
-                onChange={(e) => {
-                  setBusqueda(e.target.value.toUpperCase());
-                  setMostrarDropdown(true);
-                  setVehiculoSeleccionado(null);
-                  setErrorMsg('');
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault();
-                    if (busqueda.trim() && !vehiculoSeleccionado) {
-                      consultarPlacaEspecificaBD(busqueda);
-                    }
-                  }
-                }}
-                style={{
-                  width: '100%',
-                  padding: '10px 36px 10px 12px',
-                  backgroundColor: '#0F172A',
-                  border: vehiculoSeleccionado ? '1px solid #10B981' : '1px solid #334155',
-                  borderRadius: '6px',
-                  color: '#F8FAFC',
-                  textTransform: 'uppercase',
-                  boxSizing: 'border-box',
-                }}
-              />
-              <span
-                onClick={() => setMostrarDropdown(!mostrarDropdown)}
-                style={{
-                  position: 'absolute',
-                  right: '12px',
-                  top: '50%',
-                  transform: 'translateY(-50%)',
-                  color: '#94A3B8',
-                  cursor: 'pointer',
-                  fontSize: '12px',
-                }}
-              >
-                ▼
-              </span>
-            </div>
-
+            <input
+              type="text"
+              required
+              placeholder="Buscar por placa..."
+              value={busqueda}
+              onFocus={() => setMostrarDropdown(true)}
+              onChange={(e) => {
+                setBusqueda(e.target.value.toUpperCase());
+                setMostrarDropdown(true);
+                setVehiculoSeleccionado(null);
+              }}
+              style={{
+                width: '100%',
+                padding: '10px',
+                backgroundColor: '#0F172A',
+                border: '1px solid #334155',
+                borderRadius: '6px',
+                color: '#F8FAFC',
+                textTransform: 'uppercase',
+              }}
+            />
             {mostrarDropdown && (
               <div
                 style={{
@@ -360,99 +233,84 @@ export const ModalCrearOT: React.FC<ModalCrearOTProps> = ({
                   border: '1px solid #334155',
                   borderRadius: '6px',
                   marginTop: '4px',
-                  maxHeight: '200px',
+                  maxHeight: '180px',
                   overflowY: 'auto',
                   zIndex: 1050,
-                  boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.5)',
                 }}
               >
-                {cargandoVehiculos ? (
-                  <div
-                    style={{
-                      padding: '12px',
-                      fontSize: '13px',
-                      color: '#94A3B8',
-                      textAlign: 'center',
-                    }}
-                  >
-                    Cargando todos los vehículos de la base de datos...
-                  </div>
-                ) : opcionesFiltradas.length > 0 ? (
+                {opcionesFiltradas.length > 0 ? (
                   opcionesFiltradas.map((v) => (
                     <div
-                      key={v.placa}
+                      key={v.id_vehiculo}
                       onClick={() => seleccionarVehiculoReal(v)}
                       style={{
-                        padding: '10px 12px',
+                        padding: '8px 12px',
                         cursor: 'pointer',
-                        fontSize: '13px',
                         borderBottom: '1px solid #1E293B',
-                        color: '#F8FAFC',
-                        display: 'flex',
-                        justifyContent: 'space-between',
+                        fontSize: '13px',
                       }}
-                      onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#1E293B')}
-                      onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
                     >
-                      <span>
-                        🚘 <strong>{v.placa}</strong>{' '}
-                        {v.marca ? `— ${v.marca} ${v.modelo || ''}` : ''}
-                      </span>
-                      <span style={{ color: '#38BDF8', fontSize: '12px' }}>
-                        {v.kilometraje_actual ? `${v.kilometraje_actual.toLocaleString()} km` : ''}
-                      </span>
+                      🚘 <strong>{v.placa}</strong> - {v.marca} {v.modelo}
                     </div>
                   ))
                 ) : (
                   <div
                     style={{
-                      padding: '12px',
-                      fontSize: '13px',
+                      padding: '10px',
+                      fontSize: '12px',
                       color: '#94A3B8',
                       textAlign: 'center',
                     }}
                   >
-                    No hay coincidencia local para "{busqueda}"
-                  </div>
-                )}
-
-                {busqueda.trim() && (
-                  <div
-                    onClick={() => consultarPlacaEspecificaBD(busqueda)}
-                    style={{
-                      padding: '10px 12px',
-                      cursor: 'pointer',
-                      fontSize: '13px',
-                      backgroundColor: '#1E293B',
-                      color: '#38BDF8',
-                      fontWeight: 600,
-                      textAlign: 'center',
-                      borderTop: '1px solid #334155',
-                    }}
-                  >
-                    🔍 Consultar "{busqueda}" directamente en la BD
+                    No se encontraron vehículos.{' '}
+                    {onIrARegistrarVehiculo && (
+                      <button
+                        type="button"
+                        onClick={onIrARegistrarVehiculo}
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          color: '#38BDF8',
+                          cursor: 'pointer',
+                          textDecoration: 'underline',
+                          padding: 0,
+                          fontSize: '12px',
+                        }}
+                      >
+                        Registrar uno nuevo
+                      </button>
+                    )}
                   </div>
                 )}
               </div>
             )}
+          </div>
 
-            {vehiculoSeleccionado && (
-              <div
-                style={{
-                  marginTop: '8px',
-                  padding: '8px 12px',
-                  backgroundColor: '#064E3B',
-                  border: '1px solid #059669',
-                  borderRadius: '6px',
-                  fontSize: '12px',
-                  color: '#A7F3D0',
-                }}
-              >
-                ✓ <strong>{vehiculoSeleccionado.placa}</strong> —{' '}
-                {vehiculoSeleccionado.marca || 'Vehículo'} {vehiculoSeleccionado.modelo || ''} (Km
-                BD: {ultimoKm.toLocaleString()})
-              </div>
-            )}
+          {/* Servicio Inicial Obligatorio */}
+          <div style={{ marginBottom: '16px' }}>
+            <label
+              style={{ display: 'block', fontSize: '13px', color: '#94A3B8', marginBottom: '6px' }}
+            >
+              Servicio Inicial *
+            </label>
+            <select
+              value={idServicioInicial}
+              onChange={(e) => setIdServicioInicial(Number(e.target.value))}
+              style={{
+                width: '100%',
+                padding: '10px',
+                backgroundColor: '#0F172A',
+                border: '1px solid #334155',
+                borderRadius: '6px',
+                color: '#F8FAFC',
+              }}
+            >
+              {serviciosDisponibles.map((s) => (
+                <option key={s.id_servicio} value={s.id_servicio}>
+                  {s.nombre} (S/ {s.precio_venta_soles.toFixed(2)})
+                </option>
+              ))}
+            </select>
           </div>
 
           <div
@@ -472,11 +330,13 @@ export const ModalCrearOT: React.FC<ModalCrearOTProps> = ({
                   marginBottom: '6px',
                 }}
               >
-                Asignar Zanja (Opcional)
+                Km Ingreso *
               </label>
-              <select
-                value={zanja ?? ''}
-                onChange={(e) => setZanja(e.target.value === '' ? null : Number(e.target.value))}
+              <input
+                type="number"
+                required
+                value={kilometrajeIngreso}
+                onChange={(e) => setKilometrajeIngreso(e.target.value)}
                 style={{
                   width: '100%',
                   padding: '10px',
@@ -484,19 +344,9 @@ export const ModalCrearOT: React.FC<ModalCrearOTProps> = ({
                   border: '1px solid #334155',
                   borderRadius: '6px',
                   color: '#F8FAFC',
-                  boxSizing: 'border-box',
                 }}
-              >
-                <option value="">Sin Zanja (Atención Libre / Estacionamiento)</option>
-                <option value={1} disabled={zanja1Ocupada}>
-                  Zanja 1 {zanja1Ocupada ? '(Ocupada)' : ''}
-                </option>
-                <option value={2} disabled={zanja2Ocupada}>
-                  Zanja 2 {zanja2Ocupada ? '(Ocupada)' : ''}
-                </option>
-              </select>
+              />
             </div>
-
             <div>
               <label
                 style={{
@@ -506,10 +356,9 @@ export const ModalCrearOT: React.FC<ModalCrearOTProps> = ({
                   marginBottom: '6px',
                 }}
               >
-                Mecánico Asignado (Opcional)
+                Mecánico (Opcional)
               </label>
               <select
-                disabled={cargandoMecanicos}
                 value={idMecanico}
                 onChange={(e) => setIdMecanico(Number(e.target.value))}
                 style={{
@@ -519,112 +368,29 @@ export const ModalCrearOT: React.FC<ModalCrearOTProps> = ({
                   border: '1px solid #334155',
                   borderRadius: '6px',
                   color: '#F8FAFC',
-                  boxSizing: 'border-box',
                 }}
               >
-                <option value={0}>Sin Asignar (Mecánico Opcional)</option>
-                {cargandoMecanicos ? (
-                  <option value={0} disabled>
-                    Cargando mecánicos...
+                <option value={0}>Sin Asignar (A cola común)</option>
+                {mecanicos.map((m) => (
+                  <option key={m.id_usuario} value={m.id_usuario}>
+                    {m.nombre_completo}
                   </option>
-                ) : (
-                  mecanicos.map((m) => (
-                    <option key={m.id_usuario} value={m.id_usuario}>
-                      {m.nombre_completo}
-                    </option>
-                  ))
-                )}
+                ))}
               </select>
             </div>
-          </div>
-
-          <div style={{ marginBottom: '16px' }}>
-            <label
-              style={{ display: 'block', fontSize: '13px', color: '#94A3B8', marginBottom: '6px' }}
-            >
-              Kilometraje de Ingreso (km) *
-            </label>
-            <input
-              type="number"
-              required
-              min={0}
-              placeholder="Ej. 65200"
-              value={kilometrajeIngreso}
-              onChange={(e) => {
-                setKilometrajeIngreso(e.target.value);
-                setErrorMsg('');
-              }}
-              style={{
-                width: '100%',
-                padding: '10px',
-                backgroundColor: '#0F172A',
-                border: '1px solid #334155',
-                borderRadius: '6px',
-                color: '#F8FAFC',
-                boxSizing: 'border-box',
-              }}
-            />
-            {vehiculoSeleccionado && (
-              <div
-                style={{
-                  marginTop: '6px',
-                  fontSize: '12px',
-                  color: '#38BDF8',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '4px',
-                }}
-              >
-                <span>💡</span>
-                <span>
-                  Último ingreso: <strong>{ultimoKm.toLocaleString()} km</strong>
-                  {estimadoProximo && (
-                    <>
-                      {' '}
-                      | Estimado actual: <strong>{estimadoProximo.toLocaleString()} km</strong>
-                    </>
-                  )}
-                </span>
-              </div>
-            )}
-          </div>
-
-          <div style={{ marginBottom: '16px' }}>
-            <label
-              style={{ display: 'block', fontSize: '13px', color: '#94A3B8', marginBottom: '6px' }}
-            >
-              Tipo de Aceite a Aplicar (Opcional)
-            </label>
-            <select
-              value={tipoAceite}
-              onChange={(e) => setTipoAceite(e.target.value as TipoAceiteOT | '')}
-              style={{
-                width: '100%',
-                padding: '10px',
-                backgroundColor: '#0F172A',
-                border: '1px solid #334155',
-                borderRadius: '6px',
-                color: '#F8FAFC',
-                boxSizing: 'border-box',
-              }}
-            >
-              <option value="">Sin Aceite Específico / Mantenimiento General</option>
-              <option value="MINERAL">Mineral (+5,000 km próx. mantenimiento)</option>
-              <option value="SINTETICO">Sintético (+10,000 km próx. mantenimiento)</option>
-            </select>
           </div>
 
           <div style={{ marginBottom: '20px' }}>
             <label
               style={{ display: 'block', fontSize: '13px', color: '#94A3B8', marginBottom: '6px' }}
             >
-              Observaciones / Pedido del Cliente
+              Pedido del Cliente
             </label>
             <textarea
-              rows={3}
-              placeholder="Detalle los requerimientos del cliente..."
-              value={observaciones}
-              onChange={(e) => setObservaciones(e.target.value)}
+              rows={2}
+              value={pedidoCliente}
+              onChange={(e) => setPedidoCliente(e.target.value)}
+              placeholder="Detalle de fallas o pedido especial..."
               style={{
                 width: '100%',
                 padding: '10px',
@@ -632,7 +398,6 @@ export const ModalCrearOT: React.FC<ModalCrearOTProps> = ({
                 border: '1px solid #334155',
                 borderRadius: '6px',
                 color: '#F8FAFC',
-                boxSizing: 'border-box',
               }}
             />
           </div>
@@ -641,7 +406,6 @@ export const ModalCrearOT: React.FC<ModalCrearOTProps> = ({
             <button
               type="button"
               onClick={onClose}
-              disabled={loading}
               style={{
                 padding: '10px 16px',
                 backgroundColor: 'transparent',
@@ -658,15 +422,15 @@ export const ModalCrearOT: React.FC<ModalCrearOTProps> = ({
               disabled={loading || !vehiculoSeleccionado}
               style={{
                 padding: '10px 18px',
-                backgroundColor: !vehiculoSeleccionado ? '#475569' : '#2563EB',
-                color: '#FFFFFF',
+                backgroundColor: '#2563EB',
+                color: '#FFF',
                 border: 'none',
                 borderRadius: '6px',
                 fontWeight: '600',
-                cursor: !vehiculoSeleccionado ? 'not-allowed' : 'pointer',
+                cursor: 'pointer',
               }}
             >
-              {loading ? 'Guardando...' : 'Crear OT'}
+              {loading ? 'Recepcionando...' : 'Recepcionar OT'}
             </button>
           </div>
         </form>

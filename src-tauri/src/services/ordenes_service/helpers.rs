@@ -1,3 +1,4 @@
+use crate::dto::orden_trabajo_dto::OrdenTrabajoHistorialDto;
 use crate::errors::AppError;
 use rusqlite::{params, Connection, OptionalExtension};
 use serde_json::Value;
@@ -25,21 +26,6 @@ pub fn generar_codigo_ot(conn: &Connection) -> Result<String, AppError> {
     Ok(format!("OT-{}-{:04}", anio_actual, max_id + 1))
 }
 
-pub fn obtener_tipo_aceite_ot(conn: &Connection, id_ot: i64) -> Result<Option<String>, AppError> {
-    let sql = "SELECT tipo_aceite FROM ordenes_trabajo WHERE id_ot = ?1";
-    if let Ok(Some(Some(t))) = conn
-        .query_row(sql, [id_ot], |row| row.get::<_, Option<String>>(0))
-        .optional()
-    {
-        let t_clean = t.trim();
-        if !t_clean.is_empty() {
-            return Ok(Some(t_clean.to_string()));
-        }
-    }
-
-    Ok(None)
-}
-
 pub fn tiene_cambio_aceite(conn: &Connection, id_ot: i64) -> bool {
     let serv_count: i32 = conn
         .query_row(
@@ -50,31 +36,6 @@ pub fn tiene_cambio_aceite(conn: &Connection, id_ot: i64) -> bool {
         .unwrap_or(0);
 
     serv_count > 0
-}
-
-pub fn calcular_proximo_kilometraje(
-    conn: &Connection,
-    id_ot: i64,
-    km_base: i64,
-    tipo_aceite: Option<&str>,
-) -> Option<i64> {
-    if !tiene_cambio_aceite(conn, id_ot) {
-        return None;
-    }
-
-    let t_aceite = tipo_aceite?;
-    let t_clean = t_aceite.trim();
-    if t_clean.is_empty() {
-        return None;
-    }
-
-    let intervalo = match t_clean.to_uppercase().as_str() {
-        "SINTETICO" => 10000,
-        "MINERAL" => 5000,
-        _ => 5000,
-    };
-
-    Some(km_base + intervalo)
 }
 
 pub fn extraer_identidad_cliente_snapshot(
@@ -150,72 +111,23 @@ pub fn validar_mecanico_activo(conn: &Connection, id_mecanico: i64) -> Result<()
     }
 }
 
-pub fn validar_transicion_estado(estado_actual: &str, nuevo_estado: &str) -> Result<(), AppError> {
-    let actual = estado_actual.trim().to_uppercase();
-    let nuevo = nuevo_estado.trim().to_uppercase();
+pub fn sanitizar_ot_por_rol(
+    mut dto: OrdenTrabajoHistorialDto,
+    rol: &str,
+) -> OrdenTrabajoHistorialDto {
+    let rol_upper = rol.to_uppercase();
 
-    if actual == nuevo {
-        return Ok(());
+    // Privacidad de nota interna para CAJERO
+    if rol_upper == "CAJERO" {
+        dto.nota_interna = None;
     }
 
-    let es_valida = matches!(
-        (actual.as_str(), nuevo.as_str()),
-        ("EN_ESPERA", "EN_PROCESO")
-            | ("EN_ESPERA", "CANCELADO")
-            | ("EN_PROCESO", "FINALIZADO")
-            | ("EN_PROCESO", "CANCELADO")
-    );
-
-    if !es_valida {
-        return Err(AppError::Validation(format!(
-            "Transición de estado no permitida: No se puede cambiar de '{}' a '{}'.",
-            actual, nuevo
-        )));
-    }
-
-    Ok(())
-}
-
-pub fn validar_permiso_operacion_ot(
-    conn: &Connection,
-    id_ot: i64,
-    id_usuario: i64,
-) -> Result<(), AppError> {
-    let (rol_usuario, activo): (String, i32) = conn
-        .query_row(
-            "SELECT UPPER(rol), activo FROM usuarios WHERE id_usuario = ?1",
-            [id_usuario],
-            |row| Ok((row.get(0)?, row.get(1)?)),
-        )
-        .map_err(|_| AppError::Validation("Usuario ejecutor no encontrado.".to_string()))?;
-
-    if activo != 1 {
-        return Err(AppError::Validation("Usuario inactivo.".to_string()));
-    }
-
-    if rol_usuario == "ADMINISTRADOR" {
-        return Ok(());
-    }
-
-    if rol_usuario == "MECANICO" {
-        let id_mecanico_ot: Option<i64> = conn
-            .query_row(
-                "SELECT id_mecanico FROM ordenes_trabajo WHERE id_ot = ?1",
-                [id_ot],
-                |row| row.get(0),
-            )
-            .map_err(|_| AppError::NotFound(format!("No se encontró la OT con ID {}.", id_ot)))?;
-
-        if id_mecanico_ot != Some(id_usuario) && id_mecanico_ot != Some(0) {
-            return Err(AppError::Validation(
-                "Acceso denegado: No tienes permiso para modificar la OT de otro mecánico."
-                    .to_string(),
-            ));
+    // Privacidad de costos internos (solo ADMINISTRADOR los ve)
+    if rol_upper != "ADMINISTRADOR" {
+        for insumo in &mut dto.insumos {
+            insumo.costo_unitario_micro = None;
         }
-        return Ok(());
     }
 
-    Err(AppError::Validation(
-        "Acceso denegado: Tu rol no permite modificar detalles de Órdenes de Trabajo.".to_string(),
-    ))
+    dto
 }

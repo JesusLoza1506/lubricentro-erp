@@ -1,115 +1,210 @@
 import React from 'react';
-import { OrdenTrabajoHistorialDTO } from '../../../types/ordenTrabajo';
+import { TableroZanjasDTO, OrdenTrabajoHistorialDTO } from '../../../types/ordenTrabajo';
 import { styles } from '../ordenesStyles';
 
 interface TableroZanjasProps {
-  ordenes: OrdenTrabajoHistorialDTO[];
+  tablero: TableroZanjasDTO;
   onVerDetalle: (ot: OrdenTrabajoHistorialDTO) => void;
-  onAbrirModalCrear: (zanja: number) => void;
-  puedeCrear: boolean;
+  onIniciarEnZanja: (idOt: number, idZanja: number) => void;
 }
 
 export const TableroZanjas: React.FC<TableroZanjasProps> = ({
-  ordenes,
+  tablero,
   onVerDetalle,
-  onAbrirModalCrear,
-  puedeCrear,
+  onIniciarEnZanja,
 }) => {
-  const getOtActivaZanja = (numZanja: number) => {
-    return ordenes.find(
-      (ot) => ot.zanja === numZanja && (ot.estado === 'EN_ESPERA' || ot.estado === 'EN_PROCESO')
-    );
-  };
-
-  const renderBadgeEstado = (estado: string) => {
-    let style = { ...styles.badgeEstado };
-    if (estado === 'EN_ESPERA') {
-      style = { ...style, backgroundColor: '#334155', color: '#94A3B8' };
-    } else if (estado === 'EN_PROCESO') {
-      style = { ...style, backgroundColor: '#1E3A8A', color: '#60A5FA' };
-    } else if (estado === 'FINALIZADO') {
-      style = { ...style, backgroundColor: '#064E3B', color: '#34D399' };
-    } else {
-      style = { ...style, backgroundColor: '#7F1D1D', color: '#FCA5A5' };
-    }
-
-    return <span style={style}>{estado.replace('_', ' ')}</span>;
-  };
-
   return (
-    <div style={styles.tableroGrid}>
-      {[1, 2].map((numZanja) => {
-        const otActiva = getOtActivaZanja(numZanja);
-
-        return (
-          <div key={numZanja} style={styles.columnaZanja}>
-            <div style={styles.tituloZanja}>
-              <span>Zanja {numZanja}</span>
-              {otActiva && renderBadgeEstado(otActiva.estado)}
-            </div>
-
-            {otActiva ? (
-              <div style={styles.tarjetaOt}>
+    <div>
+      {/* COLA COMÚN EN ESPERA */}
+      <div
+        style={{
+          marginBottom: '24px',
+          backgroundColor: '#0F172A',
+          padding: '16px',
+          borderRadius: '8px',
+          border: '1px solid #334155',
+        }}
+      >
+        <h3
+          style={{
+            margin: '0 0 12px 0',
+            fontSize: '16px',
+            color: '#F8FAFC',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+          }}
+        >
+          <span>⏳</span> Cola de Espera ({tablero.cola_espera.length})
+        </h3>
+        {tablero.cola_espera.length === 0 ? (
+          <p style={{ margin: 0, color: '#64748B', fontSize: '13px', fontStyle: 'italic' }}>
+            No hay vehículos esperando atención en cola.
+          </p>
+        ) : (
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+              gap: '12px',
+            }}
+          >
+            {tablero.cola_espera.map((ot) => (
+              <div
+                key={ot.id_ot}
+                style={{
+                  backgroundColor: '#1E293B',
+                  padding: '12px',
+                  borderRadius: '6px',
+                  border: '1px solid #334155',
+                }}
+              >
                 <div
-                  style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}
+                  style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}
                 >
-                  <strong style={{ fontSize: '18px', color: '#F8FAFC' }}>{otActiva.placa}</strong>
-                  <span style={{ color: '#94A3B8', fontSize: '14px' }}>{otActiva.codigo_ot}</span>
+                  <strong style={{ fontSize: '16px', color: '#F8FAFC' }}>{ot.placa}</strong>
+                  <span style={{ color: '#94A3B8', fontSize: '12px' }}>{ot.codigo_ot}</span>
                 </div>
-
-                <p style={{ margin: '4px 0', fontSize: '14px', color: '#CBD5E1' }}>
-                  <strong>Mecánico:</strong> {otActiva.nombre_mecanico || 'No asignado'}
+                <p style={{ margin: '2px 0', fontSize: '12px', color: '#CBD5E1' }}>
+                  <strong>Cliente:</strong> {ot.cliente_nombre}
                 </p>
-                <p style={{ margin: '4px 0', fontSize: '14px', color: '#CBD5E1' }}>
-                  <strong>Km Ingreso:</strong> {otActiva.kilometraje_ingreso.toLocaleString()} km
+                <p style={{ margin: '2px 0', fontSize: '12px', color: '#CBD5E1' }}>
+                  <strong>Técnico:</strong> {ot.nombre_mecanico || 'Pendiente (Autoasignable)'}
                 </p>
-
-                {otActiva.observaciones && (
-                  <p
-                    style={{
-                      margin: '8px 0 0 0',
-                      fontSize: '13px',
-                      color: '#94A3B8',
-                      fontStyle: 'italic',
-                    }}
-                  >
-                    "{otActiva.observaciones}"
-                  </p>
-                )}
-
+                <p style={{ margin: '2px 0', fontSize: '12px', color: '#CBD5E1' }}>
+                  <strong>Km Ingreso:</strong> {ot.kilometraje_ingreso.toLocaleString()} km
+                </p>
                 <button
-                  onClick={() => onVerDetalle(otActiva)}
+                  onClick={() => onVerDetalle(ot)}
                   style={{
-                    marginTop: '16px',
+                    marginTop: '10px',
                     width: '100%',
-                    padding: '8px',
-                    backgroundColor: '#334155',
-                    color: '#F8FAFC',
+                    padding: '6px',
+                    backgroundColor: '#2563EB',
+                    color: '#FFF',
                     border: 'none',
-                    borderRadius: '6px',
+                    borderRadius: '4px',
                     cursor: 'pointer',
-                    fontWeight: '600',
+                    fontWeight: 600,
+                    fontSize: '12px',
                   }}
                 >
-                  Ver Detalle / Gestionar
+                  Atender / Gestionar OT
                 </button>
               </div>
-            ) : (
-              <div style={styles.tarjetaVacia}>
-                <p style={{ margin: 0, fontWeight: '500' }}>Zanja Disponible</p>
-                {puedeCrear && (
-                  <button
-                    onClick={() => onAbrirModalCrear(numZanja)}
-                    style={{ ...styles.btnNuevaOT, marginTop: '12px' }}
-                  >
-                    + Asignar OT a Zanja {numZanja}
-                  </button>
-                )}
-              </div>
-            )}
+            ))}
           </div>
-        );
-      })}
+        )}
+      </div>
+
+      {/* TABLERO DE ZANJAS (1 A 6) */}
+      <h3 style={{ margin: '0 0 12px 0', fontSize: '16px', color: '#F8FAFC' }}>
+        Zanjas de Trabajo (1 a 6)
+      </h3>
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
+          gap: '16px',
+        }}
+      >
+        {tablero.zanjas.map((z) => {
+          const ot = z.ot_actual;
+          return (
+            <div key={z.id_zanja} style={styles.columnaZanja}>
+              <div style={styles.tituloZanja}>
+                <span>Zanja {z.id_zanja}</span>
+                <span
+                  style={{
+                    padding: '2px 8px',
+                    borderRadius: '4px',
+                    fontSize: '11px',
+                    fontWeight: 700,
+                    backgroundColor: z.ocupada ? '#1E3A8A' : '#064E3B',
+                    color: z.ocupada ? '#60A5FA' : '#34D399',
+                  }}
+                >
+                  {z.ocupada ? 'OCUPADA' : 'LIBRE'}
+                </span>
+              </div>
+
+              {z.ocupada && ot ? (
+                <div style={styles.tarjetaOt}>
+                  <div
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      marginBottom: '8px',
+                    }}
+                  >
+                    <strong style={{ fontSize: '18px', color: '#F8FAFC' }}>{ot.placa}</strong>
+                    <span style={{ color: '#94A3B8', fontSize: '13px' }}>{ot.codigo_ot}</span>
+                  </div>
+                  <p style={{ margin: '4px 0', fontSize: '13px', color: '#CBD5E1' }}>
+                    <strong>Cliente:</strong> {ot.cliente_nombre}
+                  </p>
+                  <p style={{ margin: '4px 0', fontSize: '13px', color: '#CBD5E1' }}>
+                    <strong>Mecánico:</strong> {ot.nombre_mecanico || 'En ejecucion'}
+                  </p>
+                  <p style={{ margin: '4px 0', fontSize: '13px', color: '#CBD5E1' }}>
+                    <strong>Ingreso:</strong> {ot.kilometraje_ingreso.toLocaleString()} km
+                  </p>
+                  <button
+                    onClick={() => onVerDetalle(ot)}
+                    style={{
+                      marginTop: '12px',
+                      width: '100%',
+                      padding: '8px',
+                      backgroundColor: '#334155',
+                      color: '#F8FAFC',
+                      border: 'none',
+                      borderRadius: '6px',
+                      cursor: 'pointer',
+                      fontWeight: '600',
+                    }}
+                  >
+                    Ver Detalle / Insumos
+                  </button>
+                </div>
+              ) : (
+                <div style={styles.tarjetaVacia}>
+                  <p style={{ margin: 0, fontWeight: '500', color: '#94A3B8' }}>Zanja Disponible</p>
+                  {tablero.cola_espera.length > 0 && (
+                    <div style={{ marginTop: '10px' }}>
+                      <p style={{ fontSize: '11px', color: '#64748B', marginBottom: '4px' }}>
+                        Asignar desde cola:
+                      </p>
+                      <select
+                        onChange={(e) => {
+                          const val = Number(e.target.value);
+                          if (val > 0) onIniciarEnZanja(val, z.id_zanja);
+                        }}
+                        defaultValue={0}
+                        style={{
+                          width: '100%',
+                          padding: '6px',
+                          backgroundColor: '#0F172A',
+                          border: '1px solid #334155',
+                          borderRadius: '4px',
+                          color: '#38BDF8',
+                          fontSize: '12px',
+                        }}
+                      >
+                        <option value={0}>-- Seleccionar vehículo --</option>
+                        {tablero.cola_espera.map((colaOt) => (
+                          <option key={colaOt.id_ot} value={colaOt.id_ot}>
+                            {colaOt.placa} ({colaOt.codigo_ot})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 };

@@ -42,7 +42,6 @@ export const ModalVehiculo: React.FC<ModalVehiculoProps> = ({
   const [tipoMotor, setTipoMotor] = useState<string>('');
   const [kilometraje, setKilometraje] = useState<number | ''>('');
 
-  // Datos del Cliente
   const [idClienteSeleccionado, setIdClienteSeleccionado] = useState<number | null>(null);
   const [nombreCliente, setNombreCliente] = useState('');
   const [tipoDoc, setTipoDoc] = useState('DNI');
@@ -52,14 +51,13 @@ export const ModalVehiculo: React.FC<ModalVehiculoProps> = ({
   const [direccion, setDireccion] = useState('');
   const [motivo, setMotivo] = useState('');
 
-  // Estados del Minibuscador Predictivo
   const [sugerenciasClientes, setSugerenciasClientes] = useState<ClienteDTO[]>([]);
   const [mostrarSugerencias, setMostrarSugerencias] = useState(false);
 
   const [guardando, setGuardando] = useState(false);
+  const [isDirty, setIsDirty] = useState(false);
   const [errorModal, setErrorModal] = useState<string | null>(null);
 
-  // Estado para el modal de confirmación
   const [confirmModalOpen, setConfirmModalOpen] = useState(false);
 
   const anioMaximo = new Date().getFullYear() + 1;
@@ -106,14 +104,24 @@ export const ModalVehiculo: React.FC<ModalVehiculoProps> = ({
       setCorreo('');
       setDireccion('');
     }
+    setIsDirty(false);
   }, [modo, vehiculoEditar, modalAbierto]);
 
   if (!modalAbierto) return null;
 
-  // Manejador de entrada para el Minibuscador Predictivo de Clientes
+  const handleCerrar = () => {
+    if (guardando) return;
+    if (isDirty) {
+      const confirmar = window.confirm('¿Desea descartar los cambios no guardados?');
+      if (!confirmar) return;
+    }
+    setModalAbierto(false);
+  };
+
   const handleNombreClienteChange = async (val: string) => {
+    setIsDirty(true);
     setNombreCliente(val);
-    setIdClienteSeleccionado(null); // Al editar el texto libre, liberamos el ID previo
+    setIdClienteSeleccionado(null);
 
     if (val.trim().length >= 2) {
       try {
@@ -129,8 +137,8 @@ export const ModalVehiculo: React.FC<ModalVehiculoProps> = ({
     }
   };
 
-  // Al seleccionar un cliente sugerido de la lista flotante
   const seleccionarClienteExistente = (cliente: ClienteDTO) => {
+    setIsDirty(true);
     setIdClienteSeleccionado(cliente.id_cliente);
     setNombreCliente(cliente.nombre_razon_social);
     setTipoDoc(cliente.tipo_documento);
@@ -142,6 +150,7 @@ export const ModalVehiculo: React.FC<ModalVehiculoProps> = ({
   };
 
   const handlePlacaChange = (val: string) => {
+    setIsDirty(true);
     const clean = val
       .toUpperCase()
       .replace(/[^A-Z0-9]/g, '')
@@ -150,6 +159,7 @@ export const ModalVehiculo: React.FC<ModalVehiculoProps> = ({
   };
 
   const handleTelefonoChange = (val: string) => {
+    setIsDirty(true);
     let clean = val.trim().replace(/[\s-]/g, '');
     if (clean.startsWith('+51')) {
       clean = clean.slice(3);
@@ -160,6 +170,7 @@ export const ModalVehiculo: React.FC<ModalVehiculoProps> = ({
   };
 
   const handleNumDocChange = (val: string) => {
+    setIsDirty(true);
     if (tipoDoc === 'DNI') {
       setNumDoc(val.replace(/\D/g, '').slice(0, 8));
     } else if (tipoDoc === 'RUC') {
@@ -176,7 +187,6 @@ export const ModalVehiculo: React.FC<ModalVehiculoProps> = ({
   const numDocAnterior =
     vehiculoEditar?.cliente?.numero_documento || vehiculoEditar?.documento_cliente || '';
 
-  // Detección de cambios sensibles que requieren motivo y confirmación explícita
   const disminuyeKm = modo === 'EDITAR' && kmActualVal < kmAnteriorVal;
   const cambiaPlaca = modo === 'EDITAR' && vehiculoEditar && placa !== vehiculoEditar.placa;
   const cambiaTipoDoc = modo === 'EDITAR' && vehiculoEditar && tipoDoc !== tipoDocAnterior;
@@ -229,6 +239,7 @@ export const ModalVehiculo: React.FC<ModalVehiculoProps> = ({
         };
         await handleGuardar(payload);
       }
+      setIsDirty(false);
       setModalAbierto(false);
     } catch (err: unknown) {
       const mensaje = extraerMensajeError(err);
@@ -263,11 +274,32 @@ export const ModalVehiculo: React.FC<ModalVehiculoProps> = ({
     <>
       <div style={overlayStyle}>
         <div style={modalBoxStyle}>
-          <h3
-            style={{ fontSize: '20px', fontWeight: '800', color: '#F8FAFC', margin: '0 0 20px 0' }}
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginBottom: '20px',
+            }}
           >
-            {modo === 'CREAR' ? 'Registrar Nuevo Vehículo / Cliente' : 'Editar Ficha Vehicular'}
-          </h3>
+            <h3 style={{ fontSize: '20px', fontWeight: '800', color: '#F8FAFC', margin: 0 }}>
+              {modo === 'CREAR' ? 'Registrar Nuevo Vehículo / Cliente' : 'Editar Ficha Vehicular'}
+            </h3>
+            <button
+              type="button"
+              disabled={guardando}
+              onClick={handleCerrar}
+              style={{
+                background: 'none',
+                border: 'none',
+                color: '#94A3B8',
+                fontSize: '18px',
+                cursor: guardando ? 'not-allowed' : 'pointer',
+              }}
+            >
+              ✕
+            </button>
+          </div>
 
           {errorModal && <div style={errorBoxStyle}>⚠️ {errorModal}</div>}
 
@@ -275,17 +307,16 @@ export const ModalVehiculo: React.FC<ModalVehiculoProps> = ({
             onSubmit={onSubmit}
             style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}
           >
-            {/* DATOS DEL CLIENTE */}
             <div style={sectionBoxStyle}>
               <span style={sectionTitleStyle}>Datos del Propietario / Cliente</span>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                {/* Campo con Minibuscador Predictivo */}
                 <div style={{ position: 'relative' }}>
                   <label style={labelStyle}>
                     Cliente / Razón Social * (Escriba para buscar existente)
                   </label>
                   <input
                     required
+                    disabled={guardando}
                     type="text"
                     placeholder="Ej. Juan Pérez / Buscar por RUC o DNI..."
                     value={nombreCliente}
@@ -296,7 +327,6 @@ export const ModalVehiculo: React.FC<ModalVehiculoProps> = ({
                     style={inputStyle}
                   />
 
-                  {/* Lista desplegable flotante del Minibuscador */}
                   {mostrarSugerencias && sugerenciasClientes.length > 0 && (
                     <div style={dropdownContainerStyle}>
                       {sugerenciasClientes.map((c) => (
@@ -326,12 +356,18 @@ export const ModalVehiculo: React.FC<ModalVehiculoProps> = ({
                   <div>
                     <label style={labelStyle}>Tipo Doc. *</label>
                     <select
+                      disabled={guardando}
                       value={tipoDoc}
                       onChange={(e) => {
+                        setIsDirty(true);
                         setTipoDoc(e.target.value);
                         setNumDoc('');
                       }}
-                      style={{ ...inputStyle, backgroundColor: '#1E293B', cursor: 'pointer' }}
+                      style={{
+                        ...inputStyle,
+                        backgroundColor: '#1E293B',
+                        cursor: guardando ? 'not-allowed' : 'pointer',
+                      }}
                     >
                       <option value="DNI">DNI</option>
                       <option value="RUC">RUC</option>
@@ -342,6 +378,7 @@ export const ModalVehiculo: React.FC<ModalVehiculoProps> = ({
                     <label style={labelStyle}>N° Documento *</label>
                     <input
                       required
+                      disabled={guardando}
                       type="text"
                       placeholder={
                         tipoDoc === 'DNI' ? '8 dígitos' : tipoDoc === 'RUC' ? '11 dígitos' : 'CE'
@@ -354,6 +391,7 @@ export const ModalVehiculo: React.FC<ModalVehiculoProps> = ({
                   <div>
                     <label style={labelStyle}>Teléfono</label>
                     <input
+                      disabled={guardando}
                       type="text"
                       placeholder="987654321"
                       value={telefono}
@@ -367,20 +405,28 @@ export const ModalVehiculo: React.FC<ModalVehiculoProps> = ({
                   <div>
                     <label style={labelStyle}>Correo Electrónico</label>
                     <input
+                      disabled={guardando}
                       type="email"
                       placeholder="cliente@correo.com"
                       value={correo}
-                      onChange={(e) => setCorreo(e.target.value)}
+                      onChange={(e) => {
+                        setIsDirty(true);
+                        setCorreo(e.target.value);
+                      }}
                       style={inputStyle}
                     />
                   </div>
                   <div>
                     <label style={labelStyle}>Dirección</label>
                     <input
+                      disabled={guardando}
                       type="text"
                       placeholder="Av. Principal 123"
                       value={direccion}
-                      onChange={(e) => setDireccion(e.target.value)}
+                      onChange={(e) => {
+                        setIsDirty(true);
+                        setDireccion(e.target.value);
+                      }}
                       style={inputStyle}
                     />
                   </div>
@@ -388,7 +434,6 @@ export const ModalVehiculo: React.FC<ModalVehiculoProps> = ({
               </div>
             </div>
 
-            {/* DATOS DEL VEHÍCULO */}
             <div style={sectionBoxStyle}>
               <span style={{ ...sectionTitleStyle, color: '#C084FC' }}>Datos del Vehículo</span>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
@@ -397,7 +442,7 @@ export const ModalVehiculo: React.FC<ModalVehiculoProps> = ({
                     <label style={labelStyle}>Placa * (6 Caracteres)</label>
                     <input
                       required
-                      disabled={placaDeshabilitada}
+                      disabled={placaDeshabilitada || guardando}
                       type="text"
                       placeholder="ABC123"
                       value={placa}
@@ -406,8 +451,8 @@ export const ModalVehiculo: React.FC<ModalVehiculoProps> = ({
                         ...inputStyle,
                         fontFamily: 'monospace',
                         fontWeight: '700',
-                        opacity: placaDeshabilitada ? 0.6 : 1,
-                        cursor: placaDeshabilitada ? 'not-allowed' : 'text',
+                        opacity: placaDeshabilitada || guardando ? 0.6 : 1,
+                        cursor: placaDeshabilitada || guardando ? 'not-allowed' : 'text',
                       }}
                     />
                   </div>
@@ -415,10 +460,14 @@ export const ModalVehiculo: React.FC<ModalVehiculoProps> = ({
                     <label style={labelStyle}>Marca *</label>
                     <input
                       required
+                      disabled={guardando}
                       type="text"
                       placeholder="Toyota"
                       value={marca}
-                      onChange={(e) => setMarca(e.target.value)}
+                      onChange={(e) => {
+                        setIsDirty(true);
+                        setMarca(e.target.value);
+                      }}
                       style={inputStyle}
                     />
                   </div>
@@ -426,10 +475,14 @@ export const ModalVehiculo: React.FC<ModalVehiculoProps> = ({
                     <label style={labelStyle}>Modelo *</label>
                     <input
                       required
+                      disabled={guardando}
                       type="text"
                       placeholder="Yaris"
                       value={modelo}
-                      onChange={(e) => setModelo(e.target.value)}
+                      onChange={(e) => {
+                        setIsDirty(true);
+                        setModelo(e.target.value);
+                      }}
                       style={inputStyle}
                     />
                   </div>
@@ -439,21 +492,33 @@ export const ModalVehiculo: React.FC<ModalVehiculoProps> = ({
                   <div>
                     <label style={labelStyle}>Año</label>
                     <input
+                      disabled={guardando}
                       type="number"
                       min="1900"
                       max={anioMaximo}
                       placeholder="2020"
                       value={anio}
-                      onChange={(e) => setAnio(e.target.value === '' ? '' : Number(e.target.value))}
+                      onChange={(e) => {
+                        setIsDirty(true);
+                        setAnio(e.target.value === '' ? '' : Number(e.target.value));
+                      }}
                       style={inputStyle}
                     />
                   </div>
                   <div>
                     <label style={labelStyle}>Tipo de Motor</label>
                     <select
+                      disabled={guardando}
                       value={tipoMotor}
-                      onChange={(e) => setTipoMotor(e.target.value)}
-                      style={{ ...inputStyle, backgroundColor: '#1E293B', cursor: 'pointer' }}
+                      onChange={(e) => {
+                        setIsDirty(true);
+                        setTipoMotor(e.target.value);
+                      }}
+                      style={{
+                        ...inputStyle,
+                        backgroundColor: '#1E293B',
+                        cursor: guardando ? 'not-allowed' : 'pointer',
+                      }}
                     >
                       <option value="">Sin especificar</option>
                       <option value="GASOLINA">GASOLINA</option>
@@ -469,13 +534,15 @@ export const ModalVehiculo: React.FC<ModalVehiculoProps> = ({
                     <label style={labelStyle}>KM Actual *</label>
                     <input
                       required
+                      disabled={guardando}
                       type="number"
                       min="0"
                       placeholder="68500"
                       value={kilometraje}
-                      onChange={(e) =>
-                        setKilometraje(e.target.value === '' ? '' : Number(e.target.value))
-                      }
+                      onChange={(e) => {
+                        setIsDirty(true);
+                        setKilometraje(e.target.value === '' ? '' : Number(e.target.value));
+                      }}
                       style={inputStyle}
                     />
                   </div>
@@ -488,10 +555,14 @@ export const ModalVehiculo: React.FC<ModalVehiculoProps> = ({
                     </label>
                     <input
                       required
+                      disabled={guardando}
                       type="text"
                       placeholder="Ej. Corrección por cambio de placa, documento o ajuste de kilometraje"
                       value={motivo}
-                      onChange={(e) => setMotivo(e.target.value)}
+                      onChange={(e) => {
+                        setIsDirty(true);
+                        setMotivo(e.target.value);
+                      }}
                       style={{ ...inputStyle, borderColor: '#EF4444' }}
                     />
                   </div>
@@ -509,12 +580,25 @@ export const ModalVehiculo: React.FC<ModalVehiculoProps> = ({
             >
               <button
                 type="button"
-                onClick={() => setModalAbierto(false)}
-                style={btnSecondaryStyle}
+                disabled={guardando}
+                onClick={handleCerrar}
+                style={{
+                  ...btnSecondaryStyle,
+                  opacity: guardando ? 0.6 : 1,
+                  cursor: guardando ? 'not-allowed' : 'pointer',
+                }}
               >
                 Cancelar
               </button>
-              <button type="submit" disabled={guardando} style={btnPrimaryStyle}>
+              <button
+                type="submit"
+                disabled={guardando}
+                style={{
+                  ...btnPrimaryStyle,
+                  opacity: guardando ? 0.6 : 1,
+                  cursor: guardando ? 'not-allowed' : 'pointer',
+                }}
+              >
                 {guardando ? 'Guardando...' : 'Guardar Ficha'}
               </button>
             </div>
@@ -556,17 +640,28 @@ export const ModalVehiculo: React.FC<ModalVehiculoProps> = ({
             <div style={{ display: 'flex', justifyContent: 'center', gap: '12px' }}>
               <button
                 type="button"
+                disabled={guardando}
                 onClick={() => setConfirmModalOpen(false)}
-                style={btnSecondaryStyle}
+                style={{
+                  ...btnSecondaryStyle,
+                  opacity: guardando ? 0.6 : 1,
+                  cursor: guardando ? 'not-allowed' : 'pointer',
+                }}
               >
                 Revisar
               </button>
               <button
                 type="button"
+                disabled={guardando}
                 onClick={ejecutarGuardado}
-                style={{ ...btnPrimaryStyle, backgroundColor: '#D97706' }}
+                style={{
+                  ...btnPrimaryStyle,
+                  backgroundColor: '#D97706',
+                  opacity: guardando ? 0.6 : 1,
+                  cursor: guardando ? 'not-allowed' : 'pointer',
+                }}
               >
-                Sí, Aplicar Cambios
+                {guardando ? 'Guardando...' : 'Sí, Aplicar Cambios'}
               </button>
             </div>
           </div>

@@ -6,19 +6,30 @@ import {
   Package,
   ShoppingCart,
   Receipt,
-  Users,
-  Activity,
   Database,
+  BarChart2,
+  Home,
   LogOut,
   KeyRound,
+  Lock,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { ConfirmModal } from './ConfirmModal';
+import { ToastNotification } from './ToastNotification';
 
 interface SidebarProps {
   moduloActual: string;
   setModuloActual: (modulo: string) => void;
   onAbrirCambioClave?: () => void;
+}
+
+interface MenuItem {
+  id: string;
+  moduloKey: string;
+  label: string;
+  icon: React.ElementType;
+  siempreVisible: boolean;
+  enDesarrollo: boolean;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -38,6 +49,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   const [mostrarConfirmacion, setMostrarConfirmacion] = useState<boolean>(false);
   const [destinoPendiente, setDestinoPendiente] = useState<string | null>(null);
+  const [notificacionDev, setNotificacionDev] = useState<string | null>(null);
 
   if (estadoSesion !== 'NORMAL' || !usuario) {
     return null;
@@ -45,13 +57,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   const esProdBD = ambienteActual.toUpperCase() === 'PRODUCCION';
 
-  const menuItems = [
+  // Módulos organizados según la arquitectura oficial
+  const menuItems: MenuItem[] = [
     {
       id: 'dashboard',
       moduloKey: 'DASHBOARD',
       label: 'Inicio',
-      icon: Shield,
+      icon: Home,
       siempreVisible: true,
+      enDesarrollo: false,
     },
     {
       id: 'ficha_vehicular',
@@ -59,6 +73,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       label: 'Ficha Vehicular',
       icon: FileText,
       siempreVisible: false,
+      enDesarrollo: false,
     },
     {
       id: 'taller',
@@ -66,6 +81,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       label: 'Órdenes de Trabajo',
       icon: Wrench,
       siempreVisible: false,
+      enDesarrollo: false,
     },
     {
       id: 'inventario',
@@ -73,6 +89,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       label: 'Inventario & Stock',
       icon: Package,
       siempreVisible: false,
+      enDesarrollo: false,
     },
     {
       id: 'pos',
@@ -80,6 +97,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       label: 'Punto de Venta / POS',
       icon: ShoppingCart,
       siempreVisible: false,
+      enDesarrollo: true,
     },
     {
       id: 'caja',
@@ -87,20 +105,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       label: 'Caja Chica',
       icon: Receipt,
       siempreVisible: false,
-    },
-    {
-      id: 'fidelizacion',
-      moduloKey: 'FIDELIZACION',
-      label: 'Fidelización',
-      icon: Users,
-      siempreVisible: false,
-    },
-    {
-      id: 'monitoreo',
-      moduloKey: 'COLA_SUNAT',
-      label: 'Cola SUNAT',
-      icon: Activity,
-      siempreVisible: false,
+      enDesarrollo: true,
     },
     {
       id: 'backup',
@@ -108,6 +113,23 @@ export const Sidebar: React.FC<SidebarProps> = ({
       label: 'Backup & Copias',
       icon: Database,
       siempreVisible: false,
+      enDesarrollo: true,
+    },
+    {
+      id: 'administracion',
+      moduloKey: 'ADMINISTRACION',
+      label: 'Administración',
+      icon: Shield,
+      siempreVisible: false,
+      enDesarrollo: true,
+    },
+    {
+      id: 'reportes',
+      moduloKey: 'REPORTES',
+      label: 'Reportes',
+      icon: BarChart2,
+      siempreVisible: false,
+      enDesarrollo: true,
     },
   ];
 
@@ -115,14 +137,22 @@ export const Sidebar: React.FC<SidebarProps> = ({
     (item) => item.siempreVisible || tienePermiso(item.moduloKey, 'ver')
   );
 
-  const handleNavegarModulo = (nuevoModulo: string) => {
-    if (nuevoModulo === moduloActual) return;
+  const handleNavegarModulo = (item: MenuItem) => {
+    if (item.id === moduloActual) return;
+
+    // Interceptar módulos en construcción
+    if (item.enDesarrollo) {
+      setNotificacionDev(
+        `🚧 El módulo de ${item.label} se encuentra en desarrollo y estará disponible próximamente.`
+      );
+      return;
+    }
 
     if (hayCambiosSinGuardar) {
-      setDestinoPendiente(nuevoModulo);
+      setDestinoPendiente(item.id);
       setMostrarConfirmacion(true);
     } else {
-      setModuloActual(nuevoModulo);
+      setModuloActual(item.id);
     }
   };
 
@@ -160,6 +190,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   return (
     <>
+      {notificacionDev && (
+        <ToastNotification
+          mensaje={notificacionDev}
+          tipo="ERROR"
+          onCerrar={() => setNotificacionDev(null)}
+        />
+      )}
+
       <aside
         style={{
           width: '260px',
@@ -230,25 +268,48 @@ export const Sidebar: React.FC<SidebarProps> = ({
               return (
                 <button
                   key={item.id}
-                  onClick={() => handleNavegarModulo(item.id)}
+                  onClick={() => handleNavegarModulo(item)}
                   style={{
                     display: 'flex',
                     alignItems: 'center',
-                    gap: '12px',
+                    justifyContent: 'space-between',
                     padding: '12px 16px',
                     borderRadius: '10px',
                     border: 'none',
                     backgroundColor: esActivo ? '#2563EB' : 'transparent',
-                    color: esActivo ? '#FFFFFF' : '#94A3B8',
+                    color: esActivo ? '#FFFFFF' : item.enDesarrollo ? '#64748B' : '#94A3B8',
                     fontSize: '14px',
                     fontWeight: esActivo ? '700' : '500',
                     cursor: 'pointer',
                     textAlign: 'left',
                     transition: 'all 0.2s ease',
+                    opacity: item.enDesarrollo ? 0.75 : 1,
                   }}
                 >
-                  <Icon size={18} color={esActivo ? '#FFFFFF' : '#94A3B8'} />
-                  <span>{item.label}</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <Icon
+                      size={18}
+                      color={esActivo ? '#FFFFFF' : item.enDesarrollo ? '#64748B' : '#94A3B8'}
+                    />
+                    <span>{item.label}</span>
+                  </div>
+                  {item.enDesarrollo && (
+                    <span
+                      style={{
+                        fontSize: '9px',
+                        fontWeight: '700',
+                        color: '#94A3B8',
+                        backgroundColor: 'rgba(51, 65, 85, 0.6)',
+                        padding: '2px 6px',
+                        borderRadius: '4px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '3px',
+                      }}
+                    >
+                      <Lock size={10} /> Próx.
+                    </span>
+                  )}
                 </button>
               );
             })}

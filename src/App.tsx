@@ -85,6 +85,7 @@ const MainApp: React.FC = () => {
           <DashboardPage setModuloActual={setModuloActual} />
         );
 
+      case 'dashboard':
       default:
         return <DashboardPage setModuloActual={setModuloActual} />;
     }

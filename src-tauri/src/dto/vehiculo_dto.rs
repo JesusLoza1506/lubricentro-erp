@@ -1,4 +1,3 @@
-use crate::dto::orden_trabajo_dto::OrdenTrabajoHistorialDto;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -32,10 +31,63 @@ pub struct VehiculoCompletoDto {
     pub direccion_cliente: Option<String>,
 }
 
+/// Servicio para la vista pública de Ficha Vehicular (Sin precios ni subtotales)
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct ServicioOtPublicoDto {
+    pub id_detalle: i64,
+    pub id_servicio: Option<i64>,
+    pub codigo_snapshot: String,
+    pub nombre_snapshot: String,
+    pub cantidad: i32,
+    pub es_cambio_aceite: i32,
+}
+
+/// Insumo/Producto para la vista pública de Ficha Vehicular (Sin precios, costos ni subtotales)
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct InsumoOtPublicoDto {
+    pub id_detalle: i64,
+    pub id_producto: Option<i64>,
+    pub codigo_snapshot: String,
+    pub nombre_snapshot: String,
+    pub unidad_medida: String,
+    pub cantidad_formateada: f64,
+}
+
+/// DTO Dedicado de Historial para Ficha Vehicular
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct HistorialOtPublicoDto {
+    pub id_ot: i64,
+    pub codigo_ot: String,
+    pub placa_snapshot: String,
+    pub fecha_fin: Option<String>,
+    pub kilometraje_salida: Option<i64>,
+    pub resumen_publico: Option<String>,
+    pub tipo_aceite: Option<String>,
+    pub km_proximo: Option<i64>,
+    pub corregido: i32,
+    pub nombre_cliente: Option<String>,
+    pub documento_cliente: Option<String>,
+    pub servicios: Vec<ServicioOtPublicoDto>,
+    pub insumos: Vec<InsumoOtPublicoDto>,
+}
+
+/// Contenedor genérico para respuestas paginadas
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct ResultadoPaginadoDto<T> {
+    pub items: Vec<T>,
+    pub total_registros: u64,
+    pub pagina_actual: u32,
+    pub total_paginas: u32,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct FichaVehicularCompletaDto {
     pub vehiculo: VehiculoCompletoDto,
-    pub historial: Vec<OrdenTrabajoHistorialDto>,
+    pub historial: ResultadoPaginadoDto<HistorialOtPublicoDto>,
+    /// Tarjeta fija del último servicio independiente de la página consultada
+    pub ultimo_servicio: Option<HistorialOtPublicoDto>,
+    /// Tarjeta fija del último cambio de aceite independiente de la página consultada
+    pub ultimo_cambio_aceite: Option<HistorialOtPublicoDto>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]

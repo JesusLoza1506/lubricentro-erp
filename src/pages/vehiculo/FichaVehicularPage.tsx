@@ -6,13 +6,13 @@ import { ordenesService } from '../../services/ordenesService';
 import { clienteService } from '../../services/clienteService';
 import {
   VehiculoCompletoDTO,
-  OrdenTrabajoHistorialDTO as VehiculoOTDTO,
+  HistorialOTPublicoDTO as VehiculoOTDTO,
   CrearVehiculoDTO,
   EditarVehiculoDTO,
   CorregirHistorialOtPayloadDTO,
 } from '../../types/vehiculo';
 import { ClienteDTO, CrearClienteDTO, EditarClienteDTO } from '../../types/cliente';
-import { CrearOrdenTrabajoPayload, OrdenTrabajoHistorialDTO } from '../../types/ordenTrabajo';
+import { CrearOrdenTrabajoPayload } from '../../types/ordenTrabajo';
 import { ModalVehiculo, ModoModalVehiculo } from './components/ModalVehiculo';
 
 import { ModalDetalleOT } from './components/ModalDetalleOT';
@@ -26,9 +26,12 @@ import { FichaVehicularHeader } from './components/FichaVehicularHeader';
 import { FichaVehicularInfo } from './components/FichaVehicularInfo';
 import { FichaVehicularHistorial } from './components/FichaVehicularHistorial';
 import { FichaVehicularEmptyState } from './components/FichaVehicularEmptyState';
-import { FichaVehicularProximosCambios } from './components/FichaVehicularProximosCambios';
+import {
+  FichaVehicularProximosCambios,
+  FiltrosProximosCambiosState,
+} from './components/FichaVehicularProximosCambios';
 import { pageContainerStyle } from './vehiculoStyles';
-import { Car, Bell } from 'lucide-react';
+import { Car, Bell, RotateCcw } from 'lucide-react';
 
 interface FichaVehicularPageProps {
   placaInicial?: string;
@@ -50,7 +53,10 @@ export const FichaVehicularPage: React.FC<FichaVehicularPageProps> = ({
   placaInicial,
   onNavegarAOrdenes,
 }) => {
-  const { tienePermiso, usuario } = useAuth();
+  const { tienePermiso, usuario, setHayCambiosSinGuardar } = useAuth();
+
+  const idUsuario = usuario?.id_usuario ?? 0;
+  const rolUsuario = usuario?.rol ?? '';
 
   const esMecanico = usuario?.rol === 'MECANICO';
   const esAdmin = usuario?.rol === 'ADMINISTRADOR';
@@ -63,11 +69,26 @@ export const FichaVehicularPage: React.FC<FichaVehicularPageProps> = ({
   const [pestanaActiva, setPestanaActiva] = useState<PestanaVehiculo>('FICHA');
   const [placaBusqueda, setPlacaBusqueda] = useState<string>(placaInicial || '');
   const [vehiculo, setVehiculo] = useState<VehiculoCompletoDTO | null>(null);
+
+  // Historial Paginado Global
   const [historial, setHistorial] = useState<VehiculoOTDTO[]>([]);
-  const [ordenesTodas, setOrdenesTodas] = useState<OrdenTrabajoHistorialDTO[]>([]);
+  const [totalRegistrosHistorial, setTotalRegistrosHistorial] = useState<number>(0);
+  const [paginaActualHistorial, setPaginaActualHistorial] = useState<number>(1);
+  const [totalPaginasHistorial, setTotalPaginasHistorial] = useState<number>(1);
+
+  // Tarjetas de Resumen Rápido (Estáticas e independientes de la página)
+  const [ultimoServicio, setUltimoServicio] = useState<VehiculoOTDTO | null>(null);
+  const [ultimoCambioAceite, setUltimoCambioAceite] = useState<VehiculoOTDTO | null>(null);
+
   const [cargando, setCargando] = useState<boolean>(false);
-  const [error, setError] = useState<string | null>(null);
+  const [errorSistema, setErrorSistema] = useState<string | null>(null);
   const [buscado, setBuscado] = useState<boolean>(false);
+
+  const [filtrosProximos, setFiltrosProximos] = useState<FiltrosProximosCambiosState>({
+    busqueda: '',
+    filtroCausa: 'TODOS',
+    paginaActual: 1,
+  });
 
   const [notificacion, setNotificacion] = useState<{
     mensaje: string;
@@ -109,38 +130,56 @@ export const FichaVehicularPage: React.FC<FichaVehicularPageProps> = ({
     };
   }, []);
 
-  const ejecutarBusqueda = async (placa: string) => {
+  const ejecutarBusqueda = async (placa: string, pagina: number = 1) => {
     if (!placa.trim()) return;
 
     const currentRequestId = ++busquedaRequestIdRef.current;
 
     setCargando(true);
-    setError(null);
-    setVehiculo(null);
-    setHistorial([]);
+    setErrorSistema(null);
     setBuscado(true);
+
+    if (pagina === 1) {
+      setVehiculo(null);
+      setHistorial([]);
+      setUltimoServicio(null);
+      setUltimoCambioAceite(null);
+    }
 
     const placaClean = placa.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
     try {
-      const [fichaCompleta, listaOTs] = await Promise.all([
-        vehiculoService.obtenerFichaVehicularCompleta(placaClean),
-        ordenesService.listarOrdenesTrabajo().catch(() => []),
-      ]);
+      const fichaCompleta = await vehiculoService.obtenerFichaVehicularCompleta(
+        placaClean,
+        pagina,
+        20
+      );
 
       if (currentRequestId !== busquedaRequestIdRef.current) return;
 
       setVehiculo(fichaCompleta.vehiculo);
-      setHistorial(fichaCompleta.historial);
-      setOrdenesTodas(listaOTs);
+      const items = fichaCompleta.historial?.items || [];
+      setHistorial(items);
+      setTotalRegistrosHistorial(fichaCompleta.historial?.total_registros || 0);
+      setPaginaActualHistorial(fichaCompleta.historial?.pagina_actual || 1);
+      setTotalPaginasHistorial(fichaCompleta.historial?.total_paginas || 1);
+
+      // Tarjetas independientes del backend
+      setUltimoServicio(
+        (fichaCompleta as any).ultimo_servicio || (items.length > 0 ? items[0] : null)
+      );
+      setUltimoCambioAceite((fichaCompleta as any).ultimo_cambio_aceite || null);
     } catch (err: unknown) {
       if (currentRequestId !== busquedaRequestIdRef.current) return;
       const msg = extraerMensaje(err);
+      const msgLower = msg.toLowerCase();
 
-      // Si el error es de "No encontrado", mostramos el EmptyState limpio
-      if (msg.toLowerCase().includes('no se encontró vehículo registrado')) {
-        setError(null);
+      if (
+        msgLower.includes('no se encontró vehículo registrado') ||
+        msgLower.includes('notfound')
+      ) {
+        setErrorSistema(null);
       } else {
-        setError(msg);
+        setErrorSistema(msg);
       }
     } finally {
       if (currentRequestId === busquedaRequestIdRef.current) {
@@ -149,12 +188,64 @@ export const FichaVehicularPage: React.FC<FichaVehicularPageProps> = ({
     }
   };
 
+  const handleLimpiarBusqueda = () => {
+    busquedaRequestIdRef.current++;
+    setPlacaBusqueda('');
+    setVehiculo(null);
+    setHistorial([]);
+    setTotalRegistrosHistorial(0);
+    setPaginaActualHistorial(1);
+    setTotalPaginasHistorial(1);
+    setUltimoServicio(null);
+    setUltimoCambioAceite(null);
+    setErrorSistema(null);
+    setBuscado(false);
+  };
+
   useEffect(() => {
     if (placaInicial) {
       setPlacaBusqueda(placaInicial.toUpperCase());
-      ejecutarBusqueda(placaInicial);
+      ejecutarBusqueda(placaInicial, 1);
     }
   }, [placaInicial]);
+
+  const handleAbrirCrearOTDirecta = async () => {
+    if (!vehiculo) return;
+
+    if (vehiculo.activo !== 1) {
+      mostrarNotificacion(
+        `El vehículo con placa ${vehiculo.placa} se encuentra desactivado. Debe ser reactivado antes de recepcionar.`,
+        'ERROR'
+      );
+      return;
+    }
+
+    try {
+      setCargando(true);
+      const ordenesActivas = await ordenesService.listarOrdenesTrabajo(idUsuario, rolUsuario);
+      const otAbierta = ordenesActivas.find(
+        (ot) =>
+          ot.placa.toUpperCase() === vehiculo.placa.toUpperCase() &&
+          (ot.estado === 'EN_ESPERA' || ot.estado === 'EN_PROCESO')
+      );
+
+      if (otAbierta) {
+        mostrarNotificacion(
+          `El vehículo ya cuenta con una Orden de Trabajo abierta (${otAbierta.codigo_ot} en estado ${otAbierta.estado}).`,
+          'ERROR'
+        );
+        return;
+      }
+
+      setHayCambiosSinGuardar(true);
+      setModalCrearOTAbierto(true);
+    } catch (err: unknown) {
+      const msg = extraerMensaje(err);
+      mostrarNotificacion(msg, 'ERROR');
+    } finally {
+      setCargando(false);
+    }
+  };
 
   const handleGuardarVehiculo = async (data: CrearVehiculoDTO | EditarVehiculoDTO) => {
     try {
@@ -165,8 +256,10 @@ export const FichaVehicularPage: React.FC<FichaVehicularPageProps> = ({
         await vehiculoService.actualizarVehiculo(data as EditarVehiculoDTO);
         mostrarNotificacion('¡Ficha técnica y propietario actualizados correctamente!', 'EXITO');
       }
+      setHayCambiosSinGuardar(false);
+      setModalVehiculoAbierto(false);
       setPlacaBusqueda(data.placa);
-      await ejecutarBusqueda(data.placa);
+      await ejecutarBusqueda(data.placa, 1);
     } catch (err: unknown) {
       const msgError = extraerMensaje(err);
       mostrarNotificacion(msgError, 'ERROR');
@@ -176,14 +269,15 @@ export const FichaVehicularPage: React.FC<FichaVehicularPageProps> = ({
 
   const handleCrearOT = async (payload: CrearOrdenTrabajoPayload) => {
     try {
-      await ordenesService.crearOrdenTrabajo(payload);
+      await ordenesService.crearOrdenTrabajo(payload, idUsuario, rolUsuario);
       mostrarNotificacion('¡Orden de Trabajo creada correctamente!', 'EXITO');
+      setHayCambiosSinGuardar(false);
       setModalCrearOTAbierto(false);
 
       if (onNavegarAOrdenes) {
         onNavegarAOrdenes();
       } else if (vehiculo) {
-        await ejecutarBusqueda(vehiculo.placa);
+        await ejecutarBusqueda(vehiculo.placa, 1);
       }
     } catch (err: unknown) {
       const msgError = extraerMensaje(err);
@@ -196,9 +290,10 @@ export const FichaVehicularPage: React.FC<FichaVehicularPageProps> = ({
     try {
       await vehiculoService.corregirHistorialOt(payload);
       mostrarNotificacion('¡Historial de la OT corregido con éxito!', 'EXITO');
+      setHayCambiosSinGuardar(false);
       setOtCorregirSeleccionada(null);
       if (vehiculo) {
-        await ejecutarBusqueda(vehiculo.placa);
+        await ejecutarBusqueda(vehiculo.placa, paginaActualHistorial);
       }
     } catch (err: unknown) {
       const msgError = extraerMensaje(err);
@@ -211,6 +306,7 @@ export const FichaVehicularPage: React.FC<FichaVehicularPageProps> = ({
     if (esMecanico) return;
     setClienteEditar(null);
     setModoModalCliente('CREAR');
+    setHayCambiosSinGuardar(true);
     setModalClienteAbierto(true);
   };
 
@@ -227,6 +323,7 @@ export const FichaVehicularPage: React.FC<FichaVehicularPageProps> = ({
         setClienteEditar(null);
       }
       setModoModalCliente('EDITAR');
+      setHayCambiosSinGuardar(true);
       setModalClienteAbierto(true);
     } catch (err: unknown) {
       const msg = extraerMensaje(err);
@@ -243,9 +340,10 @@ export const FichaVehicularPage: React.FC<FichaVehicularPageProps> = ({
         await clienteService.actualizarCliente(data as EditarClienteDTO);
         mostrarNotificacion('¡Datos del cliente actualizados con éxito!', 'EXITO');
       }
+      setHayCambiosSinGuardar(false);
       setModalClienteAbierto(false);
       if (vehiculo) {
-        await ejecutarBusqueda(vehiculo.placa);
+        await ejecutarBusqueda(vehiculo.placa, paginaActualHistorial);
       }
     } catch (err: unknown) {
       const msgError = extraerMensaje(err);
@@ -276,7 +374,7 @@ export const FichaVehicularPage: React.FC<FichaVehicularPageProps> = ({
       );
       setConfirmModalEliminar(false);
       setMotivoAccion('');
-      await ejecutarBusqueda(vehiculo.placa);
+      await ejecutarBusqueda(vehiculo.placa, paginaActualHistorial);
     } catch (err: unknown) {
       const msgError = extraerMensaje(err);
       mostrarNotificacion(msgError, 'ERROR');
@@ -305,16 +403,12 @@ export const FichaVehicularPage: React.FC<FichaVehicularPageProps> = ({
       );
       setConfirmModalReactivar(false);
       setMotivoAccion('');
-      await ejecutarBusqueda(vehiculo.placa);
+      await ejecutarBusqueda(vehiculo.placa, paginaActualHistorial);
     } catch (err: unknown) {
       const msgError = extraerMensaje(err);
       mostrarNotificacion(msgError, 'ERROR');
     }
   };
-
-  const zanjasOcupadas = ordenesTodas
-    .filter((ot) => (ot.estado === 'EN_ESPERA' || ot.estado === 'EN_PROCESO') && ot.zanja)
-    .map((ot) => Number(ot.zanja));
 
   return (
     <div className="fv-page" style={pageContainerStyle}>
@@ -326,7 +420,6 @@ export const FichaVehicularPage: React.FC<FichaVehicularPageProps> = ({
         />
       )}
 
-      {/* NAVEGACIÓN ENTRE PESTAÑAS */}
       <div
         style={{
           display: 'flex',
@@ -346,7 +439,9 @@ export const FichaVehicularPage: React.FC<FichaVehicularPageProps> = ({
             backgroundColor: 'transparent',
             borderBottom: pestanaActiva === 'FICHA' ? '2px solid #6DA5F0' : '2px solid transparent',
             color: pestanaActiva === 'FICHA' ? '#FFFFFF' : '#94A3B8',
-            borderTop: 'none', borderLeft: 'none', borderRight: 'none',
+            borderTop: 'none',
+            borderLeft: 'none',
+            borderRight: 'none',
             borderRadius: '0px',
             fontWeight: '700',
             fontSize: '13px',
@@ -365,9 +460,14 @@ export const FichaVehicularPage: React.FC<FichaVehicularPageProps> = ({
               gap: '8px',
               padding: '10px 18px',
               backgroundColor: 'transparent',
-              borderBottom: pestanaActiva === 'PROXIMOS_CAMBIOS' ? '2px solid #6DA5F0' : '2px solid transparent',
+              borderBottom:
+                pestanaActiva === 'PROXIMOS_CAMBIOS'
+                  ? '2px solid #6DA5F0'
+                  : '2px solid transparent',
               color: pestanaActiva === 'PROXIMOS_CAMBIOS' ? '#FFFFFF' : '#94A3B8',
-              borderTop: 'none', borderLeft: 'none', borderRight: 'none',
+              borderTop: 'none',
+              borderLeft: 'none',
+              borderRight: 'none',
               borderRadius: '0px',
               fontWeight: '700',
               fontSize: '13px',
@@ -381,10 +481,12 @@ export const FichaVehicularPage: React.FC<FichaVehicularPageProps> = ({
 
       {pestanaActiva === 'PROXIMOS_CAMBIOS' && !esMecanico ? (
         <FichaVehicularProximosCambios
+          filtrosIniciales={filtrosProximos}
+          onFiltrosChange={setFiltrosProximos}
           onSeleccionarPlaca={(placa: string) => {
             setPlacaBusqueda(placa);
             setPestanaActiva('FICHA');
-            ejecutarBusqueda(placa);
+            ejecutarBusqueda(placa, 1);
           }}
         />
       ) : (
@@ -396,28 +498,44 @@ export const FichaVehicularPage: React.FC<FichaVehicularPageProps> = ({
             puedeCrear={puedeCrear}
             onBuscar={(e) => {
               e.preventDefault();
-              ejecutarBusqueda(placaBusqueda);
+              ejecutarBusqueda(placaBusqueda, 1);
             }}
+            onLimpiar={handleLimpiarBusqueda}
             onAbrirCrear={() => {
               setModoModalVehiculo('CREAR');
+              setHayCambiosSinGuardar(true);
               setModalVehiculoAbierto(true);
             }}
             onAbrirCrearCliente={handleAbrirCrearCliente}
           />
 
-          {error && <div style={errorStyle}>⚠️ Error del Sistema: {error}</div>}
+          {errorSistema && (
+            <div style={errorBannerStyle}>
+              <div style={{ flex: 1 }}>
+                <strong>⚠️ Error al consultar la base de datos:</strong>
+                <p style={{ margin: '4px 0 0 0', fontSize: '13px' }}>{errorSistema}</p>
+              </div>
+              <button
+                onClick={() => ejecutarBusqueda(placaBusqueda, paginaActualHistorial)}
+                style={btnReintentarStyle}
+              >
+                <RotateCcw size={14} /> Reintentar
+              </button>
+            </div>
+          )}
 
-          {!vehiculo && !cargando && !error && (
+          {!vehiculo && !cargando && !errorSistema && (
             <FichaVehicularEmptyState
               buscado={buscado}
               placaBusqueda={placaBusqueda}
               puedeCrear={puedeCrear}
               onEjecutarBusqueda={(placa) => {
                 setPlacaBusqueda(placa);
-                ejecutarBusqueda(placa);
+                ejecutarBusqueda(placa, 1);
               }}
               onAbrirCrear={() => {
                 setModoModalVehiculo('CREAR');
+                setHayCambiosSinGuardar(true);
                 setModalVehiculoAbierto(true);
               }}
             />
@@ -436,20 +554,23 @@ export const FichaVehicularPage: React.FC<FichaVehicularPageProps> = ({
                 <FichaVehicularInfo
                   accionesVehiculo={
                     <>
-                      {puedeCrearOT && vehiculo.activo === 1 && (
-                <div className="fv-create-order">
-                  <button onClick={() => setModalCrearOTAbierto(true)} style={btnCrearOTStyle}>
-                    + Crear OT para {vehiculo.placa}
-                  </button>
-                </div>
-              )}
+                      {puedeCrearOT && (
+                        <div className="fv-create-order">
+                          <button onClick={handleAbrirCrearOTDirecta} style={btnCrearOTStyle}>
+                            + Recepcionar / Crear OT para {vehiculo.placa}
+                          </button>
+                        </div>
+                      )}
                     </>
                   }
                   vehiculo={vehiculo}
+                  ultimoServicio={ultimoServicio}
+                  ultimoCambioAceite={ultimoCambioAceite}
                   puedeEditar={puedeEditar}
                   puedeEliminar={puedeEliminar}
                   onAbrirEditar={() => {
                     setModoModalVehiculo('EDITAR');
+                    setHayCambiosSinGuardar(true);
                     setModalVehiculoAbierto(true);
                   }}
                   onAbrirEliminar={() => setConfirmModalEliminar(true)}
@@ -458,24 +579,34 @@ export const FichaVehicularPage: React.FC<FichaVehicularPageProps> = ({
                 />
               </div>
 
-
-
               <FichaVehicularHistorial
-                historial={historial}
+                historial={historial as any}
+                totalRegistros={totalRegistrosHistorial}
+                paginaActual={paginaActualHistorial}
+                totalPaginas={totalPaginasHistorial}
+                cargando={cargando}
                 puedeCorregirOT={esAdmin}
-                onVerDetalleOT={(ot) => setOtSeleccionada(ot)}
-                onCorregirOT={(ot) => setOtCorregirSeleccionada(ot)}
+                onVerDetalleOT={(ot) => setOtSeleccionada(ot as any)}
+                onCorregirOT={(ot) => {
+                  setOtCorregirSeleccionada(ot as any);
+                  setHayCambiosSinGuardar(true);
+                }}
+                onCambiarPagina={(nuevaPagina) => {
+                  ejecutarBusqueda(vehiculo.placa, nuevaPagina);
+                }}
               />
             </>
           )}
         </>
       )}
 
-      {/* MODAL REGISTRAR / EDITAR VEHÍCULO */}
       {modalVehiculoAbierto && (
         <ModalVehiculo
           modalAbierto={modalVehiculoAbierto}
-          setModalAbierto={setModalVehiculoAbierto}
+          setModalAbierto={(abierto) => {
+            setModalVehiculoAbierto(abierto);
+            if (!abierto) setHayCambiosSinGuardar(false);
+          }}
           modo={modoModalVehiculo}
           vehiculoEditar={vehiculo}
           handleGuardar={handleGuardarVehiculo}
@@ -483,51 +614,56 @@ export const FichaVehicularPage: React.FC<FichaVehicularPageProps> = ({
         />
       )}
 
-      {/* MODAL DETALLE DE OT */}
-      <ModalDetalleOT
-        modalAbierto={!!otSeleccionada}
-        setModalAbierto={(abierto) => {
-          if (!abierto) setOtSeleccionada(null);
-        }}
-        ordenTrabajo={otSeleccionada}
-      />
+      {otSeleccionada && (
+        <ModalDetalleOT
+          modalAbierto={!!otSeleccionada}
+          setModalAbierto={(abierto) => {
+            if (!abierto) setOtSeleccionada(null);
+          }}
+          ordenTrabajo={otSeleccionada}
+        />
+      )}
 
-      {/* MODAL CORREGIR HISTORIAL OT */}
       {otCorregirSeleccionada && (
         <ModalCorregirHistorialOT
           modalAbierto={!!otCorregirSeleccionada}
           setModalAbierto={(abierto) => {
-            if (!abierto) setOtCorregirSeleccionada(null);
+            if (!abierto) {
+              setOtCorregirSeleccionada(null);
+              setHayCambiosSinGuardar(false);
+            }
           }}
-          ordenTrabajo={otCorregirSeleccionada}
+          ordenTrabajo={otCorregirSeleccionada as any}
           handleGuardar={handleCorregirHistorialOT}
         />
       )}
 
-      {/* MODAL EDICIÓN / REGISTRO DE CLIENTE */}
       {modalClienteAbierto && (
         <ModalCliente
           modalAbierto={modalClienteAbierto}
-          setModalAbierto={setModalClienteAbierto}
+          setModalAbierto={(abierto) => {
+            setModalClienteAbierto(abierto);
+            if (!abierto) setHayCambiosSinGuardar(false);
+          }}
           modo={modoModalCliente}
           clienteEditar={clienteEditar}
           onClienteGuardado={handleGuardarCliente}
         />
       )}
 
-      {/* MODAL CREAR ORDEN DE TRABAJO */}
       {modalCrearOTAbierto && vehiculo && (
         <ModalCrearOT
-          ordenesExistentes={ordenesTodas}
-          zanjasOcupadas={zanjasOcupadas}
           idMecanicoDefault={0}
           placaInicial={vehiculo.placa}
-          onClose={() => setModalCrearOTAbierto(false)}
+          vehiculoDirecto={vehiculo}
+          onClose={() => {
+            setModalCrearOTAbierto(false);
+            setHayCambiosSinGuardar(false);
+          }}
           onSubmit={handleCrearOT}
         />
       )}
 
-      {/* CONFIRM MODAL PARA DESACTIVAR VEHÍCULO */}
       <ConfirmModal
         abierto={confirmModalEliminar}
         titulo="⚠ ADVERTENCIA: DESACTIVAR VEHÍCULO"
@@ -542,7 +678,6 @@ export const FichaVehicularPage: React.FC<FichaVehicularPageProps> = ({
         }}
       />
 
-      {/* CONFIRM MODAL PARA REACTIVAR VEHÍCULO */}
       <ConfirmModal
         abierto={confirmModalReactivar}
         titulo="✅ REACTIVAR VEHÍCULO"
@@ -560,13 +695,32 @@ export const FichaVehicularPage: React.FC<FichaVehicularPageProps> = ({
   );
 };
 
-const errorStyle: React.CSSProperties = {
-  padding: '16px',
-  backgroundColor: 'rgba(239, 68, 68, 0.1)',
-  border: '1px solid rgba(239, 68, 68, 0.3)',
-  borderRadius: '12px',
+const errorBannerStyle: React.CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  gap: '12px',
+  padding: '14px 18px',
+  backgroundColor: 'rgba(239, 68, 68, 0.12)',
+  border: '1px solid rgba(239, 68, 68, 0.35)',
+  borderRadius: '10px',
   color: '#FCA5A5',
   fontSize: '14px',
+  marginBottom: '16px',
+};
+
+const btnReintentarStyle: React.CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: '6px',
+  padding: '8px 14px',
+  backgroundColor: '#DC2626',
+  color: '#FFFFFF',
+  border: 'none',
+  borderRadius: '6px',
+  fontSize: '12px',
+  fontWeight: '600',
+  cursor: 'pointer',
 };
 
 const btnCrearOTStyle: React.CSSProperties = {

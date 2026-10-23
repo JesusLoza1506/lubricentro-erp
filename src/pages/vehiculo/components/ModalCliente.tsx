@@ -26,6 +26,7 @@ export const ModalCliente: React.FC<ModalClienteProps> = ({
   const [direccion, setDireccion] = useState('');
   const [motivo, setMotivo] = useState('');
   const [cargando, setCargando] = useState(false);
+  const [isDirty, setIsDirty] = useState(false);
   const [errorModal, setErrorModal] = useState<string | null>(null);
 
   useEffect(() => {
@@ -46,17 +47,29 @@ export const ModalCliente: React.FC<ModalClienteProps> = ({
       setCorreo('');
       setDireccion('');
     }
+    setIsDirty(false);
   }, [modo, clienteEditar, modalAbierto]);
 
   if (!modalAbierto) return null;
 
+  const handleCerrar = () => {
+    if (cargando) return;
+    if (isDirty) {
+      const confirmar = window.confirm('¿Desea descartar los cambios no guardados?');
+      if (!confirmar) return;
+    }
+    setModalAbierto(false);
+  };
+
   const handleNumDocChange = (val: string) => {
+    setIsDirty(true);
     if (tipoDoc === 'DNI') setNumDoc(val.replace(/\D/g, '').slice(0, 8));
     else if (tipoDoc === 'RUC') setNumDoc(val.replace(/\D/g, '').slice(0, 11));
     else setNumDoc(val.replace(/[^a-zA-Z0-9]/g, '').slice(0, 12));
   };
 
   const handleTelefonoChange = (val: string) => {
+    setIsDirty(true);
     let clean = val.trim().replace(/[\s-]/g, '');
     if (clean.startsWith('+51')) {
       clean = clean.slice(3);
@@ -96,6 +109,7 @@ export const ModalCliente: React.FC<ModalClienteProps> = ({
         };
         await onClienteGuardado(payload);
       }
+      setIsDirty(false);
       setModalAbierto(false);
     } catch (err: unknown) {
       if (typeof err === 'string') setErrorModal(err);
@@ -112,9 +126,32 @@ export const ModalCliente: React.FC<ModalClienteProps> = ({
   return (
     <div style={overlayStyle}>
       <div style={modalBoxStyle}>
-        <h3 style={{ fontSize: '18px', fontWeight: '800', color: '#F8FAFC', margin: '0 0 16px 0' }}>
-          {modo === 'CREAR' ? 'Registrar Nuevo Cliente' : 'Editar Información del Cliente'}
-        </h3>
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            marginBottom: '16px',
+          }}
+        >
+          <h3 style={{ fontSize: '18px', fontWeight: '800', color: '#F8FAFC', margin: 0 }}>
+            {modo === 'CREAR' ? 'Registrar Nuevo Cliente' : 'Editar Información del Cliente'}
+          </h3>
+          <button
+            type="button"
+            disabled={cargando}
+            onClick={handleCerrar}
+            style={{
+              background: 'none',
+              border: 'none',
+              color: '#94A3B8',
+              fontSize: '18px',
+              cursor: cargando ? 'not-allowed' : 'pointer',
+            }}
+          >
+            ✕
+          </button>
+        </div>
 
         {errorModal && <div style={errorBoxStyle}>⚠️ {errorModal}</div>}
 
@@ -123,10 +160,14 @@ export const ModalCliente: React.FC<ModalClienteProps> = ({
             <label style={labelStyle}>Nombre / Razón Social *</label>
             <input
               required
+              disabled={cargando}
               type="text"
               placeholder="Ej. Juan Pérez / Empresa S.A.C."
               value={nombre}
-              onChange={(e) => setNombre(e.target.value)}
+              onChange={(e) => {
+                setIsDirty(true);
+                setNombre(e.target.value);
+              }}
               style={inputStyle}
             />
           </div>
@@ -135,12 +176,18 @@ export const ModalCliente: React.FC<ModalClienteProps> = ({
             <div>
               <label style={labelStyle}>Tipo Documento *</label>
               <select
+                disabled={cargando}
                 value={tipoDoc}
                 onChange={(e) => {
+                  setIsDirty(true);
                   setTipoDoc(e.target.value as 'DNI' | 'RUC' | 'CE');
                   setNumDoc('');
                 }}
-                style={{ ...inputStyle, backgroundColor: '#1E293B', cursor: 'pointer' }}
+                style={{
+                  ...inputStyle,
+                  backgroundColor: '#1E293B',
+                  cursor: cargando ? 'not-allowed' : 'pointer',
+                }}
               >
                 <option value="DNI">DNI</option>
                 <option value="RUC">RUC</option>
@@ -151,6 +198,7 @@ export const ModalCliente: React.FC<ModalClienteProps> = ({
               <label style={labelStyle}>N° Documento *</label>
               <input
                 required
+                disabled={cargando}
                 type="text"
                 value={numDoc}
                 onChange={(e) => handleNumDocChange(e.target.value)}
@@ -163,6 +211,7 @@ export const ModalCliente: React.FC<ModalClienteProps> = ({
             <div>
               <label style={labelStyle}>Teléfono</label>
               <input
+                disabled={cargando}
                 type="text"
                 placeholder="987654321"
                 value={telefono}
@@ -173,10 +222,14 @@ export const ModalCliente: React.FC<ModalClienteProps> = ({
             <div>
               <label style={labelStyle}>Correo Electrónico</label>
               <input
+                disabled={cargando}
                 type="email"
                 placeholder="cliente@correo.com"
                 value={correo}
-                onChange={(e) => setCorreo(e.target.value)}
+                onChange={(e) => {
+                  setIsDirty(true);
+                  setCorreo(e.target.value);
+                }}
                 style={inputStyle}
               />
             </div>
@@ -185,10 +238,14 @@ export const ModalCliente: React.FC<ModalClienteProps> = ({
           <div>
             <label style={labelStyle}>Dirección</label>
             <input
+              disabled={cargando}
               type="text"
               placeholder="Av. Principal 123"
               value={direccion}
-              onChange={(e) => setDireccion(e.target.value)}
+              onChange={(e) => {
+                setIsDirty(true);
+                setDireccion(e.target.value);
+              }}
               style={inputStyle}
             />
           </div>
@@ -196,10 +253,27 @@ export const ModalCliente: React.FC<ModalClienteProps> = ({
           <div
             style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '12px' }}
           >
-            <button type="button" onClick={() => setModalAbierto(false)} style={btnSecondaryStyle}>
+            <button
+              type="button"
+              disabled={cargando}
+              onClick={handleCerrar}
+              style={{
+                ...btnSecondaryStyle,
+                opacity: cargando ? 0.6 : 1,
+                cursor: cargando ? 'not-allowed' : 'pointer',
+              }}
+            >
               Cancelar
             </button>
-            <button type="submit" disabled={cargando} style={btnPrimaryStyle}>
+            <button
+              type="submit"
+              disabled={cargando}
+              style={{
+                ...btnPrimaryStyle,
+                opacity: cargando ? 0.6 : 1,
+                cursor: cargando ? 'not-allowed' : 'pointer',
+              }}
+            >
               {cargando ? 'Guardando...' : 'Guardar Cliente'}
             </button>
           </div>

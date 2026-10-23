@@ -5,6 +5,13 @@ export type { ClienteDTO, ClienteResumenDTO };
 export type TipoMotor = 'GASOLINA' | 'DIESEL' | 'GLP' | 'GNV' | 'HIBRIDO' | 'ELECTRICO' | 'OTRO';
 export type TipoAceite = 'MINERAL' | 'SINTETICO';
 
+export interface ResultadoPaginadoDTO<T> {
+  items: T[];
+  total_registros: number;
+  pagina_actual: number;
+  total_paginas: number;
+}
+
 export interface VehiculoCompletoDTO {
   id_vehiculo: number;
   placa: string;
@@ -33,7 +40,6 @@ export interface DetalleItemOT {
   tipo: 'PRODUCTO' | 'SERVICIO';
 }
 
-// ✅ CORREGIDO (Punto 2): Incorporación de campos de identidad histórica en la OT
 export interface OrdenTrabajoHistorialDTO {
   id_ot: number;
   codigo_ot: string;
@@ -57,9 +63,56 @@ export interface OrdenTrabajoHistorialDTO {
   detalles?: DetalleItemOT[];
 }
 
+// DTOs Públicos Sanitizados para Ficha Vehicular
+export interface ServicioOTPublicoDTO {
+  id_detalle: number;
+  id_servicio?: number;
+  codigo_snapshot?: string;
+  nombre_snapshot: string;
+  cantidad: number;
+  es_cambio_aceite: number;
+}
+
+export interface InsumoOTPublicoDTO {
+  id_detalle: number;
+  id_producto?: number;
+  codigo_snapshot?: string;
+  nombre_snapshot: string;
+  unidad_medida?: string;
+  cantidad_formateada: string | number;
+}
+
+export interface HistorialOTPublicoDTO {
+  id_ot: number;
+  codigo_ot: string;
+  placa_snapshot?: string;
+  placa?: string;
+  estado?: string;
+  fecha_fin?: string;
+  fecha_ingreso?: string;
+  kilometraje_salida?: number;
+  kilometraje_ingreso?: number;
+  resumen_publico?: string;
+  observaciones?: string;
+  tipo_aceite?: string;
+  km_proximo?: number | null;
+  proximo_kilometraje?: number | null;
+  id_mecanico?: number;
+  corregido?: number;
+  nombre_cliente?: string;
+  cliente_nombre?: string;
+  documento_cliente?: string;
+  cliente_documento?: string;
+  tipo_documento_cliente?: string;
+  nombre_mecanico?: string;
+  servicios?: ServicioOTPublicoDTO[];
+  insumos?: InsumoOTPublicoDTO[];
+  detalles?: DetalleItemOT[];
+}
+
 export interface FichaVehicularCompletaDTO {
   vehiculo: VehiculoCompletoDTO;
-  historial: OrdenTrabajoHistorialDTO[];
+  historial: ResultadoPaginadoDTO<HistorialOTPublicoDTO>;
 }
 
 export interface ProximoCambioAceiteDTO {

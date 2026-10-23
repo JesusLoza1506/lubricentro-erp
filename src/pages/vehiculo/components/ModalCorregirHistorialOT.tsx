@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
-import { OrdenTrabajoHistorialDTO, CorregirHistorialOtPayloadDTO } from '../../../types/vehiculo';
+import React, { useState, useEffect } from 'react';
+import { HistorialOTPublicoDTO, CorregirHistorialOtPayloadDTO } from '../../../types/vehiculo';
 
 interface Props {
-  ordenTrabajo: OrdenTrabajoHistorialDTO;
+  ordenTrabajo: HistorialOTPublicoDTO | any;
   modalAbierto: boolean;
   setModalAbierto: (abierto: boolean) => void;
   handleGuardar: (payload: CorregirHistorialOtPayloadDTO) => Promise<void>;
@@ -14,21 +14,51 @@ export const ModalCorregirHistorialOT: React.FC<Props> = ({
   setModalAbierto,
   handleGuardar,
 }) => {
-  const tieneCambioAceite = ordenTrabajo.proximo_kilometraje !== null;
-
-  const [resumen, setResumen] = useState(ordenTrabajo.observaciones || '');
-  const [kilometrajeSalida, setKilometrajeSalida] = useState(ordenTrabajo.kilometraje_ingreso ?? 0);
-  const [tipoAceite, setTipoAceite] = useState<string>(
-    tieneCambioAceite ? ordenTrabajo.tipo_aceite || 'SINTETICO' : 'SIN_CAMBIO'
+  const tieneServicioCambioAceite = Boolean(
+    Boolean(ordenTrabajo?.tipo_aceite) ||
+    ordenTrabajo?.servicios?.some((s: any) => s.es_cambio_aceite === 1) ||
+    (ordenTrabajo?.km_proximo !== null && ordenTrabajo?.km_proximo !== undefined) ||
+    (ordenTrabajo?.proximo_kilometraje !== null && ordenTrabajo?.proximo_kilometraje !== undefined)
   );
+
+  const [resumen, setResumen] = useState('');
+  const [kilometrajeSalida, setKilometrajeSalida] = useState<number>(0);
+  const [tipoAceite, setTipoAceite] = useState<string>('MINERAL');
   const [motivo, setMotivo] = useState('');
   const [cargando, setCargando] = useState(false);
+  const [isDirty, setIsDirty] = useState(false);
   const [errorModal, setErrorModal] = useState<string | null>(null);
 
-  // Estado para el modal de confirmación
   const [confirmModalOpen, setConfirmModalOpen] = useState(false);
 
-  if (!modalAbierto) return null;
+  useEffect(() => {
+    if (modalAbierto && ordenTrabajo) {
+      setResumen(ordenTrabajo.resumen_publico || ordenTrabajo.observaciones || '');
+      setKilometrajeSalida(
+        ordenTrabajo.kilometraje_salida ?? ordenTrabajo.kilometraje_ingreso ?? 0
+      );
+
+      if (tieneServicioCambioAceite) {
+        setTipoAceite(ordenTrabajo.tipo_aceite || 'SINTETICO');
+      } else {
+        setTipoAceite('SIN_CAMBIO');
+      }
+      setMotivo('');
+      setErrorModal(null);
+      setIsDirty(false);
+    }
+  }, [modalAbierto, ordenTrabajo, tieneServicioCambioAceite]);
+
+  if (!modalAbierto || !ordenTrabajo) return null;
+
+  const handleCerrar = () => {
+    if (cargando) return;
+    if (isDirty) {
+      const confirmar = window.confirm('¿Desea descartar los cambios no guardados?');
+      if (!confirmar) return;
+    }
+    setModalAbierto(false);
+  };
 
   const ejecutarGuardado = async () => {
     setCargando(true);
@@ -39,9 +69,13 @@ export const ModalCorregirHistorialOT: React.FC<Props> = ({
         id_ot: ordenTrabajo.id_ot,
         resumen_publico: resumen.trim(),
         kilometraje_salida: Number(kilometrajeSalida),
-        tipo_aceite: tieneCambioAceite ? (tipoAceite as any) : undefined,
+        tipo_aceite:
+          tieneServicioCambioAceite && tipoAceite !== 'SIN_CAMBIO'
+            ? (tipoAceite as any)
+            : undefined,
         motivo: motivo.trim(),
       });
+      setIsDirty(false);
       setModalAbierto(false);
     } catch (err: unknown) {
       if (typeof err === 'string') setErrorModal(err);
@@ -70,11 +104,32 @@ export const ModalCorregirHistorialOT: React.FC<Props> = ({
     <>
       <div style={overlayStyle}>
         <div style={modalBoxStyle}>
-          <h3
-            style={{ fontSize: '18px', fontWeight: '800', color: '#F8FAFC', margin: '0 0 16px 0' }}
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginBottom: '16px',
+            }}
           >
-            🛠️ Corregir Mantenimiento Finalizado (Administrador)
-          </h3>
+            <h3 style={{ fontSize: '18px', fontWeight: '800', color: '#F8FAFC', margin: 0 }}>
+              🛠️ Corregir Mantenimiento Finalizado (Administrador)
+            </h3>
+            <button
+              type="button"
+              disabled={cargando}
+              onClick={handleCerrar}
+              style={{
+                background: 'none',
+                border: 'none',
+                color: '#94A3B8',
+                fontSize: '18px',
+                cursor: cargando ? 'not-allowed' : 'pointer',
+              }}
+            >
+              ✕
+            </button>
+          </div>
 
           {errorModal && <div style={errorBoxStyle}>⚠️ {errorModal}</div>}
 
@@ -86,9 +141,13 @@ export const ModalCorregirHistorialOT: React.FC<Props> = ({
               <label style={labelStyle}>Resumen Público de Servicios *</label>
               <textarea
                 required
+                disabled={cargando}
                 rows={3}
                 value={resumen}
-                onChange={(e) => setResumen(e.target.value)}
+                onChange={(e) => {
+                  setIsDirty(true);
+                  setResumen(e.target.value);
+                }}
                 style={{ ...inputStyle, fontFamily: 'inherit', resize: 'vertical' }}
               />
             </div>
@@ -98,26 +157,33 @@ export const ModalCorregirHistorialOT: React.FC<Props> = ({
                 <label style={labelStyle}>Kilometraje de Salida *</label>
                 <input
                   required
+                  disabled={cargando}
                   type="number"
                   value={kilometrajeSalida}
-                  onChange={(e) => setKilometrajeSalida(Number(e.target.value))}
+                  onChange={(e) => {
+                    setIsDirty(true);
+                    setKilometrajeSalida(Number(e.target.value));
+                  }}
                   style={inputStyle}
                 />
               </div>
               <div>
                 <label style={labelStyle}>Tipo de Aceite</label>
                 <select
-                  disabled={!tieneCambioAceite}
+                  disabled={!tieneServicioCambioAceite || cargando}
                   value={tipoAceite}
-                  onChange={(e) => setTipoAceite(e.target.value)}
+                  onChange={(e) => {
+                    setIsDirty(true);
+                    setTipoAceite(e.target.value);
+                  }}
                   style={{
                     ...inputStyle,
-                    backgroundColor: !tieneCambioAceite ? '#0F172A' : '#1E293B',
-                    cursor: !tieneCambioAceite ? 'not-allowed' : 'pointer',
-                    opacity: !tieneCambioAceite ? 0.6 : 1,
+                    backgroundColor: !tieneServicioCambioAceite ? '#0F172A' : '#1E293B',
+                    cursor: !tieneServicioCambioAceite || cargando ? 'not-allowed' : 'pointer',
+                    opacity: !tieneServicioCambioAceite || cargando ? 0.6 : 1,
                   }}
                 >
-                  {!tieneCambioAceite ? (
+                  {!tieneServicioCambioAceite ? (
                     <option value="SIN_CAMBIO">SIN CAMBIO DE ACEITE</option>
                   ) : (
                     <>
@@ -129,7 +195,7 @@ export const ModalCorregirHistorialOT: React.FC<Props> = ({
               </div>
             </div>
 
-            {!tieneCambioAceite && (
+            {!tieneServicioCambioAceite && (
               <div style={warningBoxStyle}>
                 ℹ️ Esta OT no incluye servicio/producto de cambio de aceite. El próximo kilometraje
                 no será calculado automáticamente.
@@ -142,10 +208,14 @@ export const ModalCorregirHistorialOT: React.FC<Props> = ({
               </label>
               <input
                 required
+                disabled={cargando}
                 type="text"
                 placeholder="Ej. Corrección por error de digitación en resumen público"
                 value={motivo}
-                onChange={(e) => setMotivo(e.target.value)}
+                onChange={(e) => {
+                  setIsDirty(true);
+                  setMotivo(e.target.value);
+                }}
                 style={{ ...inputStyle, borderColor: '#EF4444' }}
               />
             </div>
@@ -160,12 +230,25 @@ export const ModalCorregirHistorialOT: React.FC<Props> = ({
             >
               <button
                 type="button"
-                onClick={() => setModalAbierto(false)}
-                style={btnSecondaryStyle}
+                disabled={cargando}
+                onClick={handleCerrar}
+                style={{
+                  ...btnSecondaryStyle,
+                  opacity: cargando ? 0.6 : 1,
+                  cursor: cargando ? 'not-allowed' : 'pointer',
+                }}
               >
                 Cancelar
               </button>
-              <button type="submit" disabled={cargando} style={btnPrimaryStyle}>
+              <button
+                type="submit"
+                disabled={cargando}
+                style={{
+                  ...btnPrimaryStyle,
+                  opacity: cargando ? 0.6 : 1,
+                  cursor: cargando ? 'not-allowed' : 'pointer',
+                }}
+              >
                 {cargando ? 'Guardando...' : 'Aplicar Corrección'}
               </button>
             </div>
@@ -200,17 +283,28 @@ export const ModalCorregirHistorialOT: React.FC<Props> = ({
             <div style={{ display: 'flex', justifyContent: 'center', gap: '12px' }}>
               <button
                 type="button"
+                disabled={cargando}
                 onClick={() => setConfirmModalOpen(false)}
-                style={btnSecondaryStyle}
+                style={{
+                  ...btnSecondaryStyle,
+                  opacity: cargando ? 0.6 : 1,
+                  cursor: cargando ? 'not-allowed' : 'pointer',
+                }}
               >
                 Cancelar
               </button>
               <button
                 type="button"
+                disabled={cargando}
                 onClick={ejecutarGuardado}
-                style={{ ...btnPrimaryStyle, backgroundColor: '#D97706' }}
+                style={{
+                  ...btnPrimaryStyle,
+                  backgroundColor: '#D97706',
+                  opacity: cargando ? 0.6 : 1,
+                  cursor: cargando ? 'not-allowed' : 'pointer',
+                }}
               >
-                Sí, Corregir OT
+                {cargando ? 'Guardando...' : 'Sí, Corregir OT'}
               </button>
             </div>
           </div>

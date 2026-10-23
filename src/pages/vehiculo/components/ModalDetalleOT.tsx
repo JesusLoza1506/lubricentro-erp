@@ -1,11 +1,15 @@
 import React from 'react';
-import { OrdenTrabajoHistorialDTO } from '../../../types/vehiculo';
+import {
+  HistorialOTPublicoDTO,
+  ServicioOTPublicoDTO,
+  InsumoOTPublicoDTO,
+} from '../../../types/vehiculo';
 import { Wrench, Calendar, Gauge, FileText, X, Droplet, UserCheck, User, Car } from 'lucide-react';
 
 interface ModalDetalleOTProps {
   modalAbierto: boolean;
   setModalAbierto: (abierto: boolean) => void;
-  ordenTrabajo: OrdenTrabajoHistorialDTO | null;
+  ordenTrabajo: HistorialOTPublicoDTO | null;
 }
 
 export const ModalDetalleOT: React.FC<ModalDetalleOTProps> = ({
@@ -21,11 +25,12 @@ export const ModalDetalleOT: React.FC<ModalDetalleOTProps> = ({
     return isNaN(fecha.getTime()) ? 'N/A' : fecha.toLocaleDateString('es-PE');
   };
 
-  // Lectura directa desde el DTO aplanado (resuelve los errores TS2339)
-  const nombreClienteAtendido = ordenTrabajo.nombre_cliente || 'Cliente Varios / No especificado';
+  const nombreClienteAtendido =
+    ordenTrabajo.nombre_cliente ||
+    ordenTrabajo.cliente_nombre ||
+    'Cliente Varios / No especificado';
 
-  const docClienteAtendido = ordenTrabajo.documento_cliente;
-
+  const docClienteAtendido = ordenTrabajo.documento_cliente || ordenTrabajo.cliente_documento;
   const tipoDocClienteAtendido = ordenTrabajo.tipo_documento_cliente || 'DOC';
 
   return (
@@ -71,20 +76,20 @@ export const ModalDetalleOT: React.FC<ModalDetalleOTProps> = ({
                 padding: '2px 8px',
                 borderRadius: '8px',
                 backgroundColor:
-                  ordenTrabajo.estado === 'FINALIZADO'
+                  ordenTrabajo.estado === 'FINALIZADO' || !ordenTrabajo.estado
                     ? 'rgba(52, 211, 153, 0.2)'
                     : ordenTrabajo.estado === 'CANCELADO'
                       ? 'rgba(239, 68, 68, 0.2)'
                       : 'rgba(251, 191, 36, 0.2)',
                 color:
-                  ordenTrabajo.estado === 'FINALIZADO'
+                  ordenTrabajo.estado === 'FINALIZADO' || !ordenTrabajo.estado
                     ? '#34D399'
                     : ordenTrabajo.estado === 'CANCELADO'
                       ? '#EF4444'
                       : '#FBBF24',
               }}
             >
-              {ordenTrabajo.estado}
+              {ordenTrabajo.estado || 'FINALIZADO'}
             </span>
           </div>
           <button
@@ -100,7 +105,7 @@ export const ModalDetalleOT: React.FC<ModalDetalleOTProps> = ({
           </button>
         </div>
 
-        {/* SECCIÓN DE IDENTIDAD HISTÓRICA (CLIENTE Y VEHÍCULO AL MOMENTO DE LA OT) */}
+        {/* IDENTIDAD HISTÓRICA */}
         <div
           style={{
             display: 'grid',
@@ -116,9 +121,7 @@ export const ModalDetalleOT: React.FC<ModalDetalleOTProps> = ({
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#CBD5E1' }}>
             <Car size={16} color="#38BDF8" />
             <span>
-              Placa: <strong>{ordenTrabajo.placa}</strong>
-              {ordenTrabajo.marca_vehiculo &&
-                ` (${ordenTrabajo.marca_vehiculo} ${ordenTrabajo.modelo_vehiculo || ''})`}
+              Placa: <strong>{ordenTrabajo.placa_snapshot || ordenTrabajo.placa}</strong>
             </span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#CBD5E1' }}>
@@ -130,7 +133,7 @@ export const ModalDetalleOT: React.FC<ModalDetalleOTProps> = ({
           </div>
         </div>
 
-        {/* METADATOS DE LA OT */}
+        {/* METADATOS DE ATENCIÓN PÚBLICA */}
         <div
           style={{
             display: 'grid',
@@ -145,25 +148,36 @@ export const ModalDetalleOT: React.FC<ModalDetalleOTProps> = ({
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#CBD5E1' }}>
             <Calendar size={16} color="#38BDF8" />
-            <span>Fecha: {formatearFecha(ordenTrabajo.fecha_ingreso)}</span>
+            <span>
+              Fecha Fin: {formatearFecha(ordenTrabajo.fecha_fin || ordenTrabajo.fecha_ingreso)}
+            </span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#CBD5E1' }}>
             <Gauge size={16} color="#FBBF24" />
-            <span>Ingreso: {(ordenTrabajo.kilometraje_ingreso ?? 0).toLocaleString()} km</span>
+            <span>
+              Salida:{' '}
+              {(
+                ordenTrabajo.kilometraje_salida ??
+                ordenTrabajo.kilometraje_ingreso ??
+                0
+              ).toLocaleString()}{' '}
+              km
+            </span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#CBD5E1' }}>
             <Wrench size={16} color="#34D399" />
             <span>
-              Próximo:{' '}
-              {ordenTrabajo.proximo_kilometraje !== null &&
-              ordenTrabajo.proximo_kilometraje !== undefined
-                ? `${ordenTrabajo.proximo_kilometraje.toLocaleString()} km`
-                : 'Sin cambio'}
+              Próximo Cambio:{' '}
+              {ordenTrabajo.km_proximo !== null && ordenTrabajo.km_proximo !== undefined
+                ? `${ordenTrabajo.km_proximo.toLocaleString()} km`
+                : ordenTrabajo.proximo_kilometraje
+                  ? `${ordenTrabajo.proximo_kilometraje.toLocaleString()} km`
+                  : 'Sin cambio'}
             </span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#CBD5E1' }}>
             <FileText size={16} color="#A855F7" />
-            <span>Placa: {ordenTrabajo.placa}</span>
+            <span>Código: {ordenTrabajo.codigo_ot}</span>
           </div>
           {ordenTrabajo.nombre_mecanico && (
             <div
@@ -179,13 +193,13 @@ export const ModalDetalleOT: React.FC<ModalDetalleOTProps> = ({
             >
               <UserCheck size={16} color="#38BDF8" />
               <span>
-                Mecánico: <strong>{ordenTrabajo.nombre_mecanico}</strong>
+                Mecánico Atendió: <strong>{ordenTrabajo.nombre_mecanico}</strong>
               </span>
             </div>
           )}
         </div>
 
-        {/* TIPO DE ACEITE / LUBRICANTE APLICADO */}
+        {/* TIPO DE ACEITE APLICADO */}
         {ordenTrabajo.tipo_aceite && (
           <div
             style={{
@@ -218,7 +232,7 @@ export const ModalDetalleOT: React.FC<ModalDetalleOTProps> = ({
           </div>
         )}
 
-        {/* DETALLE DE PRODUCTOS Y SERVICIOS */}
+        {/* INSUMOS Y SERVICIOS PÚBLICOS (SIN PRECIOS/COSTOS) */}
         <div>
           <h4
             style={{
@@ -228,11 +242,12 @@ export const ModalDetalleOT: React.FC<ModalDetalleOTProps> = ({
               margin: '0 0 10px 0',
             }}
           >
-            Insumos y Servicios Aplicados
+            Servicios e Insumos Aplicados
           </h4>
-          {!ordenTrabajo.detalles || ordenTrabajo.detalles.length === 0 ? (
+          {(!ordenTrabajo.servicios || ordenTrabajo.servicios.length === 0) &&
+          (!ordenTrabajo.insumos || ordenTrabajo.insumos.length === 0) ? (
             <p style={{ fontSize: '13px', color: '#94A3B8', fontStyle: 'italic', margin: 0 }}>
-              No hay detalle estructurado registrado para esta orden.
+              No hay detalle público registrado para esta orden.
             </p>
           ) : (
             <table
@@ -246,33 +261,29 @@ export const ModalDetalleOT: React.FC<ModalDetalleOTProps> = ({
               <thead>
                 <tr style={{ borderBottom: '1px solid #334155', color: '#94A3B8' }}>
                   <th style={{ padding: '8px' }}>Descripción</th>
-                  <th style={{ padding: '8px', textAlign: 'center' }}>Cant.</th>
-                  <th style={{ padding: '8px', textAlign: 'right' }}>P. Unit</th>
-                  <th style={{ padding: '8px', textAlign: 'right' }}>Subtotal</th>
+                  <th style={{ padding: '8px', textAlign: 'center' }}>Cantidad</th>
                 </tr>
               </thead>
               <tbody>
-                {ordenTrabajo.detalles.map((item) => (
+                {ordenTrabajo.servicios?.map((s: ServicioOTPublicoDTO) => (
                   <tr
-                    key={item.id_detalle}
+                    key={`srv-${s.id_detalle}`}
                     style={{ borderBottom: '1px solid rgba(51, 65, 85, 0.3)' }}
                   >
-                    <td style={{ padding: '8px', color: '#F8FAFC' }}>{item.descripcion}</td>
+                    <td style={{ padding: '8px', color: '#F8FAFC' }}>🛠️ {s.nombre_snapshot}</td>
                     <td style={{ padding: '8px', textAlign: 'center', color: '#CBD5E1' }}>
-                      {item.cantidad}
+                      {s.cantidad}
                     </td>
-                    <td style={{ padding: '8px', textAlign: 'right', color: '#CBD5E1' }}>
-                      S/ {item.precio_unitario.toFixed(2)}
-                    </td>
-                    <td
-                      style={{
-                        padding: '8px',
-                        textAlign: 'right',
-                        fontWeight: '700',
-                        color: '#34D399',
-                      }}
-                    >
-                      S/ {item.subtotal.toFixed(2)}
+                  </tr>
+                ))}
+                {ordenTrabajo.insumos?.map((i: InsumoOTPublicoDTO) => (
+                  <tr
+                    key={`ins-${i.id_detalle}`}
+                    style={{ borderBottom: '1px solid rgba(51, 65, 85, 0.3)' }}
+                  >
+                    <td style={{ padding: '8px', color: '#F8FAFC' }}>🛢️ {i.nombre_snapshot}</td>
+                    <td style={{ padding: '8px', textAlign: 'center', color: '#CBD5E1' }}>
+                      {i.cantidad_formateada} {i.unidad_medida || ''}
                     </td>
                   </tr>
                 ))}
@@ -281,8 +292,8 @@ export const ModalDetalleOT: React.FC<ModalDetalleOTProps> = ({
           )}
         </div>
 
-        {/* OBSERVACIONES TÉCNICAS */}
-        {ordenTrabajo.observaciones && (
+        {/* RESUMEN PÚBLICO */}
+        {(ordenTrabajo.resumen_publico || ordenTrabajo.observaciones) && (
           <div
             style={{
               padding: '12px',
@@ -300,10 +311,10 @@ export const ModalDetalleOT: React.FC<ModalDetalleOTProps> = ({
                 marginBottom: '4px',
               }}
             >
-              Observaciones del Técnico
+              Resumen de Trabajo Realizado
             </span>
             <p style={{ fontSize: '13px', color: '#E2E8F0', margin: 0 }}>
-              {ordenTrabajo.observaciones}
+              {ordenTrabajo.resumen_publico || ordenTrabajo.observaciones}
             </p>
           </div>
         )}

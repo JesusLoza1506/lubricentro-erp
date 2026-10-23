@@ -1,176 +1,200 @@
 import React, { useState, useEffect } from 'react';
-import { OrdenTrabajoHistorialDTO, EstadoOT } from '../../../types/ordenTrabajo';
+import { OrdenTrabajoHistorialDTO, TipoAceiteOT } from '../../../types/ordenTrabajo';
+import { OrdenTrabajoHistorialDTO as VehiculoOTDTO } from '../../../types/vehiculo';
 import { useAuth } from '../../../context/AuthContext';
-import { ordenesService, MecanicoDTO, ServicioResumenDTO } from '../../../services/ordenesService';
-import { inventarioService } from '../../../services/inventarioService';
-import { Producto } from '../../../types/inventario';
+import { ordenesService, MecanicoDTO } from '../../../services/ordenesService';
 
-interface ModalDetalleOTProps {
-  ot: OrdenTrabajoHistorialDTO;
+export interface ModalDetalleOTProps {
+  ordenTrabajo?: OrdenTrabajoHistorialDTO | VehiculoOTDTO;
+  ot?: OrdenTrabajoHistorialDTO | VehiculoOTDTO;
+  modalAbierto?: boolean;
+  setModalAbierto?: (abierto: boolean) => void;
   onClose: () => void;
-  onCambiarEstado: (idOt: number, nuevoEstado: EstadoOT, zanja?: number) => Promise<void>;
-  onCancelarOT?: (idOt: number) => Promise<void>;
-  onReasignarMecanico?: (idOt: number, nuevoIdMecanico: number) => Promise<void>;
-  onIrAFicha?: (placa: string) => void;
+  onIniciarZanja?: (idOt: number, idZanja: number) => Promise<void>;
+  onFinalizarOT?: (
+    idOt: number,
+    kmSalida: number,
+    resumen: string,
+    tipoAceite?: TipoAceiteOT
+  ) => Promise<void>;
+  onCancelarOT?: (idOt: number, motivo: string) => Promise<void>;
+  onReasignarMecanico?: (idOt: number, nuevoIdMecanico: number, motivo: string) => Promise<void>;
   onActualizarOT?: () => Promise<void>;
 }
 
 export const ModalDetalleOT: React.FC<ModalDetalleOTProps> = ({
+  ordenTrabajo,
   ot,
   onClose,
-  onCambiarEstado,
+  onIniciarZanja,
+  onFinalizarOT,
   onCancelarOT,
   onReasignarMecanico,
-  onIrAFicha,
   onActualizarOT,
 }) => {
   const { usuario } = useAuth();
-  const [ordenActual, setOrdenActual] = useState<OrdenTrabajoHistorialDTO>(ot);
+  const otInicial = (ordenTrabajo || ot) as OrdenTrabajoHistorialDTO;
+
+  const [ordenActual, setOrdenActual] = useState<OrdenTrabajoHistorialDTO>(
+    otInicial || {
+      id_ot: 0,
+      codigo_ot: '',
+      placa: '',
+      estado: 'EN_ESPERA',
+      kilometraje_ingreso: 0,
+      fecha_ingreso: '',
+      servicios: [],
+      insumos: [],
+    }
+  );
+
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
-  const [exitoMsg, setExitoMsg] = useState('');
 
-  // Reasignación de mecánico (Solo Admin)
+  const [modoAccion, setModoAccion] = useState<
+    'NINGUNO' | 'INICIAR' | 'FINALIZAR' | 'CANCELAR' | 'REASIGNAR' | 'DEVOLVER'
+  >('NINGUNO');
+
+  const [idZanjaSel, setIdZanjaSel] = useState<number>(1);
+  const [kmSalida, setKmSalida] = useState<number>(otInicial?.kilometraje_ingreso ?? 0);
+  const [resumenPublico, setResumenPublico] = useState<string>(
+    'Servicio técnico completado satisfactoriamente.'
+  );
+  const [tipoAceite, setTipoAceite] = useState<TipoAceiteOT | ''>('');
+
+  const [motivoAccion, setMotivoAccion] = useState<string>('');
+  const [idMecanicoNuevo, setIdMecanicoNuevo] = useState<number>(0);
+  const [idDetalleDevolver, setIdDetalleDevolver] = useState<number>(0);
+  const [cantDevolver, setCantDevolver] = useState<number>(1);
+
   const [mecanicos, setMecanicos] = useState<MecanicoDTO[]>([]);
-  const [idMecanicoSeleccionado, setIdMecanicoSeleccionado] = useState<number>(ot.id_mecanico);
-  const [reasignando, setReasignando] = useState(false);
 
-  // Estados para Insumos y Servicios
-  const [productos, setProductos] = useState<Producto[]>([]);
-  const [servicios, setServicios] = useState<ServicioResumenDTO[]>([]);
-  const [tipoItem, setTipoItem] = useState<'PRODUCTO' | 'SERVICIO'>('PRODUCTO');
-  const [idProductoSel, setIdProductoSel] = useState<number>(0);
-  const [idServicioSel, setIdServicioSel] = useState<number>(0);
-  const [cantidadProd, setCantidadProd] = useState<number>(1);
-  const [agregandoItem, setAgregandoItem] = useState(false);
-
-  const idUsuarioActual = usuario ? (usuario as any).id_usuario || (usuario as any).id || 0 : 0;
-  const esAdmin = usuario?.rol === 'ADMINISTRADOR';
-  const esMecanico = usuario?.rol === 'MECANICO';
-  const esMecanicoAsignado = esMecanico && ordenActual.id_mecanico === idUsuarioActual;
-  const puedeOperarInsumos = esAdmin || esMecanicoAsignado;
+  const rol = usuario?.rol || 'CAJERO';
+  const idUsuario = (usuario as any)?.id_usuario || (usuario as any)?.id || 0;
   const esTerminal = ordenActual.estado === 'FINALIZADO' || ordenActual.estado === 'CANCELADO';
 
-  const obtenerIdUsuario = (): number => {
-    if (!usuario) return 0;
-    const uAny = usuario as any;
-    return uAny.id_usuario || uAny.id || uAny.idUsuario || 0;
-  };
+  useEffect(() => {
+    if (otInicial) {
+      setOrdenActual(otInicial);
+      setKmSalida(otInicial.kilometraje_ingreso ?? 0);
+    }
+  }, [ordenTrabajo, ot]);
 
   useEffect(() => {
-    setOrdenActual(ot);
-    setIdMecanicoSeleccionado(ot.id_mecanico);
-  }, [ot]);
-
-  useEffect(() => {
-    if (esAdmin && !esTerminal) {
+    if (!esTerminal) {
       ordenesService.listarMecanicos().then(setMecanicos).catch(console.error);
     }
-  }, [esAdmin, esTerminal]);
+  }, [esTerminal]);
 
-  useEffect(() => {
-    if (!esTerminal && puedeOperarInsumos) {
-      inventarioService
-        .listarProductosPublicos()
-        .then((prods: Producto[]) => {
-          setProductos(prods);
-          if (prods.length > 0) setIdProductoSel(prods[0].id_producto);
-        })
-        .catch(console.error);
-
-      ordenesService
-        .listarServicios()
-        .then((servs: ServicioResumenDTO[]) => {
-          setServicios(servs);
-          if (servs.length > 0) setIdServicioSel(servs[0].id_servicio);
-        })
-        .catch(console.error);
-    }
-  }, [esTerminal, puedeOperarInsumos]);
-
-  const handleTransicion = async (nuevoEstado: EstadoOT) => {
+  const handleIniciarSubmit = async () => {
+    if (!onIniciarZanja) return;
     try {
       setLoading(true);
       setErrorMsg('');
-      await onCambiarEstado(ordenActual.id_ot, nuevoEstado, ordenActual.zanja || 1);
-
-      if (nuevoEstado === 'FINALIZADO') {
-        setExitoMsg(
-          '✅ Orden finalizada con éxito. La zanja ha sido liberada. Notifique al Cajero para la emisión del comprobante.'
-        );
-        setTimeout(() => onClose(), 3000);
-      } else {
-        onClose();
-      }
-    } catch (err: any) {
-      setErrorMsg(typeof err === 'string' ? err : err?.message || 'Error al cambiar estado.');
+      await onIniciarZanja(ordenActual.id_ot, idZanjaSel);
+      setModoAccion('NINGUNO');
+      if (onActualizarOT) await onActualizarOT();
+    } catch (err: unknown) {
+      setErrorMsg(
+        typeof err === 'string' ? err : (err as any)?.message || 'Error al iniciar zanja'
+      );
     } finally {
       setLoading(false);
     }
   };
 
-  const handleCambioMecanico = async (nuevoId: number) => {
-    if (!onReasignarMecanico || nuevoId === ordenActual.id_mecanico) return;
-    try {
-      setReasignando(true);
-      setErrorMsg('');
-      await onReasignarMecanico(ordenActual.id_ot, nuevoId);
-      setIdMecanicoSeleccionado(nuevoId);
-    } catch (err: any) {
-      setErrorMsg(typeof err === 'string' ? err : err?.message || 'Error al reasignar mecánico.');
-      setIdMecanicoSeleccionado(ordenActual.id_mecanico);
-    } finally {
-      setReasignando(false);
-    }
-  };
-
-  const handleAgregarItem = async () => {
-    try {
-      setAgregandoItem(true);
-      setErrorMsg('');
-      const uId = obtenerIdUsuario();
-
-      let otActualizada: OrdenTrabajoHistorialDTO;
-      if (tipoItem === 'PRODUCTO') {
-        if (!idProductoSel) return;
-        otActualizada = await ordenesService.agregarProductoOT(
-          { id_ot: ordenActual.id_ot, id_producto: idProductoSel, cantidad: cantidadProd },
-          uId
-        );
-      } else {
-        if (!idServicioSel) return;
-        otActualizada = await ordenesService.agregarServicioOT(
-          { id_ot: ordenActual.id_ot, id_servicio: idServicioSel },
-          uId
-        );
-      }
-
-      setOrdenActual(otActualizada);
-      if (onActualizarOT) await onActualizarOT();
-    } catch (err: any) {
-      setErrorMsg(typeof err === 'string' ? err : err?.message || 'Error al agregar ítem.');
-    } finally {
-      setAgregandoItem(false);
-    }
-  };
-
-  const handleEliminarItem = async (idDetalle: number, tipo: string) => {
+  const handleFinalizarSubmit = async () => {
+    if (!onFinalizarOT) return;
     try {
       setLoading(true);
       setErrorMsg('');
-      const uId = obtenerIdUsuario();
-
-      let otActualizada: OrdenTrabajoHistorialDTO;
-      if (tipo === 'PRODUCTO') {
-        otActualizada = await ordenesService.eliminarProductoOT(idDetalle, ordenActual.id_ot, uId);
-      } else {
-        otActualizada = await ordenesService.eliminarServicioOT(idDetalle, ordenActual.id_ot, uId);
-      }
-
-      setOrdenActual(otActualizada);
+      await onFinalizarOT(
+        ordenActual.id_ot,
+        kmSalida,
+        resumenPublico,
+        tipoAceite !== '' ? tipoAceite : undefined
+      );
+      setModoAccion('NINGUNO');
       if (onActualizarOT) await onActualizarOT();
-    } catch (err: any) {
-      setErrorMsg(typeof err === 'string' ? err : err?.message || 'Error al eliminar ítem.');
+    } catch (err: unknown) {
+      setErrorMsg(typeof err === 'string' ? err : (err as any)?.message || 'Error al finalizar OT');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCancelarSubmit = async () => {
+    if (!onCancelarOT) return;
+    if (motivoAccion.trim().length < 5) {
+      setErrorMsg('El motivo debe tener al menos 5 caracteres.');
+      return;
+    }
+    try {
+      setLoading(true);
+      setErrorMsg('');
+      await onCancelarOT(ordenActual.id_ot, motivoAccion);
+      setModoAccion('NINGUNO');
+      setMotivoAccion('');
+      if (onActualizarOT) await onActualizarOT();
+    } catch (err: unknown) {
+      setErrorMsg(typeof err === 'string' ? err : (err as any)?.message || 'Error al cancelar OT');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleReasignarSubmit = async () => {
+    if (!onReasignarMecanico) return;
+    if (idMecanicoNuevo <= 0) {
+      setErrorMsg('Seleccione un mecánico válido.');
+      return;
+    }
+    if (motivoAccion.trim().length < 5) {
+      setErrorMsg('El motivo debe tener al menos 5 caracteres.');
+      return;
+    }
+    try {
+      setLoading(true);
+      setErrorMsg('');
+      await onReasignarMecanico(ordenActual.id_ot, idMecanicoNuevo, motivoAccion);
+      setModoAccion('NINGUNO');
+      setMotivoAccion('');
+      if (onActualizarOT) await onActualizarOT();
+    } catch (err: unknown) {
+      setErrorMsg(
+        typeof err === 'string' ? err : (err as any)?.message || 'Error al reasignar mecánico'
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDevolverInsumoSubmit = async () => {
+    if (motivoAccion.trim().length < 5) {
+      setErrorMsg('El motivo de devolución debe tener al menos 5 caracteres.');
+      return;
+    }
+    try {
+      setLoading(true);
+      setErrorMsg('');
+      const act = await ordenesService.devolverInsumoOT(
+        {
+          id_ot: ordenActual.id_ot,
+          id_detalle_producto: idDetalleDevolver,
+          cantidad_a_devolver: cantDevolver,
+          motivo: motivoAccion,
+        },
+        idUsuario,
+        rol
+      );
+      setOrdenActual(act);
+      setModoAccion('NINGUNO');
+      setMotivoAccion('');
+      if (onActualizarOT) await onActualizarOT();
+    } catch (err: unknown) {
+      setErrorMsg(
+        typeof err === 'string' ? err : (err as any)?.message || 'Error al devolver insumo'
+      );
     } finally {
       setLoading(false);
     }
@@ -184,7 +208,7 @@ export const ModalDetalleOT: React.FC<ModalDetalleOTProps> = ({
         left: 0,
         right: 0,
         bottom: 0,
-        backgroundColor: 'rgba(15, 23, 42, 0.8)',
+        backgroundColor: 'rgba(15, 23, 42, 0.85)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
@@ -196,13 +220,12 @@ export const ModalDetalleOT: React.FC<ModalDetalleOTProps> = ({
           backgroundColor: '#1E293B',
           borderRadius: '12px',
           width: '100%',
-          maxWidth: '720px',
+          maxWidth: '760px',
           padding: '24px',
           border: '1px solid #334155',
           color: '#F8FAFC',
           maxHeight: '90vh',
           overflowY: 'auto',
-          overflowX: 'hidden',
         }}
       >
         <div
@@ -213,27 +236,21 @@ export const ModalDetalleOT: React.FC<ModalDetalleOTProps> = ({
             marginBottom: '16px',
           }}
         >
-          <h2 style={{ margin: 0, fontSize: '20px' }}>
-            Detalle de Orden: <span style={{ color: '#38BDF8' }}>{ordenActual.codigo_ot}</span>
+          <h2 style={{ margin: 0, fontSize: '18px' }}>
+            OT: <span style={{ color: '#38BDF8' }}>{ordenActual.codigo_ot}</span> (
+            {ordenActual.placa})
           </h2>
-          <button
-            onClick={() => {
-              onClose();
-              if (onIrAFicha) onIrAFicha(ordenActual.placa);
-            }}
+          <span
             style={{
-              backgroundColor: '#334155',
-              color: '#38BDF8',
-              border: 'none',
-              padding: '6px 12px',
+              padding: '4px 10px',
               borderRadius: '6px',
               fontSize: '12px',
-              cursor: 'pointer',
-              fontWeight: 600,
+              fontWeight: 'bold',
+              backgroundColor: '#334155',
             }}
           >
-            Ver Ficha Vehicular ({ordenActual.placa}) ↗
-          </button>
+            {ordenActual.estado}
+          </span>
         </div>
 
         {errorMsg && (
@@ -244,291 +261,571 @@ export const ModalDetalleOT: React.FC<ModalDetalleOTProps> = ({
               color: '#FCA5A5',
               borderRadius: '6px',
               marginBottom: '16px',
-              fontSize: '14px',
+              fontSize: '13px',
             }}
           >
             {errorMsg}
           </div>
         )}
 
-        {exitoMsg && (
+        {ordenActual.nota_interna && (
           <div
             style={{
-              padding: '12px',
-              backgroundColor: '#064E3B',
-              border: '1px solid #059669',
-              color: '#A7F3D0',
-              borderRadius: '6px',
+              padding: '10px',
+              backgroundColor: '#0F172A',
+              borderLeft: '4px solid #F59E0B',
+              borderRadius: '4px',
               marginBottom: '16px',
-              fontSize: '14px',
-              fontWeight: 600,
+              fontSize: '13px',
             }}
           >
-            {exitoMsg}
+            🔒 <strong>Nota Interna:</strong> {ordenActual.nota_interna}
           </div>
         )}
 
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(2, 1fr)',
-            gap: '12px',
-            backgroundColor: '#0F172A',
-            padding: '16px',
-            borderRadius: '8px',
-            marginBottom: '20px',
-          }}
-        >
-          <div>
-            <p style={{ margin: '4px 0', fontSize: '13px', color: '#94A3B8' }}>Estado Actual</p>
-            <strong style={{ color: '#F8FAFC' }}>{ordenActual.estado.replace('_', ' ')}</strong>
-          </div>
-          <div>
-            <p style={{ margin: '4px 0', fontSize: '13px', color: '#94A3B8' }}>Zanja Asignada</p>
-            <strong style={{ color: '#F8FAFC' }}>
-              {ordenActual.zanja ? `Zanja ${ordenActual.zanja}` : 'Ninguna'}
-            </strong>
-          </div>
-          <div>
-            <p style={{ margin: '4px 0', fontSize: '13px', color: '#94A3B8' }}>Mecánico Asignado</p>
-            {esAdmin && !esTerminal ? (
-              <select
-                disabled={reasignando}
-                value={idMecanicoSeleccionado}
-                onChange={(e) => handleCambioMecanico(Number(e.target.value))}
-                style={{
-                  width: '100%',
-                  padding: '6px 10px',
-                  backgroundColor: '#1E293B',
-                  border: '1px solid #38BDF8',
-                  borderRadius: '6px',
-                  color: '#F8FAFC',
-                  fontSize: '13px',
-                  marginTop: '2px',
-                }}
-              >
-                {mecanicos.map((m) => (
-                  <option key={m.id_usuario} value={m.id_usuario}>
-                    {m.nombre_completo}
-                  </option>
-                ))}
-              </select>
-            ) : (
-              <strong style={{ color: '#F8FAFC' }}>
-                {ordenActual.nombre_mecanico || 'No asignado'}
-              </strong>
-            )}
-          </div>
-          <div>
-            <p style={{ margin: '4px 0', fontSize: '13px', color: '#94A3B8' }}>
-              Kilometraje Ingreso / Próximo
-            </p>
-            <strong style={{ color: '#F8FAFC' }}>
-              {ordenActual.kilometraje_ingreso.toLocaleString()} /{' '}
-              {ordenActual.proximo_kilometraje.toLocaleString()} km
-            </strong>
-          </div>
-        </div>
-
-        {/* Formulario para Agregar Ítem (Solo para Admin o Mecánico asignado a la OT) */}
-        {!esTerminal && puedeOperarInsumos && (
+        {/* ACCIONES DE ESTADO DE ORDEN */}
+        {!esTerminal && (
           <div
             style={{
-              backgroundColor: '#0F172A',
-              padding: '14px',
-              borderRadius: '8px',
-              marginBottom: '20px',
-              border: '1px solid #334155',
+              display: 'flex',
+              gap: '8px',
+              marginBottom: '16px',
+              flexWrap: 'wrap',
             }}
           >
-            <h4 style={{ margin: '0 0 10px 0', fontSize: '14px', color: '#38BDF8' }}>
-              + Agregar Insumo o Servicio
-            </h4>
-            <div
-              style={{
-                display: 'flex',
-                flexWrap: 'wrap',
-                gap: '8px',
-                alignItems: 'center',
-              }}
-            >
-              <select
-                value={tipoItem}
-                onChange={(e) => setTipoItem(e.target.value as any)}
-                style={{
-                  flex: '0 0 110px',
-                  padding: '8px',
-                  backgroundColor: '#1E293B',
-                  border: '1px solid #334155',
-                  borderRadius: '6px',
-                  color: '#F8FAFC',
-                  fontSize: '12px',
-                }}
-              >
-                <option value="PRODUCTO">Producto</option>
-                <option value="SERVICIO">Servicio</option>
-              </select>
-
-              <div style={{ flex: '1 1 200px', minWidth: '180px' }}>
-                {tipoItem === 'PRODUCTO' ? (
-                  <select
-                    value={idProductoSel}
-                    onChange={(e) => setIdProductoSel(Number(e.target.value))}
-                    style={{
-                      width: '100%',
-                      padding: '8px',
-                      backgroundColor: '#1E293B',
-                      border: '1px solid #334155',
-                      borderRadius: '6px',
-                      color: '#F8FAFC',
-                      fontSize: '12px',
-                    }}
-                  >
-                    {productos.map((p) => (
-                      <option key={p.id_producto} value={p.id_producto}>
-                        {p.nombre} (S/ {(p.precio_venta / 100.0).toFixed(2)}) - Stock:{' '}
-                        {p.stock_actual}
-                      </option>
-                    ))}
-                  </select>
-                ) : (
-                  <select
-                    value={idServicioSel}
-                    onChange={(e) => setIdServicioSel(Number(e.target.value))}
-                    style={{
-                      width: '100%',
-                      padding: '8px',
-                      backgroundColor: '#1E293B',
-                      border: '1px solid #334155',
-                      borderRadius: '6px',
-                      color: '#F8FAFC',
-                      fontSize: '12px',
-                    }}
-                  >
-                    {servicios.map((s) => (
-                      <option key={s.id_servicio} value={s.id_servicio}>
-                        {s.descripcion} (S/ {s.precio_base.toFixed(2)})
-                      </option>
-                    ))}
-                  </select>
-                )}
-              </div>
-
-              <div style={{ flex: '0 0 70px' }}>
-                {tipoItem === 'PRODUCTO' ? (
-                  <input
-                    type="number"
-                    min={1}
-                    value={cantidadProd}
-                    onChange={(e) => setCantidadProd(Number(e.target.value))}
-                    style={{
-                      width: '100%',
-                      padding: '8px',
-                      backgroundColor: '#1E293B',
-                      border: '1px solid #334155',
-                      borderRadius: '6px',
-                      color: '#F8FAFC',
-                      fontSize: '12px',
-                      textAlign: 'center',
-                    }}
-                  />
-                ) : (
-                  <span
-                    style={{
-                      fontSize: '12px',
-                      color: '#94A3B8',
-                      textAlign: 'center',
-                      display: 'block',
-                    }}
-                  >
-                    1 unid
-                  </span>
-                )}
-              </div>
-
+            {ordenActual.estado === 'EN_ESPERA' && onIniciarZanja && (
               <button
-                type="button"
-                onClick={handleAgregarItem}
-                disabled={agregandoItem}
+                disabled={loading}
+                onClick={() => setModoAccion('INICIAR')}
                 style={{
-                  flex: '0 0 75px',
-                  padding: '8px 12px',
+                  padding: '6px 12px',
                   backgroundColor: '#2563EB',
                   color: '#FFF',
                   border: 'none',
                   borderRadius: '6px',
                   cursor: 'pointer',
-                  fontWeight: 600,
                   fontSize: '12px',
+                  fontWeight: '600',
                 }}
               >
-                {agregandoItem ? '...' : 'Añadir'}
+                ▶ Iniciar Trabajo en Zanja
+              </button>
+            )}
+
+            {ordenActual.estado === 'EN_PROCESO' && onFinalizarOT && (
+              <button
+                disabled={loading}
+                onClick={() => setModoAccion('FINALIZAR')}
+                style={{
+                  padding: '6px 12px',
+                  backgroundColor: '#16A34A',
+                  color: '#FFF',
+                  border: 'none',
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  fontSize: '12px',
+                  fontWeight: '600',
+                }}
+              >
+                ✔ Finalizar OT
+              </button>
+            )}
+
+            {rol === 'ADMINISTRADOR' && onReasignarMecanico && (
+              <button
+                disabled={loading}
+                onClick={() => setModoAccion('REASIGNAR')}
+                style={{
+                  padding: '6px 12px',
+                  backgroundColor: '#0284C7',
+                  color: '#FFF',
+                  border: 'none',
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  fontSize: '12px',
+                  fontWeight: '600',
+                }}
+              >
+                👤 Reasignar Mecánico
+              </button>
+            )}
+
+            {onCancelarOT && (
+              <button
+                disabled={loading}
+                onClick={() => setModoAccion('CANCELAR')}
+                style={{
+                  padding: '6px 12px',
+                  backgroundColor: '#DC2626',
+                  color: '#FFF',
+                  border: 'none',
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  fontSize: '12px',
+                  fontWeight: '600',
+                }}
+              >
+                ✖ Cancelar OT
+              </button>
+            )}
+          </div>
+        )}
+
+        {/* FORMULARIOS DE ACCIÓN */}
+        {modoAccion === 'INICIAR' && (
+          <div
+            style={{
+              padding: '12px',
+              backgroundColor: '#0F172A',
+              borderRadius: '6px',
+              marginBottom: '16px',
+              border: '1px solid #2563EB',
+            }}
+          >
+            <h5 style={{ margin: '0 0 8px 0', color: '#38BDF8' }}>Asignar Zanja de Trabajo</h5>
+            <select
+              value={idZanjaSel}
+              onChange={(e) => setIdZanjaSel(Number(e.target.value))}
+              style={{
+                width: '100%',
+                padding: '6px',
+                marginBottom: '8px',
+                backgroundColor: '#1E293B',
+                border: '1px solid #334155',
+                color: '#FFF',
+              }}
+            >
+              {[1, 2, 3, 4, 5, 6].map((z) => (
+                <option key={z} value={z}>
+                  Zanja N° {z}
+                </option>
+              ))}
+            </select>
+            <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+              <button
+                onClick={() => setModoAccion('NINGUNO')}
+                style={{
+                  padding: '4px 10px',
+                  backgroundColor: '#475569',
+                  color: '#FFF',
+                  border: 'none',
+                  borderRadius: '4px',
+                }}
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleIniciarSubmit}
+                style={{
+                  padding: '4px 10px',
+                  backgroundColor: '#2563EB',
+                  color: '#FFF',
+                  border: 'none',
+                  borderRadius: '4px',
+                }}
+              >
+                Confirmar Inicio
               </button>
             </div>
           </div>
         )}
 
-        <h3 style={{ fontSize: '15px', color: '#CBD5E1', marginBottom: '8px' }}>
-          Insumos y Servicios Aplicados
-        </h3>
-        {ordenActual.detalles.length === 0 ? (
-          <p style={{ fontSize: '13px', color: '#64748B', fontStyle: 'italic' }}>
-            No se registraron productos ni servicios adicionales.
-          </p>
-        ) : (
-          <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '20px' }}>
-            <thead>
-              <tr
+        {modoAccion === 'FINALIZAR' && (
+          <div
+            style={{
+              padding: '12px',
+              backgroundColor: '#0F172A',
+              borderRadius: '6px',
+              marginBottom: '16px',
+              border: '1px solid #16A34A',
+            }}
+          >
+            <h5 style={{ margin: '0 0 8px 0', color: '#4ADE80' }}>Finalizar Orden de Trabajo</h5>
+            <label style={{ fontSize: '12px', color: '#94A3B8' }}>Km Salida *</label>
+            <input
+              type="number"
+              value={kmSalida}
+              onChange={(e) => setKmSalida(Number(e.target.value))}
+              style={{
+                width: '100%',
+                padding: '6px',
+                marginBottom: '8px',
+                backgroundColor: '#1E293B',
+                border: '1px solid #334155',
+                color: '#FFF',
+              }}
+            />
+            <label style={{ fontSize: '12px', color: '#94A3B8' }}>Tipo de Aceite Utilizado</label>
+            <select
+              value={tipoAceite}
+              onChange={(e) => setTipoAceite(e.target.value as TipoAceiteOT | '')}
+              style={{
+                width: '100%',
+                padding: '6px',
+                marginBottom: '8px',
+                backgroundColor: '#1E293B',
+                border: '1px solid #334155',
+                color: '#FFF',
+              }}
+            >
+              <option value="">No aplica / Sin cambio de aceite</option>
+              <option value="MINERAL">MINERAL (5,000 km)</option>
+              <option value="SINTETICO">SINTETICO (10,000 km)</option>
+            </select>
+            <label style={{ fontSize: '12px', color: '#94A3B8' }}>Resumen Público *</label>
+            <textarea
+              rows={2}
+              value={resumenPublico}
+              onChange={(e) => setResumenPublico(e.target.value)}
+              style={{
+                width: '100%',
+                padding: '6px',
+                marginBottom: '8px',
+                backgroundColor: '#1E293B',
+                border: '1px solid #334155',
+                color: '#FFF',
+              }}
+            />
+            <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+              <button
+                onClick={() => setModoAccion('NINGUNO')}
                 style={{
-                  borderBottom: '1px solid #334155',
-                  textAlign: 'left',
-                  fontSize: '12px',
-                  color: '#94A3B8',
+                  padding: '4px 10px',
+                  backgroundColor: '#475569',
+                  color: '#FFF',
+                  border: 'none',
+                  borderRadius: '4px',
                 }}
               >
-                <th style={{ padding: '8px' }}>Ítem</th>
-                <th style={{ padding: '8px' }}>Tipo</th>
-                <th style={{ padding: '8px' }}>Cant.</th>
-                <th style={{ padding: '8px' }}>P. Unit</th>
-                <th style={{ padding: '8px' }}>Subtotal</th>
-                {!esTerminal && puedeOperarInsumos && (
-                  <th style={{ padding: '8px', textAlign: 'center' }}>Acción</th>
-                )}
+                Cancelar
+              </button>
+              <button
+                onClick={handleFinalizarSubmit}
+                style={{
+                  padding: '4px 10px',
+                  backgroundColor: '#16A34A',
+                  color: '#FFF',
+                  border: 'none',
+                  borderRadius: '4px',
+                }}
+              >
+                Confirmar Finalización
+              </button>
+            </div>
+          </div>
+        )}
+
+        {modoAccion === 'CANCELAR' && (
+          <div
+            style={{
+              padding: '12px',
+              backgroundColor: '#0F172A',
+              borderRadius: '6px',
+              marginBottom: '16px',
+              border: '1px solid #DC2626',
+            }}
+          >
+            <h5 style={{ margin: '0 0 8px 0', color: '#FCA5A5' }}>Cancelar Orden de Trabajo</h5>
+            <textarea
+              rows={2}
+              value={motivoAccion}
+              onChange={(e) => setMotivoAccion(e.target.value)}
+              placeholder="Motivo de cancelación (mínimo 5 caracteres)..."
+              style={{
+                width: '100%',
+                padding: '6px',
+                marginBottom: '8px',
+                backgroundColor: '#1E293B',
+                border: '1px solid #334155',
+                color: '#FFF',
+              }}
+            />
+            <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+              <button
+                onClick={() => setModoAccion('NINGUNO')}
+                style={{
+                  padding: '4px 10px',
+                  backgroundColor: '#475569',
+                  color: '#FFF',
+                  border: 'none',
+                  borderRadius: '4px',
+                }}
+              >
+                Volver
+              </button>
+              <button
+                onClick={handleCancelarSubmit}
+                style={{
+                  padding: '4px 10px',
+                  backgroundColor: '#DC2626',
+                  color: '#FFF',
+                  border: 'none',
+                  borderRadius: '4px',
+                }}
+              >
+                Confirmar Cancelación
+              </button>
+            </div>
+          </div>
+        )}
+
+        {modoAccion === 'REASIGNAR' && (
+          <div
+            style={{
+              padding: '12px',
+              backgroundColor: '#0F172A',
+              borderRadius: '6px',
+              marginBottom: '16px',
+              border: '1px solid #0284C7',
+            }}
+          >
+            <h5 style={{ margin: '0 0 8px 0', color: '#38BDF8' }}>Reasignar Mecánico</h5>
+            <select
+              value={idMecanicoNuevo}
+              onChange={(e) => setIdMecanicoNuevo(Number(e.target.value))}
+              style={{
+                width: '100%',
+                padding: '6px',
+                marginBottom: '8px',
+                backgroundColor: '#1E293B',
+                border: '1px solid #334155',
+                color: '#FFF',
+              }}
+            >
+              <option value={0}>Seleccione Nuevo Mecánico...</option>
+              {mecanicos.map((m) => (
+                <option key={m.id_usuario} value={m.id_usuario}>
+                  {m.nombre_completo}
+                </option>
+              ))}
+            </select>
+            <textarea
+              rows={2}
+              value={motivoAccion}
+              onChange={(e) => setMotivoAccion(e.target.value)}
+              placeholder="Motivo de reasignación (mínimo 5 caracteres)..."
+              style={{
+                width: '100%',
+                padding: '6px',
+                marginBottom: '8px',
+                backgroundColor: '#1E293B',
+                border: '1px solid #334155',
+                color: '#FFF',
+              }}
+            />
+            <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+              <button
+                onClick={() => setModoAccion('NINGUNO')}
+                style={{
+                  padding: '4px 10px',
+                  backgroundColor: '#475569',
+                  color: '#FFF',
+                  border: 'none',
+                  borderRadius: '4px',
+                }}
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleReasignarSubmit}
+                style={{
+                  padding: '4px 10px',
+                  backgroundColor: '#0284C7',
+                  color: '#FFF',
+                  border: 'none',
+                  borderRadius: '4px',
+                }}
+              >
+                Confirmar Reasignación
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* SECCIÓN SERVICIOS */}
+        <h4 style={{ color: '#38BDF8', marginBottom: '8px' }}>Servicios Aplicados</h4>
+        <table
+          style={{
+            width: '100%',
+            borderCollapse: 'collapse',
+            marginBottom: '16px',
+            fontSize: '13px',
+          }}
+        >
+          <thead>
+            <tr style={{ borderBottom: '1px solid #334155', color: '#94A3B8' }}>
+              <th style={{ textAlign: 'left', padding: '6px' }}>Servicio</th>
+              <th style={{ padding: '6px' }}>Cant.</th>
+              <th style={{ padding: '6px' }}>P. Unit</th>
+              <th style={{ padding: '6px' }}>Subtotal</th>
+            </tr>
+          </thead>
+          <tbody>
+            {ordenActual.servicios && ordenActual.servicios.length > 0 ? (
+              ordenActual.servicios.map((s) => (
+                <tr key={s.id_detalle} style={{ borderBottom: '1px solid #0F172A' }}>
+                  <td style={{ padding: '6px' }}>{s.nombre_snapshot}</td>
+                  <td style={{ padding: '6px', textAlign: 'center' }}>{s.cantidad}</td>
+                  <td style={{ padding: '6px', textAlign: 'right' }}>
+                    S/ {s.precio_unitario_soles.toFixed(2)}
+                  </td>
+                  <td style={{ padding: '6px', textAlign: 'right', fontWeight: 'bold' }}>
+                    S/ {s.subtotal_soles.toFixed(2)}
+                  </td>
+                </tr>
+              ))
+            ) : (
+              <tr>
+                <td colSpan={4} style={{ padding: '8px', textAlign: 'center', color: '#94A3B8' }}>
+                  Sin servicios registrados
+                </td>
               </tr>
-            </thead>
-            <tbody>
-              {ordenActual.detalles.map((d) => (
-                <tr
-                  key={`${d.tipo}-${d.id_detalle}`}
-                  style={{ borderBottom: '1px solid #1E293B', fontSize: '13px' }}
-                >
-                  <td style={{ padding: '8px' }}>{d.descripcion}</td>
-                  <td style={{ padding: '8px', color: '#94A3B8' }}>{d.tipo}</td>
-                  <td style={{ padding: '8px' }}>{d.cantidad}</td>
-                  <td style={{ padding: '8px' }}>S/ {d.precio_unitario.toFixed(2)}</td>
-                  <td style={{ padding: '8px', fontWeight: '600' }}>S/ {d.subtotal.toFixed(2)}</td>
-                  {!esTerminal && puedeOperarInsumos && (
-                    <td style={{ padding: '8px', textAlign: 'center' }}>
+            )}
+          </tbody>
+        </table>
+
+        {/* SECCIÓN INSUMOS */}
+        <h4 style={{ color: '#38BDF8', marginBottom: '8px' }}>Insumos Consumidos</h4>
+        <table
+          style={{
+            width: '100%',
+            borderCollapse: 'collapse',
+            marginBottom: '20px',
+            fontSize: '13px',
+          }}
+        >
+          <thead>
+            <tr style={{ borderBottom: '1px solid #334155', color: '#94A3B8' }}>
+              <th style={{ textAlign: 'left', padding: '6px' }}>Insumo</th>
+              <th style={{ padding: '6px' }}>Consumido</th>
+              <th style={{ padding: '6px' }}>Devuelto</th>
+              <th style={{ padding: '6px' }}>Neto</th>
+              <th style={{ padding: '6px' }}>Subtotal</th>
+              {!esTerminal && <th style={{ padding: '6px' }}>Acción</th>}
+            </tr>
+          </thead>
+          <tbody>
+            {ordenActual.insumos && ordenActual.insumos.length > 0 ? (
+              ordenActual.insumos.map((i) => (
+                <tr key={i.id_detalle} style={{ borderBottom: '1px solid #0F172A' }}>
+                  <td style={{ padding: '6px' }}>{i.nombre_snapshot}</td>
+                  <td style={{ padding: '6px', textAlign: 'center' }}>
+                    {i.cantidad_formateada} {i.unidad_medida}
+                  </td>
+                  <td style={{ padding: '6px', textAlign: 'center', color: '#F59E0B' }}>
+                    {i.devuelto_ml_und}
+                  </td>
+                  <td style={{ padding: '6px', textAlign: 'center', fontWeight: 'bold' }}>
+                    {i.neto_ml_und}
+                  </td>
+                  <td style={{ padding: '6px', textAlign: 'right' }}>
+                    S/ {i.subtotal_soles.toFixed(2)}
+                  </td>
+                  {!esTerminal && (
+                    <td style={{ padding: '6px', textAlign: 'center' }}>
                       <button
-                        onClick={() => handleEliminarItem(d.id_detalle, d.tipo)}
+                        onClick={() => {
+                          setIdDetalleDevolver(i.id_detalle);
+                          setModoAccion('DEVOLVER');
+                        }}
                         style={{
-                          backgroundColor: '#7F1D1D',
-                          color: '#FCA5A5',
+                          padding: '2px 6px',
+                          backgroundColor: '#D97706',
+                          color: '#FFF',
                           border: 'none',
-                          padding: '2px 8px',
                           borderRadius: '4px',
                           cursor: 'pointer',
                           fontSize: '11px',
                         }}
                       >
-                        ✕
+                        Devolver
                       </button>
                     </td>
                   )}
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              ))
+            ) : (
+              <tr>
+                <td
+                  colSpan={!esTerminal ? 6 : 5}
+                  style={{ padding: '8px', textAlign: 'center', color: '#94A3B8' }}
+                >
+                  Sin insumos registrados
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+
+        {modoAccion === 'DEVOLVER' && (
+          <div
+            style={{
+              padding: '12px',
+              backgroundColor: '#0F172A',
+              borderRadius: '6px',
+              marginBottom: '16px',
+              border: '1px solid #D97706',
+            }}
+          >
+            <h5 style={{ margin: '0 0 8px 0', color: '#F59E0B' }}>
+              Devolución de Insumo a Inventario
+            </h5>
+            <input
+              type="number"
+              min={1}
+              value={cantDevolver}
+              onChange={(e) => setCantDevolver(Number(e.target.value))}
+              placeholder="Cantidad"
+              style={{
+                width: '100%',
+                padding: '6px',
+                marginBottom: '8px',
+                backgroundColor: '#1E293B',
+                border: '1px solid #334155',
+                color: '#FFF',
+              }}
+            />
+            <textarea
+              rows={2}
+              value={motivoAccion}
+              onChange={(e) => setMotivoAccion(e.target.value)}
+              placeholder="Motivo obligatorio de devolución (min 5 caracteres)..."
+              style={{
+                width: '100%',
+                padding: '6px',
+                marginBottom: '8px',
+                backgroundColor: '#1E293B',
+                border: '1px solid #334155',
+                color: '#FFF',
+              }}
+            />
+            <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+              <button
+                onClick={() => setModoAccion('NINGUNO')}
+                style={{
+                  padding: '4px 10px',
+                  backgroundColor: '#475569',
+                  color: '#FFF',
+                  border: 'none',
+                  borderRadius: '4px',
+                }}
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleDevolverInsumoSubmit}
+                style={{
+                  padding: '4px 10px',
+                  backgroundColor: '#D97706',
+                  color: '#FFF',
+                  border: 'none',
+                  borderRadius: '4px',
+                }}
+              >
+                Confirmar Devolución
+              </button>
+            </div>
+          </div>
         )}
 
         <div
@@ -536,99 +833,27 @@ export const ModalDetalleOT: React.FC<ModalDetalleOTProps> = ({
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
-            marginTop: '24px',
-            paddingTop: '16px',
+            marginTop: '20px',
+            paddingTop: '12px',
             borderTop: '1px solid #334155',
           }}
         >
-          <div>
-            {/* Cancelación restringida estrictamente al ADMINISTRADOR */}
-            {esAdmin && !esTerminal && onCancelarOT && (
-              <button
-                type="button"
-                onClick={async () => {
-                  try {
-                    setLoading(true);
-                    await onCancelarOT(ordenActual.id_ot);
-                    onClose();
-                  } catch (err: any) {
-                    setErrorMsg(
-                      typeof err === 'string' ? err : err?.message || 'Error al cancelar la OT.'
-                    );
-                  } finally {
-                    setLoading(false);
-                  }
-                }}
-                disabled={loading || !!exitoMsg}
-                style={{
-                  padding: '8px 14px',
-                  backgroundColor: '#7F1D1D',
-                  color: '#FCA5A5',
-                  border: 'none',
-                  borderRadius: '6px',
-                  cursor: 'pointer',
-                  fontSize: '13px',
-                }}
-              >
-                Cancelar OT
-              </button>
-            )}
-          </div>
-
-          <div style={{ display: 'flex', gap: '10px' }}>
-            <button
-              type="button"
-              onClick={onClose}
-              style={{
-                padding: '8px 16px',
-                backgroundColor: 'transparent',
-                color: '#94A3B8',
-                border: '1px solid #334155',
-                borderRadius: '6px',
-                cursor: 'pointer',
-              }}
-            >
-              Cerrar
-            </button>
-
-            {(esAdmin || esMecanicoAsignado) && ordenActual.estado === 'EN_ESPERA' && (
-              <button
-                type="button"
-                onClick={() => handleTransicion('EN_PROCESO')}
-                disabled={loading || !!exitoMsg}
-                style={{
-                  padding: '8px 16px',
-                  backgroundColor: '#2563EB',
-                  color: '#FFF',
-                  border: 'none',
-                  borderRadius: '6px',
-                  fontWeight: '600',
-                  cursor: 'pointer',
-                }}
-              >
-                Iniciar Trabajo (EN PROCESO)
-              </button>
-            )}
-
-            {(esAdmin || esMecanicoAsignado) && ordenActual.estado === 'EN_PROCESO' && (
-              <button
-                type="button"
-                onClick={() => handleTransicion('FINALIZADO')}
-                disabled={loading || !!exitoMsg}
-                style={{
-                  padding: '8px 16px',
-                  backgroundColor: '#059669',
-                  color: '#FFF',
-                  border: 'none',
-                  borderRadius: '6px',
-                  fontWeight: '600',
-                  cursor: 'pointer',
-                }}
-              >
-                Finalizar Trabajo
-              </button>
-            )}
-          </div>
+          <strong style={{ fontSize: '16px', color: '#10B981' }}>
+            Total General: S/ {(ordenActual.total_general_soles ?? 0).toFixed(2)}
+          </strong>
+          <button
+            onClick={onClose}
+            style={{
+              padding: '8px 16px',
+              backgroundColor: '#475569',
+              color: '#FFF',
+              border: 'none',
+              borderRadius: '6px',
+              cursor: 'pointer',
+            }}
+          >
+            Cerrar
+          </button>
         </div>
       </div>
     </div>

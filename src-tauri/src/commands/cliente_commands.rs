@@ -2,7 +2,7 @@ use crate::dto::cliente_dto::{ClienteDto, CrearClienteDto, EditarClienteDto};
 use crate::dto::vehiculo_dto::{
     CambiarEstadoVehiculoPayloadDto, CorregirHistorialOtPayloadDto, CrearVehiculoPayloadDto,
     EditarVehiculoPayloadDto, FichaVehicularCompletaDto, ProximoCambioAceiteDto,
-    VehiculoCompletoDto,
+    ResultadoPaginadoDto, VehiculoCompletoDto,
 };
 use crate::errors::AppError;
 use crate::services::cliente_service::ClienteService;
@@ -260,6 +260,8 @@ pub fn obtener_ficha_vehicular_completa_cmd(
     db_state: State<'_, Mutex<Connection>>,
     session_state: State<'_, Mutex<SessionState>>,
     placa: String,
+    pagina: Option<u32>,
+    limite: Option<u32>,
 ) -> Result<FichaVehicularCompletaDto, AppError> {
     let mut session = session_state
         .lock()
@@ -273,14 +275,24 @@ pub fn obtener_ficha_vehicular_completa_cmd(
         &conn,
         &["ADMINISTRADOR", "CAJERO", "MECANICO"],
     )?;
-    ClienteService::obtener_ficha_vehicular_completa(&conn, &placa, Some(&rol))
+    ClienteService::obtener_ficha_vehicular_completa(
+        &conn,
+        &placa,
+        Some(&rol),
+        pagina.unwrap_or(1),
+        limite.unwrap_or(20),
+    )
 }
 
 #[tauri::command]
 pub fn obtener_proximos_cambios_aceite_cmd(
     db_state: State<'_, Mutex<Connection>>,
     session_state: State<'_, Mutex<SessionState>>,
-) -> Result<Vec<ProximoCambioAceiteDto>, AppError> {
+    pagina: Option<u32>,
+    limite: Option<u32>,
+    busqueda: Option<String>,
+    filtro_causa: Option<String>,
+) -> Result<ResultadoPaginadoDto<ProximoCambioAceiteDto>, AppError> {
     let mut session = session_state
         .lock()
         .map_err(|_| AppError::Validation("Fallo sesión".into()))?;
@@ -289,5 +301,12 @@ pub fn obtener_proximos_cambios_aceite_cmd(
         .map_err(|_| AppError::Validation("Fallo BD".into()))?;
 
     let (_, _, rol) = verificar_permiso_sesion(&mut session, &conn, &["ADMINISTRADOR", "CAJERO"])?;
-    ClienteService::obtener_proximos_cambios_aceite(&conn, Some(&rol))
+    crate::services::cliente_service::ficha_vehicular::obtener_proximos_cambios_aceite_paginado(
+        &conn,
+        Some(&rol),
+        pagina.unwrap_or(1),
+        limite.unwrap_or(20),
+        busqueda.as_deref(),
+        filtro_causa.as_deref(),
+    )
 }

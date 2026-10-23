@@ -11,6 +11,29 @@ use crate::errors::AppError;
 use crate::services::auditoria_service::AuditoriaService;
 use rusqlite::{params, Connection, OptionalExtension};
 
+#[derive(Default)]
+struct ClienteSnapshot {
+    nombre_razon_social: Option<String>,
+    tipo_documento: Option<String>,
+    numero_documento: Option<String>,
+    telefono: Option<String>,
+    correo: Option<String>,
+    direccion: Option<String>,
+}
+
+struct VehiculoClienteSnapshot {
+    id_vehiculo: i64,
+    placa: String,
+    marca: String,
+    modelo: String,
+    anio: Option<i32>,
+    tipo_motor: Option<String>,
+    kilometraje_actual: i64,
+    id_cliente: i64,
+    activo: i32,
+    cliente: ClienteSnapshot,
+}
+
 pub fn registrar_vehiculo(
     conn: &Connection,
     req: CrearVehiculoPayloadDto,
@@ -90,6 +113,13 @@ pub fn registrar_vehiculo(
         ));
     }
 
+    let tipo_motor_clean = req
+        .tipo_motor
+        .as_ref()
+        .map(|s| s.trim())
+        .filter(|s| !s.is_empty())
+        .map(|s| s.to_string());
+
     conn.execute(
         "INSERT INTO vehiculos (placa, id_cliente, marca, modelo, anio, tipo_motor, kilometraje_actual, activo)
          VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, 1)",
@@ -99,10 +129,27 @@ pub fn registrar_vehiculo(
             marca,
             modelo,
             req.anio,
-            req.tipo_motor.as_ref().map(|s| s.trim()).filter(|s| !s.is_empty()),
+            tipo_motor_clean,
             req.kilometraje_actual,
         ],
     )?;
+
+    let cliente_snap: ClienteSnapshot = conn
+        .query_row(
+            "SELECT nombre_razon_social, tipo_documento, numero_documento, telefono, correo, direccion FROM clientes WHERE id_cliente = ?1",
+            [id_cliente_final],
+            |row| {
+                Ok(ClienteSnapshot {
+                    nombre_razon_social: row.get(0)?,
+                    tipo_documento: row.get(1)?,
+                    numero_documento: row.get(2)?,
+                    telefono: row.get(3)?,
+                    correo: row.get(4)?,
+                    direccion: row.get(5)?,
+                })
+            },
+        )
+        .unwrap_or_default();
 
     let detalle_auditoria = format!(
         "Alta de vehículo placa: {}, cliente ID: {}",
@@ -110,12 +157,25 @@ pub fn registrar_vehiculo(
     );
 
     let despues_json = serde_json::json!({
-        "placa": placa,
-        "id_cliente": id_cliente_final,
-        "marca": marca,
-        "modelo": modelo,
-        "anio": req.anio,
-        "kilometraje_actual": req.kilometraje_actual
+        "vehiculo": {
+            "placa": placa,
+            "id_cliente": id_cliente_final,
+            "marca": marca,
+            "modelo": modelo,
+            "anio": req.anio,
+            "tipo_motor": tipo_motor_clean,
+            "kilometraje_actual": req.kilometraje_actual,
+            "activo": 1
+        },
+        "cliente": {
+            "id_cliente": id_cliente_final,
+            "nombre_razon_social": cliente_snap.nombre_razon_social,
+            "tipo_documento": cliente_snap.tipo_documento,
+            "numero_documento": cliente_snap.numero_documento,
+            "telefono": cliente_snap.telefono,
+            "correo": cliente_snap.correo,
+            "direccion": cliente_snap.direccion
+        }
     })
     .to_string();
 
@@ -157,35 +217,79 @@ pub fn actualizar_vehiculo(
     validar_placa(&placa_nueva)?;
     validar_telefono(req.telefono.as_ref())?;
 
-    let (id_vehiculo_target, placa_actual, id_cliente_actual, km_actual, activo_actual): (
-        i64,
-        String,
-        i64,
-        i64,
-        i32,
-    ) = if let Some(id_v) = req.id_vehiculo {
+    let snap_previo: VehiculoClienteSnapshot = if let Some(id_v) = req.id_vehiculo {
         conn.query_row(
-            "SELECT id_vehiculo, placa, id_cliente, kilometraje_actual, activo FROM vehiculos WHERE id_vehiculo = ?1",
+            "SELECT 
+                v.id_vehiculo, v.placa, v.marca, v.modelo, v.anio, v.tipo_motor, v.kilometraje_actual, v.id_cliente, v.activo,
+                c.nombre_razon_social, c.tipo_documento, c.numero_documento, c.telefono, c.correo, c.direccion
+             FROM vehiculos v
+             LEFT JOIN clientes c ON v.id_cliente = c.id_cliente
+             WHERE v.id_vehiculo = ?1",
             [id_v],
-            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?, row.get(4)?)),
+            |row| {
+                Ok(VehiculoClienteSnapshot {
+                    id_vehiculo: row.get(0)?,
+                    placa: row.get(1)?,
+                    marca: row.get(2)?,
+                    modelo: row.get(3)?,
+                    anio: row.get(4)?,
+                    tipo_motor: row.get(5)?,
+                    kilometraje_actual: row.get(6)?,
+                    id_cliente: row.get(7)?,
+                    activo: row.get(8)?,
+                    cliente: ClienteSnapshot {
+                        nombre_razon_social: row.get(9)?,
+                        tipo_documento: row.get(10)?,
+                        numero_documento: row.get(11)?,
+                        telefono: row.get(12)?,
+                        correo: row.get(13)?,
+                        direccion: row.get(14)?,
+                    },
+                })
+            },
         )
         .map_err(|_| AppError::NotFound(format!("Vehículo con ID {} no encontrado.", id_v)))?
     } else {
         conn.query_row(
-            "SELECT id_vehiculo, placa, id_cliente, kilometraje_actual, activo FROM vehiculos WHERE placa = ?1",
+            "SELECT 
+                v.id_vehiculo, v.placa, v.marca, v.modelo, v.anio, v.tipo_motor, v.kilometraje_actual, v.id_cliente, v.activo,
+                c.nombre_razon_social, c.tipo_documento, c.numero_documento, c.telefono, c.correo, c.direccion
+             FROM vehiculos v
+             LEFT JOIN clientes c ON v.id_cliente = c.id_cliente
+             WHERE v.placa = ?1",
             [&placa_nueva],
-            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?, row.get(4)?)),
+            |row| {
+                Ok(VehiculoClienteSnapshot {
+                    id_vehiculo: row.get(0)?,
+                    placa: row.get(1)?,
+                    marca: row.get(2)?,
+                    modelo: row.get(3)?,
+                    anio: row.get(4)?,
+                    tipo_motor: row.get(5)?,
+                    kilometraje_actual: row.get(6)?,
+                    id_cliente: row.get(7)?,
+                    activo: row.get(8)?,
+                    cliente: ClienteSnapshot {
+                        nombre_razon_social: row.get(9)?,
+                        tipo_documento: row.get(10)?,
+                        numero_documento: row.get(11)?,
+                        telefono: row.get(12)?,
+                        correo: row.get(13)?,
+                        direccion: row.get(14)?,
+                    },
+                })
+            },
         )
         .map_err(|_| AppError::NotFound(format!("Vehículo con placa {} no encontrado.", placa_nueva)))?
     };
 
-    if activo_actual == 0 {
+    if snap_previo.activo == 0 {
         return Err(AppError::Validation(
             "El vehículo está desactivado. Un Administrador debe reactivarlo primero.".to_string(),
         ));
     }
 
-    let cambio_placa = placa_nueva != placa_actual;
+    let cambio_placa = placa_nueva != snap_previo.placa;
     if cambio_placa {
         if rol_usuario != "ADMINISTRADOR" {
             return Err(AppError::Validation(
@@ -203,7 +307,7 @@ pub fn actualizar_vehiculo(
 
         let existe_placa: i32 = conn.query_row(
             "SELECT COUNT(*) FROM vehiculos WHERE placa = ?1 AND id_vehiculo <> ?2",
-            params![placa_nueva, id_vehiculo_target],
+            params![placa_nueva, snap_previo.id_vehiculo],
             |row| row.get(0),
         )?;
 
@@ -215,7 +319,7 @@ pub fn actualizar_vehiculo(
         }
     }
 
-    let disminuye_km = req.kilometraje_actual < km_actual;
+    let disminuye_km = req.kilometraje_actual < snap_previo.kilometraje_actual;
     if disminuye_km {
         if rol_usuario != "ADMINISTRADOR" {
             return Err(AppError::Validation(
@@ -231,7 +335,7 @@ pub fn actualizar_vehiculo(
         }
     }
 
-    let mut id_cliente_asignar = id_cliente_actual;
+    let mut id_cliente_asignar = snap_previo.id_cliente;
 
     if let (Some(tipo), Some(doc)) = (req.tipo_documento.as_ref(), req.numero_documento.as_ref()) {
         let doc_clean = doc.trim();
@@ -261,7 +365,7 @@ pub fn actualizar_vehiculo(
         }
     }
 
-    let cambio_propietario = id_cliente_asignar != id_cliente_actual;
+    let cambio_propietario = id_cliente_asignar != snap_previo.id_cliente;
     if cambio_propietario {
         if rol_usuario != "ADMINISTRADOR" {
             return Err(AppError::Validation(
@@ -280,6 +384,13 @@ pub fn actualizar_vehiculo(
 
     let motivo_str = req.motivo.as_deref().unwrap_or("");
 
+    let tipo_motor_clean = req
+        .tipo_motor
+        .as_ref()
+        .map(|s| s.trim())
+        .filter(|s| !s.is_empty())
+        .map(|s| s.to_string());
+
     conn.execute(
         "UPDATE vehiculos
          SET placa = ?1, marca = ?2, modelo = ?3, anio = ?4, tipo_motor = ?5, kilometraje_actual = ?6, id_cliente = ?7
@@ -289,10 +400,10 @@ pub fn actualizar_vehiculo(
             marca,
             modelo,
             req.anio,
-            req.tipo_motor.as_ref().map(|s| s.trim()).filter(|s| !s.is_empty()),
+            tipo_motor_clean,
             req.kilometraje_actual,
             id_cliente_asignar,
-            id_vehiculo_target,
+            snap_previo.id_vehiculo,
         ],
     )?;
 
@@ -325,17 +436,68 @@ pub fn actualizar_vehiculo(
         }
     }
 
+    let cliente_nuevo_snap: ClienteSnapshot = conn
+        .query_row(
+            "SELECT nombre_razon_social, tipo_documento, numero_documento, telefono, correo, direccion FROM clientes WHERE id_cliente = ?1",
+            [id_cliente_asignar],
+            |row| {
+                Ok(ClienteSnapshot {
+                    nombre_razon_social: row.get(0)?,
+                    tipo_documento: row.get(1)?,
+                    numero_documento: row.get(2)?,
+                    telefono: row.get(3)?,
+                    correo: row.get(4)?,
+                    direccion: row.get(5)?,
+                })
+            },
+        )
+        .unwrap_or_default();
+
     let antes_json = serde_json::json!({
-        "placa": placa_actual,
-        "kilometraje_actual": km_actual,
-        "id_cliente": id_cliente_actual
+        "vehiculo": {
+            "id_vehiculo": snap_previo.id_vehiculo,
+            "placa": snap_previo.placa,
+            "marca": snap_previo.marca,
+            "modelo": snap_previo.modelo,
+            "anio": snap_previo.anio,
+            "tipo_motor": snap_previo.tipo_motor,
+            "kilometraje_actual": snap_previo.kilometraje_actual,
+            "id_cliente": snap_previo.id_cliente,
+            "activo": snap_previo.activo
+        },
+        "cliente": {
+            "id_cliente": snap_previo.id_cliente,
+            "nombre_razon_social": snap_previo.cliente.nombre_razon_social,
+            "tipo_documento": snap_previo.cliente.tipo_documento,
+            "numero_documento": snap_previo.cliente.numero_documento,
+            "telefono": snap_previo.cliente.telefono,
+            "correo": snap_previo.cliente.correo,
+            "direccion": snap_previo.cliente.direccion
+        }
     })
     .to_string();
 
     let despues_json = serde_json::json!({
-        "placa": placa_nueva,
-        "kilometraje_actual": req.kilometraje_actual,
-        "id_cliente": id_cliente_asignar
+        "vehiculo": {
+            "id_vehiculo": snap_previo.id_vehiculo,
+            "placa": placa_nueva,
+            "marca": marca,
+            "modelo": modelo,
+            "anio": req.anio,
+            "tipo_motor": tipo_motor_clean,
+            "kilometraje_actual": req.kilometraje_actual,
+            "id_cliente": id_cliente_asignar,
+            "activo": snap_previo.activo
+        },
+        "cliente": {
+            "id_cliente": id_cliente_asignar,
+            "nombre_razon_social": cliente_nuevo_snap.nombre_razon_social,
+            "tipo_documento": cliente_nuevo_snap.tipo_documento,
+            "numero_documento": cliente_nuevo_snap.numero_documento,
+            "telefono": cliente_nuevo_snap.telefono,
+            "correo": cliente_nuevo_snap.correo,
+            "direccion": cliente_nuevo_snap.direccion
+        }
     })
     .to_string();
 
@@ -373,11 +535,38 @@ pub fn cambiar_estado_vehiculo(
     let placa = sanitizar_placa(&payload.placa);
     let motivo = validar_motivo(&payload.motivo)?;
 
-    let (estado_anterior,): (i32,) = conn
+    let (
+        id_vehiculo_target,
+        marca,
+        modelo,
+        anio,
+        tipo_motor,
+        km_actual,
+        id_cliente,
+        estado_anterior,
+    ): (
+        i64,
+        String,
+        String,
+        Option<i32>,
+        Option<String>,
+        i64,
+        i64,
+        i32,
+    ) = conn
         .query_row(
-            "SELECT activo FROM vehiculos WHERE placa = ?1",
+            "SELECT id_vehiculo, marca, modelo, anio, tipo_motor, kilometraje_actual, id_cliente, activo FROM vehiculos WHERE placa = ?1",
             [&placa],
-            |row| Ok((row.get(0)?,)),
+            |row| Ok((
+                row.get(0)?,
+                row.get(1)?,
+                row.get(2)?,
+                row.get(3)?,
+                row.get(4)?,
+                row.get(5)?,
+                row.get(6)?,
+                row.get(7)?,
+            )),
         )
         .map_err(|_| AppError::NotFound(format!("Vehículo {} no encontrado.", placa)))?;
 
@@ -399,8 +588,35 @@ pub fn cambiar_estado_vehiculo(
         "DESACTIVAR_VEHICULO"
     };
 
-    let antes_json = serde_json::json!({ "activo": estado_anterior }).to_string();
-    let despues_json = serde_json::json!({ "activo": payload.activo }).to_string();
+    let antes_json = serde_json::json!({
+        "vehiculo": {
+            "id_vehiculo": id_vehiculo_target,
+            "placa": placa,
+            "marca": marca,
+            "modelo": modelo,
+            "anio": anio,
+            "tipo_motor": tipo_motor,
+            "kilometraje_actual": km_actual,
+            "id_cliente": id_cliente,
+            "activo": estado_anterior
+        }
+    })
+    .to_string();
+
+    let despues_json = serde_json::json!({
+        "vehiculo": {
+            "id_vehiculo": id_vehiculo_target,
+            "placa": placa,
+            "marca": marca,
+            "modelo": modelo,
+            "anio": anio,
+            "tipo_motor": tipo_motor,
+            "kilometraje_actual": km_actual,
+            "id_cliente": id_cliente,
+            "activo": payload.activo
+        }
+    })
+    .to_string();
 
     AuditoriaService::registrar_v5(
         conn,
@@ -441,7 +657,7 @@ pub fn obtener_vehiculo_por_placa(
          WHERE v.placa = ?1",
     )?;
 
-    let mut dto = stmt
+    let opt_row = stmt
         .query_row([&placa_clean], |row| {
             let id_cliente: i64 = row.get(2)?;
             let tipo_doc: Option<String> = row.get(9)?;
@@ -480,12 +696,17 @@ pub fn obtener_vehiculo_por_placa(
                 direccion_cliente: direccion,
             })
         })
-        .map_err(|_| {
-            AppError::NotFound(format!(
-                "No se encontró vehículo registrado con la placa {}",
+        .optional()?;
+
+    let mut dto = match opt_row {
+        Some(v) => v,
+        None => {
+            return Err(AppError::NotFound(format!(
+                "No se encontró vehículo registrado con la placa {}.",
                 placa_clean
-            ))
-        })?;
+            )))
+        }
+    };
 
     if let Some(r) = rol_ejecutor {
         if r.to_uppercase() == "MECANICO" {
