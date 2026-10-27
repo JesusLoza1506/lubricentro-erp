@@ -1,4 +1,7 @@
+import { mensajeErrorOT } from '../AvisosOT';
+import '../ordenesVisual.css';
 import React, { useState, useEffect, useRef } from 'react';
+import { Car, ClipboardPlus } from 'lucide-react';
 import { CrearOrdenTrabajoPayload, ServicioInicialDTO } from '../../../types/ordenTrabajo';
 import { vehiculoService } from '../../../services/vehiculoService';
 import { ordenesService, MecanicoDTO, ServicioResumenDTO } from '../../../services/ordenesService';
@@ -63,7 +66,7 @@ export const ModalCrearOT: React.FC<ModalCrearOTProps> = ({
           if (vehs.length > 0) seleccionarVehiculoReal(vehs[0]);
         }
       } catch (err) {
-        console.error('Error inicializando modal crear OT:', err);
+        setErrorMsg(mensajeErrorOT(err, 'No se pudieron cargar los datos de recepción. Cierra y vuelve a abrir el formulario para reintentar.'));
       }
     };
     init();
@@ -74,7 +77,7 @@ export const ModalCrearOT: React.FC<ModalCrearOTProps> = ({
       vehiculoService
         .buscarVehiculosCandidatos(busqueda)
         .then(setListaVehiculosBD)
-        .catch(console.error);
+        .catch((err: unknown) => setErrorMsg(mensajeErrorOT(err, 'No se pudo buscar el vehículo. Intenta nuevamente.')));
     } else {
       setListaVehiculosBD([]);
     }
@@ -144,7 +147,7 @@ export const ModalCrearOT: React.FC<ModalCrearOTProps> = ({
   };
 
   return (
-    <div
+    <div className="ot-overlay"
       style={{
         position: 'fixed',
         top: 0,
@@ -158,7 +161,7 @@ export const ModalCrearOT: React.FC<ModalCrearOTProps> = ({
         zIndex: 1000,
       }}
     >
-      <div
+      <div className="ot-dialog ot-reception-dialog" role="dialog" aria-modal="true" aria-label="Recepcionar vehículo"
         style={{
           backgroundColor: '#1E293B',
           borderRadius: '12px',
@@ -170,11 +173,11 @@ export const ModalCrearOT: React.FC<ModalCrearOTProps> = ({
         }}
       >
         <h2 style={{ marginTop: 0, fontSize: '20px', color: '#F8FAFC' }}>
-          Nueva Orden de Trabajo (Recepción)
+          <ClipboardPlus size={22} /> Recepcionar vehículo
         </h2>
 
         {errorMsg && (
-          <div
+          <div role="alert"
             style={{
               padding: '10px',
               backgroundColor: '#7F1D1D',
@@ -188,12 +191,12 @@ export const ModalCrearOT: React.FC<ModalCrearOTProps> = ({
           </div>
         )}
 
-        <form onSubmit={handleSubmit}>
+        <form onSubmit={handleSubmit} className="ot-reception-form">
           <div style={{ marginBottom: '16px', position: 'relative' }} ref={dropdownRef}>
             <label
               style={{ display: 'block', fontSize: '13px', color: '#94A3B8', marginBottom: '6px' }}
             >
-              Placa Vehículo *
+              Placa del vehículo *
             </label>
             <input
               type="text"
@@ -244,7 +247,7 @@ export const ModalCrearOT: React.FC<ModalCrearOTProps> = ({
                         fontSize: '13px',
                       }}
                     >
-                      🚘 <strong>{v.placa}</strong> - {v.marca} {v.modelo}
+                      <Car size={16} aria-hidden="true" /> <strong>{v.placa}</strong> - {v.marca} {v.modelo}
                     </div>
                   ))
                 ) : (
@@ -284,7 +287,7 @@ export const ModalCrearOT: React.FC<ModalCrearOTProps> = ({
             <label
               style={{ display: 'block', fontSize: '13px', color: '#94A3B8', marginBottom: '6px' }}
             >
-              Servicio Inicial Único * (Cantidad: 1)
+              Servicio inicial * · Cantidad: 1
             </label>
             <select
               value={idServicioInicial}
@@ -307,7 +310,7 @@ export const ModalCrearOT: React.FC<ModalCrearOTProps> = ({
           </div>
 
           <div
-            style={{
+            className="ot-reception-grid" style={{
               display: 'grid',
               gridTemplateColumns: '1fr 1fr',
               gap: '12px',
@@ -323,7 +326,7 @@ export const ModalCrearOT: React.FC<ModalCrearOTProps> = ({
                   marginBottom: '6px',
                 }}
               >
-                Km Ingreso * (Mayor a 0)
+                Kilometraje de ingreso *
               </label>
               <input
                 type="number"
@@ -350,7 +353,7 @@ export const ModalCrearOT: React.FC<ModalCrearOTProps> = ({
                   marginBottom: '6px',
                 }}
               >
-                Mecánico Predeterminado
+                Mecánico asignado (opcional)
               </label>
               <select
                 value={idMecanico}
@@ -364,7 +367,7 @@ export const ModalCrearOT: React.FC<ModalCrearOTProps> = ({
                   color: '#F8FAFC',
                 }}
               >
-                <option value={0}>Sin Asignar (A cola común)</option>
+                <option value={0}>Sin asignar · Cola común</option>
                 {mecanicos.map((m) => (
                   <option key={m.id_usuario} value={m.id_usuario}>
                     {m.nombre_completo}
@@ -378,7 +381,7 @@ export const ModalCrearOT: React.FC<ModalCrearOTProps> = ({
             <label
               style={{ display: 'block', fontSize: '13px', color: '#94A3B8', marginBottom: '6px' }}
             >
-              Pedido del Cliente
+              Pedido del cliente
             </label>
             <textarea
               rows={2}
@@ -396,7 +399,7 @@ export const ModalCrearOT: React.FC<ModalCrearOTProps> = ({
             />
           </div>
 
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
+          <div className="ot-dialog-footer" style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
             <button
               type="button"
               disabled={loading}
@@ -424,7 +427,7 @@ export const ModalCrearOT: React.FC<ModalCrearOTProps> = ({
                 fontWeight: '600',
                 cursor: loading ? 'not-allowed' : 'pointer',
                 opacity: loading ? 0.6 : 1,
-              }}
+              }} data-tone="primary"
             >
               {loading ? 'Recepcionando...' : 'Recepcionar OT'}
             </button>

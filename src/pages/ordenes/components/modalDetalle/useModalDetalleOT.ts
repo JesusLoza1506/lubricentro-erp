@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+import { useNotificarOT, mensajeErrorOT } from '../../AvisosOT';
 import {
   OrdenTrabajoHistorialDTO,
   TipoAceiteOT,
@@ -38,6 +39,7 @@ export const useModalDetalleOT = ({
   onActualizarOT,
 }: UseModalDetalleOTProps) => {
   const { usuario } = useAuth();
+  const notificar = useNotificarOT();
   const otInicial = (ordenTrabajo || ot) as OrdenTrabajoHistorialDTO;
 
   const [ordenActual, setOrdenActual] = useState<OrdenTrabajoHistorialDTO>(
@@ -54,7 +56,11 @@ export const useModalDetalleOT = ({
   );
 
   const [loading, setLoading] = useState(false);
-  const [errorMsg, setErrorMsg] = useState('');
+  const [errorMsg, setErrorMsgState] = useState('');
+  const setErrorMsg = useCallback((mensaje: string) => {
+    setErrorMsgState(mensaje);
+    if (mensaje) notificar(mensaje, 'ERROR');
+  }, [notificar]);
 
   const [modoAccion, setModoAccion] = useState<
     | 'NINGUNO'
@@ -131,23 +137,31 @@ export const useModalDetalleOT = ({
     if (!esTerminal) {
       Promise.resolve(ordenesService.listarMecanicos?.())
         .then((res) => setMecanicos(res || []))
-        .catch(console.error);
+        .catch((err: unknown) => setErrorMsg(mensajeErrorOT(err, 'No se pudo cargar el catálogo de mecánicos.')));
 
       Promise.resolve(ordenesService.listarServicios?.())
         .then((res) => setServiciosCatalogo(res || []))
-        .catch(console.error);
+        .catch((err: unknown) => setErrorMsg(mensajeErrorOT(err, 'No se pudo cargar el catálogo de servicios.')));
 
       Promise.resolve(ordenesService.listarProductosInsumo?.())
         .then((res) => setProductosCatalogo(res || []))
-        .catch(console.error);
+        .catch((err: unknown) => setErrorMsg(mensajeErrorOT(err, 'No se pudo cargar el catálogo de insumos.')));
 
       if (ordenActual.estado === 'EN_ESPERA') {
         Promise.resolve(ordenesService.obtenerTableroZanjas?.(idUsuario, rol))
           .then((res) => setTablero(res || null))
-          .catch(console.error);
+          .catch((err: unknown) => setErrorMsg(mensajeErrorOT(err, 'No se pudo consultar la disponibilidad de zanjas.')));
       }
     }
   }, [esTerminal, ordenActual.estado, idUsuario, rol]);
+
+  const refrescarTrasGuardar = async () => {
+    try {
+      if (onActualizarOT) await onActualizarOT();
+    } catch (err: unknown) {
+      setErrorMsg(`La operación se guardó, pero no se pudo actualizar la vista. ${mensajeErrorOT(err, 'Vuelve a consultar la orden.')}`);
+    }
+  };
 
   const handleIniciarSubmit = async () => {
     if (!onIniciarZanja) return;
@@ -160,7 +174,7 @@ export const useModalDetalleOT = ({
         idMecanicoInicio > 0 ? idMecanicoInicio : undefined
       );
       setModoAccion('NINGUNO');
-      if (onActualizarOT) await onActualizarOT();
+      await refrescarTrasGuardar();
     } catch (err: unknown) {
       setErrorMsg(
         typeof err === 'string' ? err : (err as any)?.message || 'Error al iniciar zanja'
@@ -182,7 +196,7 @@ export const useModalDetalleOT = ({
         tipoAceite !== '' ? tipoAceite : undefined
       );
       setModoAccion('NINGUNO');
-      if (onActualizarOT) await onActualizarOT();
+      await refrescarTrasGuardar();
     } catch (err: unknown) {
       setErrorMsg(typeof err === 'string' ? err : (err as any)?.message || 'Error al finalizar OT');
     } finally {
@@ -202,7 +216,7 @@ export const useModalDetalleOT = ({
       await onCancelarOT(ordenActual.id_ot, motivoAccion);
       setModoAccion('NINGUNO');
       setMotivoAccion('');
-      if (onActualizarOT) await onActualizarOT();
+      await refrescarTrasGuardar();
     } catch (err: unknown) {
       setErrorMsg(typeof err === 'string' ? err : (err as any)?.message || 'Error al cancelar OT');
     } finally {
@@ -226,7 +240,7 @@ export const useModalDetalleOT = ({
       await onReasignarMecanico(ordenActual.id_ot, idMecanicoNuevo, motivoAccion);
       setModoAccion('NINGUNO');
       setMotivoAccion('');
-      if (onActualizarOT) await onActualizarOT();
+      await refrescarTrasGuardar();
     } catch (err: unknown) {
       setErrorMsg(
         typeof err === 'string' ? err : (err as any)?.message || 'Error al reasignar mecánico'
@@ -268,10 +282,11 @@ export const useModalDetalleOT = ({
         idUsuario,
         rol
       );
+      notificar('¡Devolución de insumo registrada correctamente!', 'EXITO');
       setOrdenActual(act);
       setModoAccion('NINGUNO');
       setMotivoAccion('');
-      if (onActualizarOT) await onActualizarOT();
+      await refrescarTrasGuardar();
     } catch (err: unknown) {
       setErrorMsg(
         typeof err === 'string' ? err : (err as any)?.message || 'Error al devolver insumo'
@@ -294,11 +309,12 @@ export const useModalDetalleOT = ({
         idUsuario,
         rol
       );
+      notificar('¡Servicio agregado correctamente!', 'EXITO');
       setOrdenActual(act);
       setModoAccion('NINGUNO');
       setIdServicioSel(0);
       setCantServicioSel(1);
-      if (onActualizarOT) await onActualizarOT();
+      await refrescarTrasGuardar();
     } catch (err: unknown) {
       setErrorMsg(
         typeof err === 'string' ? err : (err as any)?.message || 'Error al agregar servicio'
@@ -321,9 +337,10 @@ export const useModalDetalleOT = ({
         idUsuario,
         rol
       );
+      notificar('¡Servicio actualizado correctamente!', 'EXITO');
       setOrdenActual(act);
       setModoAccion('NINGUNO');
-      if (onActualizarOT) await onActualizarOT();
+      await refrescarTrasGuardar();
     } catch (err: unknown) {
       setErrorMsg(
         typeof err === 'string' ? err : (err as any)?.message || 'Error al modificar servicio'
@@ -344,8 +361,9 @@ export const useModalDetalleOT = ({
         idUsuario,
         rol
       );
+      notificar('¡Servicio retirado correctamente!', 'EXITO');
       setOrdenActual(act);
-      if (onActualizarOT) await onActualizarOT();
+      await refrescarTrasGuardar();
     } catch (err: unknown) {
       setErrorMsg(
         typeof err === 'string' ? err : (err as any)?.message || 'Error al eliminar servicio'
@@ -383,11 +401,12 @@ export const useModalDetalleOT = ({
         idUsuario,
         rol
       );
+      notificar('¡Despacho de insumo registrado correctamente!', 'EXITO');
       setOrdenActual(act);
       setModoAccion('NINGUNO');
       setIdProductoSel(0);
       setCantProductoSel(1);
-      if (onActualizarOT) await onActualizarOT();
+      await refrescarTrasGuardar();
     } catch (err: unknown) {
       setErrorMsg(
         typeof err === 'string' ? err : (err as any)?.message || 'Error al registrar insumo'

@@ -34,7 +34,7 @@ export const TablaServiciosOT: React.FC<TablaServiciosOTProps> = ({
   onEliminarServicio,
 }) => {
   return (
-    <>
+    <section className="ot-detail-section ot-services-section">
       <div
         style={{
           display: 'flex',
@@ -55,7 +55,7 @@ export const TablaServiciosOT: React.FC<TablaServiciosOTProps> = ({
               borderRadius: '4px',
               fontSize: '12px',
               cursor: 'pointer',
-            }}
+            }} data-tone="primary"
           >
             + Agregar Servicio
           </button>
@@ -127,7 +127,7 @@ export const TablaServiciosOT: React.FC<TablaServiciosOTProps> = ({
                 color: '#FFF',
                 border: 'none',
                 borderRadius: '4px',
-              }}
+              }} data-tone="primary"
             >
               Guardar Servicio
             </button>
@@ -180,7 +180,7 @@ export const TablaServiciosOT: React.FC<TablaServiciosOTProps> = ({
                 color: '#FFF',
                 border: 'none',
                 borderRadius: '4px',
-              }}
+              }} data-tone="secondary"
             >
               Actualizar Cantidad
             </button>
@@ -188,7 +188,7 @@ export const TablaServiciosOT: React.FC<TablaServiciosOTProps> = ({
         </div>
       )}
 
-      <table
+      <div className="ot-detail-table-scroll"><table
         style={{
           width: '100%',
           borderCollapse: 'collapse',
@@ -234,7 +234,7 @@ export const TablaServiciosOT: React.FC<TablaServiciosOTProps> = ({
                         cursor: 'pointer',
                         fontSize: '11px',
                         marginRight: '4px',
-                      }}
+                      }} data-tone="secondary"
                     >
                       Editar
                     </button>
@@ -248,7 +248,7 @@ export const TablaServiciosOT: React.FC<TablaServiciosOTProps> = ({
                         borderRadius: '4px',
                         cursor: 'pointer',
                         fontSize: '11px',
-                      }}
+                      }} data-tone="danger"
                     >
                       Retirar
                     </button>
@@ -267,7 +267,7 @@ export const TablaServiciosOT: React.FC<TablaServiciosOTProps> = ({
             </tr>
           )}
         </tbody>
-      </table>
-    </>
+      </table></div>
+    </section>
   );
 };

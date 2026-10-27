@@ -173,7 +173,7 @@ describe('OrdenesPage - Batería Frontend FASE 4 (Vitest React)', () => {
     });
 
     const btnsVer = screen.getAllByText(
-      /(Ver Detalle \/ Gestionar|Ver Detalle|Gestionar|Atender \/ Gestionar OT|Ver Detalle \/ Insumos)/i
+      /(Abrir atención|Ver Detalle \/ Gestionar|Ver Detalle|Gestionar|Atender \/ Gestionar OT|Ver Detalle \/ Insumos)/i
     );
     fireEvent.click(btnsVer[0]);
 

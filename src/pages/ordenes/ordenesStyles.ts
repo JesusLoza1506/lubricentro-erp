@@ -2,13 +2,18 @@ import { CSSProperties } from 'react';
 
 export const styles: Record<string, CSSProperties> = {
   container: {
-    padding: '24px',
-    color: '#F8FAFC',
-    minHeight: '100vh',
-    backgroundColor: '#0F172A',
+    padding: '24px 28px',
+    color: '#E7EDF6',
+    minHeight: 0,
+    minWidth: 0,
+    height: '100%',
+    flex: 1,
+    backgroundColor: '#131D2C',
+    border: '1px solid #2A374A',
+    borderRadius: '14px',
     boxSizing: 'border-box',
-    overflowY: 'auto', // Scroll general de la página
-    maxHeight: '100vh',
+    overflowY: 'auto',
+    fontFamily: '\"Segoe UI Variable\", \"Segoe UI\", sans-serif',
   },
   header: {
     display: 'flex',

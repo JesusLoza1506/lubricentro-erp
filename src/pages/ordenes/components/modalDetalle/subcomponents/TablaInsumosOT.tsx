@@ -46,7 +46,7 @@ export const TablaInsumosOT: React.FC<TablaInsumosOTProps> = ({
   procesandoDevolucion = false,
 }) => {
   return (
-    <>
+    <section className="ot-detail-section ot-supplies-section">
       <div
         style={{
           display: 'flex',
@@ -69,7 +69,7 @@ export const TablaInsumosOT: React.FC<TablaInsumosOTProps> = ({
               fontSize: '12px',
               cursor: procesandoDespacho ? 'not-allowed' : 'pointer',
               opacity: procesandoDespacho ? 0.6 : 1,
-            }}
+            }} data-tone="primary"
           >
             + Despachar Insumo
           </button>
@@ -153,7 +153,7 @@ export const TablaInsumosOT: React.FC<TablaInsumosOTProps> = ({
                 borderRadius: '4px',
                 cursor: procesandoDespacho ? 'not-allowed' : 'pointer',
                 opacity: procesandoDespacho ? 0.6 : 1,
-              }}
+              }} data-tone="primary"
             >
               {procesandoDespacho ? 'Despachando...' : 'Confirmar Despacho'}
             </button>
@@ -161,7 +161,7 @@ export const TablaInsumosOT: React.FC<TablaInsumosOTProps> = ({
         </div>
       )}
 
-      <table
+      <div className="ot-detail-table-scroll"><table
         style={{
           width: '100%',
           borderCollapse: 'collapse',
@@ -232,7 +232,7 @@ export const TablaInsumosOT: React.FC<TablaInsumosOTProps> = ({
             </tr>
           )}
         </tbody>
-      </table>
+      </table></div>
 
       {modoAccion === 'DEVOLVER' && (
         <div
@@ -312,6 +312,6 @@ export const TablaInsumosOT: React.FC<TablaInsumosOTProps> = ({
           </div>
         </div>
       )}
-    </>
+    </section>
   );
 };

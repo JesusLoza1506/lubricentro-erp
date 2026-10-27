@@ -1,3 +1,4 @@
+import '../../ordenesVisual.css';
 import React from 'react';
 import { ModalDetalleOTProps } from '../ModalDetalleOT';
 import { useModalDetalleOT } from './useModalDetalleOT';
@@ -14,7 +15,7 @@ export const ModalDetalleOTContainer: React.FC<ModalDetalleOTProps> = (props) =>
   const idUsuario = (usuario as any)?.id_usuario || (usuario as any)?.id || 0;
 
   return (
-    <div
+    <div className="ot-overlay"
       style={{
         position: 'fixed',
         top: 0,
@@ -28,7 +29,7 @@ export const ModalDetalleOTContainer: React.FC<ModalDetalleOTProps> = (props) =>
         zIndex: 1000,
       }}
     >
-      <div
+      <div className="ot-dialog ot-detail-dialog" role="dialog" aria-modal="true" aria-label="Detalle de orden de trabajo"
         style={{
           backgroundColor: '#1E293B',
           borderRadius: '12px',
@@ -41,6 +42,7 @@ export const ModalDetalleOTContainer: React.FC<ModalDetalleOTProps> = (props) =>
           overflowY: 'auto',
         }}
       >
+        <div className="ot-detail-body">
         <ModalDetalleHeader
           ordenActual={state.ordenActual}
           errorMsg={state.errorMsg}
@@ -121,7 +123,8 @@ export const ModalDetalleOTContainer: React.FC<ModalDetalleOTProps> = (props) =>
           procesandoDevolucion={state.loading && state.modoAccion === 'DEVOLVER'}
         />
 
-        <div
+        </div>
+        <div className="ot-dialog-footer ot-detail-footer"
           style={{
             display: 'flex',
             justifyContent: 'space-between',
@@ -132,7 +135,7 @@ export const ModalDetalleOTContainer: React.FC<ModalDetalleOTProps> = (props) =>
           }}
         >
           <strong style={{ fontSize: '16px', color: '#10B981' }}>
-            Total General: S/ {(state.ordenActual.total_general_soles ?? 0).toFixed(2)}
+            Total de la orden: S/ {(state.ordenActual.total_general_soles ?? 0).toFixed(2)}
           </strong>
           <button
             onClick={onClose}

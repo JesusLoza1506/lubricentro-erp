@@ -1,3 +1,4 @@
+import { Play, Check, X, UserRoundCog } from 'lucide-react';
 import React, { useEffect } from 'react';
 import {
   OrdenTrabajoHistorialDTO,
@@ -90,7 +91,7 @@ export const AccionesEstadoBar: React.FC<AccionesEstadoBarProps> = ({
   );
 
   return (
-    <>
+    <section className="ot-detail-actions-section">
       <div
         style={{
           display: 'flex',
@@ -113,9 +114,9 @@ export const AccionesEstadoBar: React.FC<AccionesEstadoBarProps> = ({
               fontSize: '12px',
               fontWeight: '600',
               opacity: loading ? 0.6 : 1,
-            }}
+            }} data-tone="primary"
           >
-            ▶ Iniciar Trabajo en Zanja
+            <Play size={14} aria-hidden="true" /> Iniciar Trabajo en Zanja
           </button>
         )}
 
@@ -133,9 +134,9 @@ export const AccionesEstadoBar: React.FC<AccionesEstadoBarProps> = ({
               fontSize: '12px',
               fontWeight: '600',
               opacity: loading ? 0.6 : 1,
-            }}
+            }} data-tone="primary"
           >
-            ✔ Finalizar OT
+            <Check size={14} aria-hidden="true" /> Finalizar OT
           </button>
         )}
 
@@ -153,9 +154,9 @@ export const AccionesEstadoBar: React.FC<AccionesEstadoBarProps> = ({
               fontSize: '12px',
               fontWeight: '600',
               opacity: loading ? 0.6 : 1,
-            }}
+            }} data-tone="secondary"
           >
-            👤 Reasignar Mecánico
+            <UserRoundCog size={14} aria-hidden="true" /> Reasignar Mecánico
           </button>
         )}
 
@@ -173,9 +174,9 @@ export const AccionesEstadoBar: React.FC<AccionesEstadoBarProps> = ({
               fontSize: '12px',
               fontWeight: '600',
               opacity: loading ? 0.6 : 1,
-            }}
+            }} data-tone="danger"
           >
-            ✖ Cancelar OT
+            <X size={14} aria-hidden="true" /> Cancelar OT
           </button>
         )}
       </div>
@@ -365,7 +366,7 @@ export const AccionesEstadoBar: React.FC<AccionesEstadoBarProps> = ({
                 border: 'none',
                 borderRadius: '4px',
                 opacity: loading ? 0.6 : 1,
-              }}
+              }} data-tone="primary"
             >
               {loading ? 'Finalizando...' : 'Confirmar Finalización'}
             </button>
@@ -423,7 +424,7 @@ export const AccionesEstadoBar: React.FC<AccionesEstadoBarProps> = ({
                 border: 'none',
                 borderRadius: '4px',
                 opacity: loading ? 0.6 : 1,
-              }}
+              }} data-tone="danger"
             >
               {loading ? 'Cancelando...' : 'Confirmar Cancelación'}
             </button>
@@ -501,13 +502,13 @@ export const AccionesEstadoBar: React.FC<AccionesEstadoBarProps> = ({
                 border: 'none',
                 borderRadius: '4px',
                 opacity: loading ? 0.6 : 1,
-              }}
+              }} data-tone="secondary"
             >
               {loading ? 'Reasignando...' : 'Confirmar Reasignación'}
             </button>
           </div>
         </div>
       )}
-    </>
+    </section>
   );
 };

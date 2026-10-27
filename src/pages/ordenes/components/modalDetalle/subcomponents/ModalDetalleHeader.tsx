@@ -1,3 +1,5 @@
+import { useNotificarOT, mensajeErrorOT } from '../../../AvisosOT';
+import { LockKeyhole } from 'lucide-react';
 import React, { useState } from 'react';
 import { OrdenTrabajoHistorialDTO } from '../../../../../types/ordenTrabajo';
 import { ordenesService } from '../../../../../services/ordenesService';
@@ -17,6 +19,7 @@ export const ModalDetalleHeader: React.FC<ModalDetalleHeaderProps> = ({
   errorMsg,
   onActualizarOT,
 }) => {
+  const notificar = useNotificarOT();
   const [editandoNota, setEditandoNota] = useState(false);
   const [nuevaNota, setNuevaNota] = useState(ordenActual.nota_interna || '');
   const [saving, setSaving] = useState(false);
@@ -44,19 +47,26 @@ export const ModalDetalleHeader: React.FC<ModalDetalleHeaderProps> = ({
         rol
       );
       setEditandoNota(false);
-      if (onActualizarOT) await onActualizarOT();
+      notificar('¡Nota interna actualizada correctamente!', 'EXITO');
+      try {
+        if (onActualizarOT) await onActualizarOT();
+      } catch (err: unknown) {
+        const mensaje = `La nota se guardó, pero no se pudo actualizar la vista. ${mensajeErrorOT(err, 'Vuelve a consultar la orden.')}`;
+        setErrLocal(mensaje);
+        notificar(mensaje, 'ERROR');
+      }
     } catch (err: any) {
       const msg =
         typeof err === 'string' ? err : err?.message || 'Error al actualizar nota interna';
       setErrLocal(msg);
-      console.error('Error al actualizar nota interna:', err);
+      notificar(msg, 'ERROR');
     } finally {
       setSaving(false);
     }
   };
 
   return (
-    <>
+    <section className="ot-detail-header-section">
       <div
         style={{
           display: 'flex',
@@ -78,12 +88,12 @@ export const ModalDetalleHeader: React.FC<ModalDetalleHeaderProps> = ({
             backgroundColor: '#334155',
           }}
         >
-          {ordenActual.estado}
+          <span className="ot-status" data-state={ordenActual.estado}>{ordenActual.estado.replace(/_/g, ' ')}</span>
         </span>
       </div>
 
       {(errorMsg || errLocal) && (
-        <div
+        <div role="alert"
           style={{
             padding: '10px',
             backgroundColor: '#7F1D1D',
@@ -109,7 +119,7 @@ export const ModalDetalleHeader: React.FC<ModalDetalleHeaderProps> = ({
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <span>
-            🔒 <strong>Nota Interna:</strong>
+            <LockKeyhole size={14} aria-hidden="true" /> <strong>Nota interna</strong>
           </span>
           {puedeEditarNota && !editandoNota && (
             <button
@@ -173,7 +183,7 @@ export const ModalDetalleHeader: React.FC<ModalDetalleHeaderProps> = ({
                   color: '#FFF',
                   border: 'none',
                   borderRadius: '4px',
-                }}
+                }} data-tone="primary"
               >
                 {saving ? 'Guardando...' : 'Guardar'}
               </button>
@@ -189,6 +199,6 @@ export const ModalDetalleHeader: React.FC<ModalDetalleHeaderProps> = ({
           </div>
         )}
       </div>
-    </>
+    </section>
   );
 };
