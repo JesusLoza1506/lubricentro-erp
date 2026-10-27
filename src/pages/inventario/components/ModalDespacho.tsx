@@ -11,6 +11,7 @@ interface ModalDespachoProps {
   setMotivo: (val: string) => void;
   onClose: () => void;
   onSubmit: (e: React.FormEvent) => void;
+  loading?: boolean;
 }
 
 export const ModalDespacho: React.FC<ModalDespachoProps> = ({
@@ -22,6 +23,7 @@ export const ModalDespacho: React.FC<ModalDespachoProps> = ({
   setMotivo,
   onClose,
   onSubmit,
+  loading = false,
 }) => {
   if (!abierto || !producto) return null;
 
@@ -67,6 +69,7 @@ export const ModalDespacho: React.FC<ModalDespachoProps> = ({
             </label>
             <input
               required
+              disabled={loading}
               type="number"
               step="0.01"
               min="0.01"
@@ -84,6 +87,7 @@ export const ModalDespacho: React.FC<ModalDespachoProps> = ({
             </label>
             <input
               type="text"
+              disabled={loading}
               placeholder="Ej. Usado en OT-2026-0045"
               value={motivo}
               onChange={(e) => setMotivo(e.target.value)}
@@ -95,6 +99,7 @@ export const ModalDespacho: React.FC<ModalDespachoProps> = ({
           >
             <button
               type="button"
+              disabled={loading}
               onClick={onClose}
               style={{
                 padding: '10px 16px',
@@ -102,13 +107,14 @@ export const ModalDespacho: React.FC<ModalDespachoProps> = ({
                 border: '1px solid #334155',
                 color: '#CBD5E1',
                 borderRadius: '8px',
-                cursor: 'pointer',
+                cursor: loading ? 'not-allowed' : 'pointer',
               }}
             >
               Cancelar
             </button>
             <button
               type="submit"
+              disabled={loading}
               style={{
                 padding: '10px 20px',
                 backgroundColor: '#10B981',
@@ -116,10 +122,11 @@ export const ModalDespacho: React.FC<ModalDespachoProps> = ({
                 border: 'none',
                 borderRadius: '8px',
                 fontWeight: '700',
-                cursor: 'pointer',
+                cursor: loading ? 'not-allowed' : 'pointer',
+                opacity: loading ? 0.6 : 1,
               }}
             >
-              Confirmar Despacho
+              {loading ? 'Procesando...' : 'Confirmar Despacho'}
             </button>
           </div>
         </form>

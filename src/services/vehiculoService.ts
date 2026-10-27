@@ -31,28 +31,16 @@ export const vehiculoService = {
     });
   },
 
-  // 3. Listar Vehículos Candidatos (Compatibilidad Modal OT)
+  // Búsqueda ligera y directa para recepción en Modal OT (Desvinculado de Cambios de Aceite)
+  buscarVehiculosCandidatos: async (busqueda: string): Promise<VehiculoCompletoDTO[]> => {
+    return await invoke<VehiculoCompletoDTO[]>('buscar_vehiculos_candidatos_cmd', {
+      busqueda: busqueda.trim().toUpperCase(),
+    });
+  },
+
+  // 3. Listar Vehículos Candidatos
   listarVehiculos: async (): Promise<VehiculoCompletoDTO[]> => {
-    const res = await invoke<ResultadoPaginadoDTO<ProximoCambioAceiteDTO>>(
-      'obtener_proximos_cambios_aceite_cmd',
-      {
-        pagina: 1,
-        limite: 100,
-        busqueda: null,
-        filtroCausa: null,
-      }
-    );
-    return (res.items || []).map((p) => ({
-      id_vehiculo: p.id_vehiculo,
-      placa: p.placa,
-      id_cliente: p.id_cliente,
-      marca: '',
-      modelo: '',
-      kilometraje_actual: p.kilometraje_actual,
-      activo: 1,
-      nombre_cliente: p.nombre_razon_social,
-      telefono_cliente: p.telefono,
-    }));
+    return await invoke<VehiculoCompletoDTO[]>('listar_vehiculos_activos_cmd');
   },
 
   // 4. Registrar Nuevo Vehículo
@@ -83,7 +71,7 @@ export const vehiculoService = {
     });
   },
 
-  // 8. Consultar Próximos Cambios de Aceite (Admins y Cajeros) - Paginado y Filtrado en BD
+  // 8. Consultar Próximos Cambios de Aceite (Admins y Cajeros)
   obtenerProximosCambiosAceite: async (
     pagina = 1,
     limite = 20,

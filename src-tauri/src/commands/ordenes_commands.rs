@@ -5,6 +5,10 @@ use crate::dto::orden_trabajo_dto::{
 };
 use crate::dto::usuario_dto::MecanicoResumenDto;
 use crate::errors::AppError;
+use crate::services::ordenes_service::ot_consultas::{
+    FiltroPaginacionOtDto, ResultadoPaginadoOtDto,
+};
+use crate::services::ordenes_service::ot_gestion::{self, ModificarNotaInternaOtDto};
 use crate::services::ordenes_service::OrdenesService;
 use crate::services::session_manager::SessionState;
 use rusqlite::Connection;
@@ -27,6 +31,47 @@ fn verificar_permiso_sesion(
     }
 
     Ok((user_id, rol))
+}
+
+#[tauri::command]
+pub fn modificar_nota_interna_ot_cmd(
+    db_state: State<'_, Mutex<Connection>>,
+    session_state: State<'_, Mutex<SessionState>>,
+    payload: ModificarNotaInternaOtDto,
+) -> Result<OrdenTrabajoHistorialDto, AppError> {
+    let mut session = session_state
+        .lock()
+        .map_err(|_| AppError::Validation("Error de sesión".into()))?;
+    let mut conn = db_state
+        .lock()
+        .map_err(|_| AppError::Validation("Error DB".into()))?;
+
+    let (user_id, rol) =
+        verificar_permiso_sesion(&mut session, &conn, &["ADMINISTRADOR", "MECANICO"])?;
+
+    ot_gestion::modificar_nota_interna_ot(&mut conn, payload, user_id, &rol)
+}
+
+#[tauri::command]
+pub fn obtener_ot_por_id_cmd(
+    db_state: State<'_, Mutex<Connection>>,
+    session_state: State<'_, Mutex<SessionState>>,
+    id_ot: i64,
+) -> Result<OrdenTrabajoHistorialDto, AppError> {
+    let mut session = session_state
+        .lock()
+        .map_err(|_| AppError::Validation("Error de sesión".into()))?;
+    let conn = db_state
+        .lock()
+        .map_err(|_| AppError::Validation("Error DB".into()))?;
+
+    let (user_id, rol) = verificar_permiso_sesion(
+        &mut session,
+        &conn,
+        &["ADMINISTRADOR", "CAJERO", "MECANICO"],
+    )?;
+
+    OrdenesService::obtener_ot_por_id(&conn, id_ot, user_id, &rol)
 }
 
 #[tauri::command]
@@ -69,6 +114,30 @@ pub fn listar_ordenes_trabajo_cmd(
     )?;
 
     OrdenesService::listar_ordenes_trabajo(&conn, user_id, &rol)
+}
+
+#[tauri::command]
+pub fn listar_ordenes_trabajo_paginado_cmd(
+    db_state: State<'_, Mutex<Connection>>,
+    session_state: State<'_, Mutex<SessionState>>,
+    filtros: FiltroPaginacionOtDto,
+) -> Result<ResultadoPaginadoOtDto, AppError> {
+    let mut session = session_state
+        .lock()
+        .map_err(|_| AppError::Validation("Error de sesión".into()))?;
+    let conn = db_state
+        .lock()
+        .map_err(|_| AppError::Validation("Error DB".into()))?;
+
+    let (user_id, rol) = verificar_permiso_sesion(
+        &mut session,
+        &conn,
+        &["ADMINISTRADOR", "CAJERO", "MECANICO"],
+    )?;
+
+    crate::services::ordenes_service::ot_consultas::listar_ordenes_trabajo_paginado(
+        &conn, filtros, user_id, &rol,
+    )
 }
 
 #[tauri::command]
@@ -159,7 +228,8 @@ pub fn devolver_insumo_ot_cmd(
         .lock()
         .map_err(|_| AppError::Validation("Error DB".into()))?;
 
-    let (user_id, rol) = verificar_permiso_sesion(&mut session, &conn, &["ADMINISTRADOR"])?;
+    let (user_id, rol) =
+        verificar_permiso_sesion(&mut session, &conn, &["ADMINISTRADOR", "MECANICO"])?;
 
     OrdenesService::devolver_insumo_ot(&mut conn, payload, user_id, &rol)
 }
@@ -256,7 +326,10 @@ pub fn cancelar_ot_cmd(
 
     let (user_id, rol) = verificar_permiso_sesion(&mut session, &conn, &["ADMINISTRADOR"])?;
 
-    OrdenesService::cancelar_ot(&mut conn, payload, user_id, &rol)
+    let id_ot = payload.id_ot;
+    OrdenesService::cancelar_ot(&mut conn, payload, user_id, &rol)?;
+
+    OrdenesService::obtener_ot_por_id(&conn, id_ot, user_id, &rol)
 }
 
 #[tauri::command]

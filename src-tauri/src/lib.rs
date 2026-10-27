@@ -71,6 +71,7 @@ pub fn run() {
             obtener_vehiculo_por_placa_cmd,
             obtener_ficha_vehicular_completa_cmd,
             obtener_proximos_cambios_aceite_cmd,
+            buscar_vehiculos_candidatos_cmd,
             // Inventario
             listar_productos_cmd,
             listar_productos_publicos_cmd,
@@ -82,8 +83,10 @@ pub fn run() {
             ajustar_stock_cmd,
             listar_categorias_cmd,
             // Órdenes de Trabajo V7.0
+            obtener_ot_por_id_cmd,
             obtener_tablero_zanjas_cmd,
             listar_ordenes_trabajo_cmd,
+            listar_ordenes_trabajo_paginado_cmd,
             crear_orden_trabajo_cmd,
             iniciar_trabajo_ot_cmd,
             reasignar_mecanico_ot_cmd,
@@ -94,6 +97,7 @@ pub fn run() {
             agregar_servicio_ot_cmd,
             modificar_servicio_ot_cmd,
             eliminar_servicio_ot_cmd,
+            modificar_nota_interna_ot_cmd, // <--- REGISTRADO
             obtener_historial_por_placa_cmd,
             listar_mecanicos_cmd,
             listar_servicios_cmd,

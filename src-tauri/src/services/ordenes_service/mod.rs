@@ -119,7 +119,9 @@ impl OrdenesService {
         id_usuario: i64,
         rol: &str,
     ) -> Result<OrdenTrabajoHistorialDto, AppError> {
-        ot_gestion::cancelar_ot(conn, req, id_usuario, rol)
+        let id_ot = req.id_ot;
+        ot_gestion::cancelar_ot(conn, req, id_usuario, rol)?;
+        Self::obtener_ot_por_id(conn, id_ot, id_usuario, rol)
     }
 
     pub fn obtener_ot_por_id(

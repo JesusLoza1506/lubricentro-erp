@@ -1,16 +1,19 @@
-export type UnidadMedida = 'LITRO' | 'GALON' | 'UNIDAD' | 'BARRIL';
+export type UnidadMedida = 'ML' | 'UNIDAD' | 'LITRO' | 'GALON' | 'BARRIL';
 
-// DTO Público (CAJERO / MECANICO) - Fuga de datos de costos imposibilitada desde tipos
+// DTO Público (CAJERO / MECANICO) - Evita fugas de datos de costo
 export interface ProductoPublicoDTO {
   id_producto: number;
   id_categoria: number;
   nombre_categoria?: string;
+  categoria?: string;
   nombre: string;
   codigo_barras: string | null;
+  codigo?: string;
   unidad_medida: string | null;
   stock_actual: number;
   stock_minimo: number;
-  precio_venta: number; // En céntimos
+  precio_venta: number; // En céntimos desde el backend
+  precio_venta_soles?: number; // Calculado en frontend
   es_critico: boolean;
 }
 
@@ -68,6 +71,6 @@ export interface ProductoForm {
   unidad_medida?: string | null;
   stock_actual: number;
   stock_minimo: number;
-  precio_compra: number; // En Soles en el formulario (ej. 15.50)
-  precio_venta: number; // En Soles en el formulario (ej. 28.00)
+  precio_compra: number; // En Soles en la UI
+  precio_venta: number; // En Soles en la UI
 }

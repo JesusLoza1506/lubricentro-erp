@@ -90,6 +90,7 @@ pub struct CrearOrdenTrabajoDto {
 pub struct IniciarTrabajoOtDto {
     pub id_ot: i64,
     pub id_zanja_ejecucion: i32,
+    pub id_mecanico: Option<i64>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -99,19 +100,23 @@ pub struct ReasignarMecanicoOtDto {
     pub motivo: String, // 5 a 250 caracteres
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Default)]
 pub struct RegistrarInsumoOtDto {
     pub id_ot: i64,
     pub id_producto: i64,
     pub cantidad: f64, // Unidades o Litros desde el frontend
+    #[serde(default)]
+    pub id_operacion: Option<String>, // Para garantizar idempotencia
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Default)]
 pub struct DevolverInsumoOtDto {
     pub id_ot: i64,
     pub id_detalle_producto: i64,
     pub cantidad_a_devolver: f64, // Unidades o Litros
     pub motivo: String,           // 5 a 250 caracteres
+    #[serde(default)]
+    pub id_operacion: Option<String>, // Para garantizar idempotencia
 }
 
 #[derive(Debug, Deserialize)]

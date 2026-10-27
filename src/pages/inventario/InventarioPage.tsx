@@ -38,6 +38,7 @@ export const InventarioPage: React.FC = () => {
   const [productos, setProductos] = useState<Producto[]>([]);
   const [categorias, setCategorias] = useState<Categoria[]>([]);
   const [cargando, setCargando] = useState<boolean>(true);
+  const [despachando, setDespachando] = useState<boolean>(false);
   const [busqueda, setBusqueda] = useState<string>('');
   const [filtroCritico, setFiltroCritico] = useState<boolean>(false);
 
@@ -183,8 +184,9 @@ export const InventarioPage: React.FC = () => {
   // Handlers para Despacho
   const ejecutarDespacho = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!modalDespacho.producto) return;
+    if (!modalDespacho.producto || despachando) return;
     try {
+      setDespachando(true);
       const payload: DespacharProductoDTO = {
         id_producto: modalDespacho.producto.id_producto,
         cantidad: Number(modalDespacho.cantidad),
@@ -200,6 +202,8 @@ export const InventarioPage: React.FC = () => {
           ? err
           : (err as { message?: string })?.message || 'Error al procesar el despacho';
       setErrorModalMsg(msg);
+    } finally {
+      setDespachando(false);
     }
   };
 
@@ -411,6 +415,7 @@ export const InventarioPage: React.FC = () => {
           setModalDespacho({ abierto: false, producto: null, cantidad: 1, motivo: '' })
         }
         onSubmit={ejecutarDespacho}
+        loading={despachando}
       />
 
       <ModalAjusteStock

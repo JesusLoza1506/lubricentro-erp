@@ -8,11 +8,16 @@ interface TableroZanjasProps {
   onIniciarEnZanja: (idOt: number, idZanja: number) => void;
 }
 
+type ZanjaItemDTO = TableroZanjasDTO['zanjas'][number];
+
 export const TableroZanjas: React.FC<TableroZanjasProps> = ({
   tablero,
   onVerDetalle,
   onIniciarEnZanja,
 }) => {
+  // Filtrar zanjas únicamente activadas en base de datos (Fase 3 Punto 2)
+  const zanjasHabilitadas = tablero.zanjas.filter((z: ZanjaItemDTO) => z.activa === 1);
+
   return (
     <div>
       {/* COLA COMÚN EN ESPERA */}
@@ -49,7 +54,7 @@ export const TableroZanjas: React.FC<TableroZanjasProps> = ({
               gap: '12px',
             }}
           >
-            {tablero.cola_espera.map((ot) => (
+            {tablero.cola_espera.map((ot: OrdenTrabajoHistorialDTO) => (
               <div
                 key={ot.id_ot}
                 style={{
@@ -66,7 +71,7 @@ export const TableroZanjas: React.FC<TableroZanjasProps> = ({
                   <span style={{ color: '#94A3B8', fontSize: '12px' }}>{ot.codigo_ot}</span>
                 </div>
                 <p style={{ margin: '2px 0', fontSize: '12px', color: '#CBD5E1' }}>
-                  <strong>Cliente:</strong> {ot.cliente_nombre}
+                  <strong>Cliente:</strong> {ot.cliente_nombre || 'No especificado'}
                 </p>
                 <p style={{ margin: '2px 0', fontSize: '12px', color: '#CBD5E1' }}>
                   <strong>Técnico:</strong> {ot.nombre_mecanico || 'Pendiente (Autoasignable)'}
@@ -97,9 +102,9 @@ export const TableroZanjas: React.FC<TableroZanjasProps> = ({
         )}
       </div>
 
-      {/* TABLERO DE ZANJAS (1 A 6) */}
+      {/* TABLERO DE ZANJAS HABILITADAS */}
       <h3 style={{ margin: '0 0 12px 0', fontSize: '16px', color: '#F8FAFC' }}>
-        Zanjas de Trabajo (1 a 6)
+        Zanjas de Trabajo ({zanjasHabilitadas.length} Habilitadas)
       </h3>
       <div
         style={{
@@ -108,8 +113,10 @@ export const TableroZanjas: React.FC<TableroZanjasProps> = ({
           gap: '16px',
         }}
       >
-        {tablero.zanjas.map((z) => {
+        {zanjasHabilitadas.map((z: ZanjaItemDTO) => {
           const ot = z.ot_actual;
+          const estaOcupada = z.ocupada || Boolean(ot);
+
           return (
             <div key={z.id_zanja} style={styles.columnaZanja}>
               <div style={styles.tituloZanja}>
@@ -120,15 +127,15 @@ export const TableroZanjas: React.FC<TableroZanjasProps> = ({
                     borderRadius: '4px',
                     fontSize: '11px',
                     fontWeight: 700,
-                    backgroundColor: z.ocupada ? '#1E3A8A' : '#064E3B',
-                    color: z.ocupada ? '#60A5FA' : '#34D399',
+                    backgroundColor: estaOcupada ? '#1E3A8A' : '#064E3B',
+                    color: estaOcupada ? '#60A5FA' : '#34D399',
                   }}
                 >
-                  {z.ocupada ? 'OCUPADA' : 'LIBRE'}
+                  {estaOcupada ? 'OCUPADA' : 'LIBRE'}
                 </span>
               </div>
 
-              {z.ocupada && ot ? (
+              {estaOcupada && ot ? (
                 <div style={styles.tarjetaOt}>
                   <div
                     style={{
@@ -141,10 +148,10 @@ export const TableroZanjas: React.FC<TableroZanjasProps> = ({
                     <span style={{ color: '#94A3B8', fontSize: '13px' }}>{ot.codigo_ot}</span>
                   </div>
                   <p style={{ margin: '4px 0', fontSize: '13px', color: '#CBD5E1' }}>
-                    <strong>Cliente:</strong> {ot.cliente_nombre}
+                    <strong>Cliente:</strong> {ot.cliente_nombre || 'No especificado'}
                   </p>
                   <p style={{ margin: '4px 0', fontSize: '13px', color: '#CBD5E1' }}>
-                    <strong>Mecánico:</strong> {ot.nombre_mecanico || 'En ejecucion'}
+                    <strong>Mecánico:</strong> {ot.nombre_mecanico || 'En ejecución'}
                   </p>
                   <p style={{ margin: '4px 0', fontSize: '13px', color: '#CBD5E1' }}>
                     <strong>Ingreso:</strong> {ot.kilometraje_ingreso.toLocaleString()} km
@@ -160,7 +167,7 @@ export const TableroZanjas: React.FC<TableroZanjasProps> = ({
                       border: 'none',
                       borderRadius: '6px',
                       cursor: 'pointer',
-                      fontWeight: '600',
+                      fontWeight: 600,
                     }}
                   >
                     Ver Detalle / Insumos
@@ -168,7 +175,7 @@ export const TableroZanjas: React.FC<TableroZanjasProps> = ({
                 </div>
               ) : (
                 <div style={styles.tarjetaVacia}>
-                  <p style={{ margin: 0, fontWeight: '500', color: '#94A3B8' }}>Zanja Disponible</p>
+                  <p style={{ margin: 0, fontWeight: 500, color: '#94A3B8' }}>Zanja Disponible</p>
                   {tablero.cola_espera.length > 0 && (
                     <div style={{ marginTop: '10px' }}>
                       <p style={{ fontSize: '11px', color: '#64748B', marginBottom: '4px' }}>
@@ -191,7 +198,7 @@ export const TableroZanjas: React.FC<TableroZanjasProps> = ({
                         }}
                       >
                         <option value={0}>-- Seleccionar vehículo --</option>
-                        {tablero.cola_espera.map((colaOt) => (
+                        {tablero.cola_espera.map((colaOt: OrdenTrabajoHistorialDTO) => (
                           <option key={colaOt.id_ot} value={colaOt.id_ot}>
                             {colaOt.placa} ({colaOt.codigo_ot})
                           </option>

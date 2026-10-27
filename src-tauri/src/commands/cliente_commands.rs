@@ -310,3 +310,49 @@ pub fn obtener_proximos_cambios_aceite_cmd(
         filtro_causa.as_deref(),
     )
 }
+
+#[tauri::command]
+pub fn buscar_vehiculos_candidatos_cmd(
+    db_state: State<'_, Mutex<Connection>>,
+    session_state: State<'_, Mutex<SessionState>>,
+    busqueda: String,
+) -> Result<Vec<VehiculoCompletoDto>, AppError> {
+    let mut session = session_state
+        .lock()
+        .map_err(|_| AppError::Validation("Fallo sesión".into()))?;
+    let conn = db_state
+        .lock()
+        .map_err(|_| AppError::Validation("Fallo BD".into()))?;
+
+    let (_, _, rol) = verificar_permiso_sesion(
+        &mut session,
+        &conn,
+        &["ADMINISTRADOR", "CAJERO", "MECANICO"],
+    )?;
+
+    let termino = format!("%{}%", busqueda.trim().to_uppercase());
+
+    let mut stmt = conn.prepare(
+        "SELECT v.placa
+         FROM vehiculos v
+         JOIN clientes c ON c.id_cliente = v.id_cliente
+         WHERE v.activo = 1 
+           AND (v.placa LIKE ?1 OR c.nombre_razon_social LIKE ?1 OR c.numero_documento LIKE ?1)
+         ORDER BY v.placa ASC
+         LIMIT 15",
+    )?;
+
+    let iter = stmt.query_map([termino], |row| row.get::<_, String>(0))?;
+
+    let mut lista = Vec::new();
+    for placa_res in iter {
+        let placa = placa_res?;
+        if let Ok(vehiculo_dto) =
+            ClienteService::obtener_vehiculo_por_placa(&conn, &placa, Some(&rol))
+        {
+            lista.push(vehiculo_dto);
+        }
+    }
+
+    Ok(lista)
+}

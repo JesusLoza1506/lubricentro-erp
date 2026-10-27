@@ -85,6 +85,22 @@ export interface TableroZanjasDTO {
   cola_espera: OrdenTrabajoHistorialDTO[];
 }
 
+export interface FiltroPaginacionOtPayload {
+  pagina?: number;
+  limite?: number;
+  placa?: string;
+  codigo_ot?: string;
+  fecha_inicio?: string;
+  fecha_fin?: string;
+}
+
+export interface ResultadoPaginadoOtDTO {
+  items: OrdenTrabajoHistorialDTO[];
+  total_items: number;
+  pagina_actual: number;
+  total_paginas: number;
+}
+
 export interface CrearOrdenTrabajoPayload {
   id_vehiculo: number;
   id_cliente_atendido: number;
@@ -97,6 +113,7 @@ export interface CrearOrdenTrabajoPayload {
 export interface IniciarTrabajoOtPayload {
   id_ot: number;
   id_zanja_ejecucion: number;
+  id_mecanico?: number;
 }
 
 export interface ReasignarMecanicoOtPayload {
@@ -121,6 +138,7 @@ export interface RegistrarInsumoOtPayload {
   id_ot: number;
   id_producto: number;
   cantidad: number;
+  id_operacion?: string;
 }
 
 export interface DevolverInsumoOtPayload {
@@ -128,6 +146,7 @@ export interface DevolverInsumoOtPayload {
   id_detalle_producto: number;
   cantidad_a_devolver: number;
   motivo: string;
+  id_operacion?: string;
 }
 
 export interface AgregarServicioOtPayload {

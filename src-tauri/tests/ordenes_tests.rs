@@ -14,7 +14,7 @@ fn setup_test_db() -> Connection {
     let schema_v7 = include_str!("../migrations/0001_initial_schema_v7.sql");
     conn.execute_batch(schema_v7).unwrap();
 
-    // Insertar datos de prueba
+    // Insertar datos de prueba iniciales
     conn.execute_batch(
         "
         -- Configuración inicial V7.0
@@ -45,10 +45,11 @@ fn setup_test_db() -> Connection {
         (1, 'ABC123', 2, 'Toyota', 'Yaris', 2020, 50000, 1),
         (2, 'XYZ999', 2, 'Nissan', 'Frontier', 2022, 10000, 1);
 
-        -- Productos (con ultimo_costo_micro = 50000000 > 0) y Servicios
+        -- Productos y Servicios
         INSERT INTO productos (id_producto, codigo, nombre, categoria, unidad_medida, stock_actual, stock_minimo, valor_stock_micro, ultimo_costo_micro, precio_venta_cent, activo) VALUES
         (1, 'PROD-001', 'Aceite 10W-40 Sintetico', 'ACEITE', 'UND', 0, 0, 0, 50000000, 12000, 1),
-        (2, 'PROD-002', 'Filtro de Aceite', 'FILTRO', 'UND', 0, 0, 0, 15000000, 2500, 1);
+        (2, 'PROD-002', 'Filtro de Aceite', 'FILTRO', 'UND', 0, 0, 0, 15000000, 2500, 1),
+        (3, 'PROD-003', 'Aceite Granel 15W-40', 'GRANEL', 'ML', 0, 0, 0, 50000000, 1500, 1);
 
         INSERT INTO servicios (id_servicio, codigo, nombre, precio_venta_cent, es_cambio_aceite, activo) VALUES
         (1, 'SERV-001', 'Cambio de Aceite Basico', 2500, 1, 1),
@@ -57,22 +58,40 @@ fn setup_test_db() -> Connection {
     )
     .unwrap();
 
-    // Cargar inventario inicial vía Kardex V7.0
+    // ------------------------------------------------------------------
+    // CARGA DE INVENTARIO INICIAL CUMPLIENDO CON EL ORDEN DDL V7.0:
+    // 1. Ingreso nace en estado 'PREPARANDO'
+    // 2. Insertar detalle de ingreso
+    // 3. Insertar movimiento en movimientos_inventario (Kardex)
+    // 4. Actualizar stock_actual y valor_stock_micro en productos via Kardex
+    // 5. Confirmar ingreso pasando estado a 'REGISTRADO'
+    // ------------------------------------------------------------------
+
+    // Paso 1: Ingreso en 'PREPARANDO'
     let id_op = uuid::Uuid::new_v4().to_string();
     conn.execute(
         "INSERT INTO ingresos_stock (id_operacion, codigo, origen, referencia_inicial, total_costo_micro, id_usuario, observacion, estado)
-         VALUES (?1, 'ING-001', 'INICIAL', 'CARGA-INICIAL-001', 500000000, 1, 'Carga inicial de inventario para pruebas', 'PREPARANDO')",
+         VALUES (?1, 'ING-001', 'INICIAL', 'CARGA-INICIAL-001', 3000000000, 1, 'Carga inicial de inventario para pruebas', 'PREPARANDO')",
         [&id_op],
     ).unwrap();
     let id_ingreso = conn.last_insert_rowid();
 
+    // Paso 2: Detalles de ingreso
     conn.execute(
         "INSERT INTO detalle_ingreso (id_ingreso, id_producto, codigo_snapshot, nombre_snapshot, unidad_medida, cantidad, costo_efectivo_micro, valor_aporte_micro)
-         VALUES (?1, 1, 'PROD-001', 'Aceite 10W-40', 'UND', 10, 50000000, 500000000)",
+         VALUES (?1, 1, 'PROD-001', 'Aceite 10W-40 Sintetico', 'UND', 10, 50000000, 500000000)",
         [id_ingreso],
     ).unwrap();
     let id_det1 = conn.last_insert_rowid();
 
+    conn.execute(
+        "INSERT INTO detalle_ingreso (id_ingreso, id_producto, codigo_snapshot, nombre_snapshot, unidad_medida, cantidad, costo_efectivo_micro, valor_aporte_micro)
+         VALUES (?1, 3, 'PROD-003', 'Aceite Granel 15W-40', 'ML', 50000, 50000000, 2500000000)",
+        [id_ingreso],
+    ).unwrap();
+    let id_det3 = conn.last_insert_rowid();
+
+    // Paso 3: Movimientos Kardex
     let op_k1 = uuid::Uuid::new_v4().to_string();
     conn.execute(
         "INSERT INTO movimientos_inventario (id_operacion, id_producto, id_usuario, tipo_movimiento, id_detalle_ingreso, unidad_medida, stock_anterior, diferencia, stock_resultante, valor_anterior_micro, valor_delta_micro, valor_resultante_micro, costo_unitario_micro)
@@ -80,12 +99,25 @@ fn setup_test_db() -> Connection {
         [&op_k1, &id_det1.to_string()],
     ).unwrap();
 
-    // Actualizar saldo de producto tras movimiento kardex y mantener ultimo_costo_micro > 0
+    let op_k3 = uuid::Uuid::new_v4().to_string();
     conn.execute(
-        "UPDATE productos SET stock_actual = 10, valor_stock_micro = 500000000, ultimo_costo_micro = 50000000 WHERE id_producto = 1",
+        "INSERT INTO movimientos_inventario (id_operacion, id_producto, id_usuario, tipo_movimiento, id_detalle_ingreso, unidad_medida, stock_anterior, diferencia, stock_resultante, valor_anterior_micro, valor_delta_micro, valor_resultante_micro, costo_unitario_micro)
+         VALUES (?1, 3, 1, 'STOCK_INICIAL', ?2, 'ML', 0, 50000, 50000, 0, 2500000000, 2500000000, 50000000)",
+        [&op_k3, &id_det3.to_string()],
+    ).unwrap();
+
+    // Paso 4: Actualizar producto para hacer match exacto con el último Kardex
+    conn.execute(
+        "UPDATE productos SET stock_actual = 10, valor_stock_micro = 500000000 WHERE id_producto = 1",
         [],
     ).unwrap();
 
+    conn.execute(
+        "UPDATE productos SET stock_actual = 50000, valor_stock_micro = 2500000000 WHERE id_producto = 3",
+        [],
+    ).unwrap();
+
+    // Paso 5: Transición de Ingreso a 'REGISTRADO'
     conn.execute(
         "UPDATE ingresos_stock SET estado = 'REGISTRADO' WHERE id_ingreso = ?1",
         [id_ingreso],
@@ -112,7 +144,7 @@ fn helper_crear_ot_base(conn: &mut Connection) -> i64 {
 }
 
 // ==========================================
-// MATRIZ DE PRUEBAS V7.0
+// MATRIZ DE PRUEBAS COMPLETA V7.0
 // ==========================================
 
 #[test]
@@ -185,6 +217,7 @@ fn tc_ot_03_inicio_combinado_transaccional() {
     let req_iniciar = IniciarTrabajoOtDto {
         id_ot: ot.id_ot,
         id_zanja_ejecucion: 1,
+        id_mecanico: None,
     };
     let ot_iniciada =
         OrdenesService::iniciar_trabajo_ot(&mut conn, req_iniciar, 2, "MECANICO").unwrap();
@@ -203,6 +236,7 @@ fn tc_ot_04_exclusividad_zanja_y_reasignacion_admin() {
     let req_iniciar1 = IniciarTrabajoOtDto {
         id_ot: id_ot_1,
         id_zanja_ejecucion: 2,
+        id_mecanico: None,
     };
     OrdenesService::iniciar_trabajo_ot(&mut conn, req_iniciar1, 2, "MECANICO").unwrap();
 
@@ -223,6 +257,7 @@ fn tc_ot_04_exclusividad_zanja_y_reasignacion_admin() {
     let req_iniciar2 = IniciarTrabajoOtDto {
         id_ot: ot2.id_ot,
         id_zanja_ejecucion: 2,
+        id_mecanico: None,
     };
     assert!(OrdenesService::iniciar_trabajo_ot(&mut conn, req_iniciar2, 4, "MECANICO").is_err());
 
@@ -285,6 +320,7 @@ fn tc_ot_06_descuento_real_stock_kardex() {
     let req_iniciar = IniciarTrabajoOtDto {
         id_ot,
         id_zanja_ejecucion: 1,
+        id_mecanico: None,
     };
     OrdenesService::iniciar_trabajo_ot(&mut conn, req_iniciar, 2, "MECANICO").unwrap();
 
@@ -293,10 +329,11 @@ fn tc_ot_06_descuento_real_stock_kardex() {
         id_ot,
         id_producto: 1,
         cantidad: 2.0,
+        id_operacion: None,
     };
     OrdenesService::registrar_insumo_ot(&mut conn, req_insumo, 2, "MECANICO").unwrap();
 
-    // Validar descuento en productos
+    // Validar descuento directo en la columna stock_actual de la tabla productos (10 - 2 = 8)
     let stock_actual: i64 = conn
         .query_row(
             "SELECT stock_actual FROM productos WHERE id_producto = 1",
@@ -323,6 +360,7 @@ fn tc_ot_07_devolucion_fisica_insumos_con_motivo() {
     let req_iniciar = IniciarTrabajoOtDto {
         id_ot,
         id_zanja_ejecucion: 1,
+        id_mecanico: None,
     };
     OrdenesService::iniciar_trabajo_ot(&mut conn, req_iniciar, 2, "MECANICO").unwrap();
 
@@ -330,6 +368,7 @@ fn tc_ot_07_devolucion_fisica_insumos_con_motivo() {
         id_ot,
         id_producto: 1,
         cantidad: 3.0,
+        id_operacion: None,
     };
     let ot = OrdenesService::registrar_insumo_ot(&mut conn, req_insumo, 2, "MECANICO").unwrap();
     let id_det_producto = ot.insumos[0].id_detalle;
@@ -340,6 +379,7 @@ fn tc_ot_07_devolucion_fisica_insumos_con_motivo() {
         id_detalle_producto: id_det_producto,
         cantidad_a_devolver: 1.0,
         motivo: "Devolución de 1 lata no abierta".to_string(),
+        id_operacion: None,
     };
     OrdenesService::devolver_insumo_ot(&mut conn, req_dev, 1, "ADMINISTRADOR").unwrap();
 
@@ -371,6 +411,7 @@ fn tc_ot_08_finalizacion_kilometraje_y_liberacion_zanja() {
     let req_iniciar = IniciarTrabajoOtDto {
         id_ot,
         id_zanja_ejecucion: 3,
+        id_mecanico: None,
     };
     OrdenesService::iniciar_trabajo_ot(&mut conn, req_iniciar, 2, "MECANICO").unwrap();
 
@@ -406,6 +447,7 @@ fn tc_ot_09_cancelacion_corta_con_costo_interno() {
     let req_iniciar = IniciarTrabajoOtDto {
         id_ot,
         id_zanja_ejecucion: 1,
+        id_mecanico: None,
     };
     OrdenesService::iniciar_trabajo_ot(&mut conn, req_iniciar, 2, "MECANICO").unwrap();
 
@@ -413,6 +455,7 @@ fn tc_ot_09_cancelacion_corta_con_costo_interno() {
         id_ot,
         id_producto: 1,
         cantidad: 2.0,
+        id_operacion: None,
     };
     OrdenesService::registrar_insumo_ot(&mut conn, req_insumo, 2, "MECANICO").unwrap();
 
@@ -435,4 +478,115 @@ fn tc_ot_09_cancelacion_corta_con_costo_interno() {
         )
         .unwrap();
     assert_eq!(stock_actual, 8); // Se mantienen consumidas 2 unidades
+}
+
+// ==========================================
+// PRUEBAS DE COBERTURA AVANZADA (Fase 5)
+// ==========================================
+
+#[test]
+fn tc_ot_10_consumo_devolucion_granel_ml_y_costos() {
+    let mut conn = setup_test_db();
+    let id_ot = helper_crear_ot_base(&mut conn);
+
+    let req_iniciar = IniciarTrabajoOtDto {
+        id_ot,
+        id_zanja_ejecucion: 1,
+        id_mecanico: None,
+    };
+    OrdenesService::iniciar_trabajo_ot(&mut conn, req_iniciar, 2, "MECANICO").unwrap();
+
+    // Consumo de 3.5 Litros (3500 mL) a granel
+    let req_insumo_granel = RegistrarInsumoOtDto {
+        id_ot,
+        id_producto: 3, // Producto en ML
+        cantidad: 3.5,  // 3.5 Litros enviando float
+        id_operacion: None,
+    };
+    let ot =
+        OrdenesService::registrar_insumo_ot(&mut conn, req_insumo_granel, 2, "MECANICO").unwrap();
+    assert_eq!(ot.insumos[0].cantidad, 3500); // Guardado internamente en base mL
+
+    // Stock debe disminuir en 3,500 mL (50,000 - 3,500 = 46,500 mL)
+    let stock_actual: i64 = conn
+        .query_row(
+            "SELECT stock_actual FROM productos WHERE id_producto = 3",
+            [],
+            |r| r.get(0),
+        )
+        .unwrap();
+    assert_eq!(stock_actual, 46500);
+
+    // Devolución parcial de 0.5 Litros (500 mL)
+    let id_det = ot.insumos[0].id_detalle;
+    let req_dev_granel = DevolverInsumoOtDto {
+        id_ot,
+        id_detalle_producto: id_det,
+        cantidad_a_devolver: 0.5,
+        motivo: "Devolución de medio litro sobrante de jarra".to_string(),
+        id_operacion: None,
+    };
+    OrdenesService::devolver_insumo_ot(&mut conn, req_dev_granel, 1, "ADMINISTRADOR").unwrap();
+
+    // Stock recuperado a 47,000 mL
+    let stock_final: i64 = conn
+        .query_row(
+            "SELECT stock_actual FROM productos WHERE id_producto = 3",
+            [],
+            |r| r.get(0),
+        )
+        .unwrap();
+    assert_eq!(stock_final, 47000);
+}
+
+#[test]
+fn tc_ot_11_acumulacion_servicios_duplicados_update() {
+    let mut conn = setup_test_db();
+    let id_ot = helper_crear_ot_base(&mut conn);
+
+    // Agregar el mismo servicio ID 1 que ya se incluyó en la creación inicial
+    let req_repetido = AgregarServicioOtDto {
+        id_ot,
+        id_servicio: 1,
+        cantidad: 2,
+    };
+    let ot_actualizada =
+        OrdenesService::agregar_servicio_ot(&mut conn, req_repetido, 2, "MECANICO").unwrap();
+
+    // Acumula cantidad a 3 (1 + 2) sin duplicar líneas
+    assert_eq!(ot_actualizada.servicios.len(), 1);
+    assert_eq!(ot_actualizada.servicios[0].cantidad, 3);
+}
+
+#[test]
+fn tc_ot_12_inicio_ot_administrador_con_seleccion_mecanico() {
+    let mut conn = setup_test_db();
+
+    // Crear OT sin mecánico asignado
+    let req_crear = CrearOrdenTrabajoDto {
+        id_vehiculo: 1,
+        id_cliente_atendido: 2,
+        kilometraje_ingreso: 50000,
+        id_mecanico: None,
+        pedido_cliente: None,
+        servicios_iniciales: vec![ServicioInicialDto {
+            id_servicio: 1,
+            cantidad: 1,
+        }],
+    };
+    let ot = OrdenesService::crear_orden_trabajo(&mut conn, req_crear, 3, "CAJERO").unwrap();
+
+    // Administrador inicia asignando al mecánico 4
+    let req_iniciar_admin = IniciarTrabajoOtDto {
+        id_ot: ot.id_ot,
+        id_zanja_ejecucion: 1,
+        id_mecanico: Some(4),
+    };
+    let ot_iniciada =
+        OrdenesService::iniciar_trabajo_ot(&mut conn, req_iniciar_admin, 1, "ADMINISTRADOR")
+            .unwrap();
+
+    assert_eq!(ot_iniciada.estado, "EN_PROCESO");
+    assert_eq!(ot_iniciada.id_mecanico, Some(4));
+    assert_eq!(ot_iniciada.id_zanja_ejecucion, Some(1));
 }

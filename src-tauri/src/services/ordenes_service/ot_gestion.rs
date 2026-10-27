@@ -1,6 +1,5 @@
 use super::helpers::{
-    generar_codigo_ot, recalcular_kilometraje_vehiculo, tiene_cambio_aceite,
-    validar_mecanico_activo, DatosVehiculoCliente,
+    generar_codigo_ot, tiene_cambio_aceite, validar_mecanico_activo, DatosVehiculoCliente,
 };
 use super::ot_consultas::obtener_ot_por_id;
 use crate::dto::orden_trabajo_dto::{
@@ -10,7 +9,14 @@ use crate::dto::orden_trabajo_dto::{
 use crate::errors::AppError;
 use crate::services::auditoria_service::AuditoriaService;
 use rusqlite::{params, Connection};
+use serde::{Deserialize, Serialize};
 use uuid::Uuid;
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct ModificarNotaInternaOtDto {
+    pub id_ot: i64,
+    pub nota_interna: String,
+}
 
 pub fn crear_orden_trabajo(
     conn: &mut Connection,
@@ -18,6 +24,12 @@ pub fn crear_orden_trabajo(
     id_creador: i64,
     rol: &str,
 ) -> Result<OrdenTrabajoHistorialDto, AppError> {
+    if req.kilometraje_ingreso <= 0 {
+        return Err(AppError::Validation(
+            "El kilometraje de ingreso debe ser estrictamente mayor a 0.".to_string(),
+        ));
+    }
+
     if req.servicios_iniciales.is_empty() {
         return Err(AppError::Validation(
             "La Orden de Trabajo debe incluir al menos un servicio inicial.".to_string(),
@@ -149,6 +161,30 @@ pub fn crear_orden_trabajo(
         )?;
     }
 
+    // AUDITORÍA: Registro de Recepción de Orden de Trabajo
+    let (username, user_rol): (String, String) = tx.query_row(
+        "SELECT username, rol FROM usuarios WHERE id_usuario = ?1",
+        [id_creador],
+        |r| Ok((r.get(0)?, r.get(1)?)),
+    )?;
+
+    AuditoriaService::registrar_v5(
+        &tx,
+        Some(id_creador),
+        "USUARIO",
+        Some(&username),
+        Some(&user_rol),
+        None,
+        "OT",
+        "CREAR_OT",
+        Some("ordenes_trabajo"),
+        Some(&id_ot.to_string()),
+        None,
+        None,
+        Some(&format!("Código OT: {}, Placa: {}", codigo_ot, placa)),
+        "OK",
+    )?;
+
     tx.commit()
         .map_err(|e| AppError::Validation(e.to_string()))?;
 
@@ -175,6 +211,19 @@ pub fn iniciar_trabajo_ot(
         ));
     }
 
+    let zanja_activa: i32 = conn.query_row(
+        "SELECT COUNT(*) FROM zanjas WHERE id_zanja = ?1 AND activa = 1",
+        [req.id_zanja_ejecucion],
+        |row| row.get(0),
+    )?;
+
+    if zanja_activa == 0 {
+        return Err(AppError::Validation(format!(
+            "La zanja {} no se encuentra habilitada.",
+            req.id_zanja_ejecucion
+        )));
+    }
+
     let ocupada: i32 = conn.query_row(
         "SELECT COUNT(*) FROM ordenes_trabajo WHERE id_zanja_ejecucion = ?1 AND estado = 'EN_PROCESO'",
         [req.id_zanja_ejecucion],
@@ -188,23 +237,70 @@ pub fn iniciar_trabajo_ot(
         )));
     }
 
-    let id_mecanico_final = if let Some(id_m) = ot.id_mecanico {
-        if rol == "MECANICO" && id_m != id_usuario {
-            return Err(AppError::Validation(
-                "No tienes permiso para iniciar una OT asignada a otro mecánico.".to_string(),
-            ));
+    let id_mecanico_final = if rol.to_uppercase() == "MECANICO" {
+        if let Some(id_m) = ot.id_mecanico {
+            if id_m != id_usuario {
+                return Err(AppError::Validation(
+                    "No tienes permiso para iniciar una OT asignada a otro mecánico.".to_string(),
+                ));
+            }
+            id_m
+        } else {
+            validar_mecanico_activo(conn, id_usuario)?;
+            id_usuario
         }
+    } else if let Some(id_m) = ot.id_mecanico {
         id_m
+    } else if let Some(req_mecanico) = req.id_mecanico {
+        validar_mecanico_activo(conn, req_mecanico)?;
+        req_mecanico
     } else {
-        id_usuario
+        return Err(AppError::Validation(
+            "Un administrador debe seleccionar un mecánico responsable para iniciar la OT libre."
+                .to_string(),
+        ));
     };
 
-    conn.execute(
+    let tx = conn
+        .transaction()
+        .map_err(|e| AppError::Validation(e.to_string()))?;
+
+    tx.execute(
         "UPDATE ordenes_trabajo 
          SET estado = 'EN_PROCESO', id_zanja_ejecucion = ?1, id_mecanico = ?2, fecha_inicio = COALESCE(fecha_inicio, datetime('now', '-5 hours'))
          WHERE id_ot = ?3",
         params![req.id_zanja_ejecucion, id_mecanico_final, req.id_ot],
     )?;
+
+    // AUDITORÍA: Registro de Inicio de Trabajo
+    let (username, user_rol): (String, String) = tx.query_row(
+        "SELECT username, rol FROM usuarios WHERE id_usuario = ?1",
+        [id_usuario],
+        |r| Ok((r.get(0)?, r.get(1)?)),
+    )?;
+
+    AuditoriaService::registrar_v5(
+        &tx,
+        Some(id_usuario),
+        "USUARIO",
+        Some(&username),
+        Some(&user_rol),
+        None,
+        "OT",
+        "INICIAR_TRABAJO_OT",
+        Some("ordenes_trabajo"),
+        Some(&req.id_ot.to_string()),
+        None,
+        None,
+        Some(&format!(
+            "Zanja: {}, Mecánico ID: {}",
+            req.id_zanja_ejecucion, id_mecanico_final
+        )),
+        "OK",
+    )?;
+
+    tx.commit()
+        .map_err(|e| AppError::Validation(e.to_string()))?;
 
     obtener_ot_por_id(conn, req.id_ot, id_usuario, rol)
 }
@@ -275,6 +371,74 @@ pub fn reasignar_mecanico_ot(
     obtener_ot_por_id(conn, req.id_ot, id_usuario, rol)
 }
 
+pub fn modificar_nota_interna_ot(
+    conn: &mut Connection,
+    req: ModificarNotaInternaOtDto,
+    id_usuario: i64,
+    rol: &str,
+) -> Result<OrdenTrabajoHistorialDto, AppError> {
+    let rol_upper = rol.to_uppercase();
+
+    let ot = obtener_ot_por_id(conn, req.id_ot, id_usuario, rol)?;
+    if ot.estado == "FINALIZADO" || ot.estado == "CANCELADO" {
+        return Err(AppError::Validation(
+            "No se puede modificar la nota interna en una OT finalizada o cancelada.".to_string(),
+        ));
+    }
+
+    if rol_upper != "ADMINISTRADOR" {
+        if rol_upper == "MECANICO" {
+            if ot.id_mecanico != Some(id_usuario) {
+                return Err(AppError::Validation(
+                    "No tiene permiso para modificar la nota interna de una OT asignada a otro mecánico.".to_string(),
+                ));
+            }
+        } else {
+            return Err(AppError::Validation(
+                "No tiene autorización para modificar la nota interna de la orden.".to_string(),
+            ));
+        }
+    }
+
+    let tx = conn
+        .transaction()
+        .map_err(|e| AppError::Validation(e.to_string()))?;
+
+    tx.execute(
+        "UPDATE ordenes_trabajo SET nota_interna = ?1 WHERE id_ot = ?2",
+        params![req.nota_interna.trim(), req.id_ot],
+    )?;
+
+    // AUDITORÍA: Modificación de Nota Interna
+    let (username, user_rol): (String, String) = tx.query_row(
+        "SELECT username, rol FROM usuarios WHERE id_usuario = ?1",
+        [id_usuario],
+        |r| Ok((r.get(0)?, r.get(1)?)),
+    )?;
+
+    AuditoriaService::registrar_v5(
+        &tx,
+        Some(id_usuario),
+        "USUARIO",
+        Some(&username),
+        Some(&user_rol),
+        None,
+        "OT",
+        "MODIFICAR_NOTA_INTERNA",
+        Some("ordenes_trabajo"),
+        Some(&req.id_ot.to_string()),
+        None,
+        None,
+        Some("Actualización de nota interna técnica"),
+        "OK",
+    )?;
+
+    tx.commit()
+        .map_err(|e| AppError::Validation(e.to_string()))?;
+
+    obtener_ot_por_id(conn, req.id_ot, id_usuario, rol)
+}
+
 pub fn finalizar_ot(
     conn: &mut Connection,
     req: FinalizarOtDto,
@@ -287,6 +451,17 @@ pub fn finalizar_ot(
         return Err(AppError::Validation(
             "Solo se pueden finalizar órdenes de trabajo que estén 'EN_PROCESO'.".to_string(),
         ));
+    }
+
+    if rol.to_uppercase() == "MECANICO" {
+        if let Some(id_mec) = ot.id_mecanico {
+            if id_mec != id_usuario {
+                return Err(AppError::Validation(
+                    "No tienes permisos para finalizar la Orden de Trabajo de otro mecánico."
+                        .to_string(),
+                ));
+            }
+        }
     }
 
     if req.kilometraje_salida < ot.kilometraje_ingreso {
@@ -318,20 +493,21 @@ pub fn finalizar_ot(
         tipo_aceite_final = Some(t_aceite);
     }
 
+    let mecanico_terminal = ot.id_mecanico.unwrap_or(id_usuario);
+
     let tx = conn
         .transaction()
         .map_err(|e| AppError::Validation(e.to_string()))?;
 
-    // Sin modificar id_zanja_ejecucion ni fecha_inicio para respetar trg_ot_transicion del DDL V7.0
     tx.execute(
         "UPDATE ordenes_trabajo 
          SET estado = 'FINALIZADO', fecha_fin = datetime('now', '-5 hours'),
-             kilometraje_salida = ?1, id_mecanico_terminal = COALESCE(id_mecanico, ?2),
+             kilometraje_salida = ?1, id_mecanico_terminal = ?2,
              resumen_publico = ?3, tipo_aceite = ?4, intervalo_aceite_km = ?5
          WHERE id_ot = ?6",
         params![
             req.kilometraje_salida,
-            id_usuario,
+            mecanico_terminal,
             req.resumen_publico.trim(),
             tipo_aceite_final,
             intervalo_km,
@@ -342,6 +518,30 @@ pub fn finalizar_ot(
     tx.execute(
         "UPDATE vehiculos SET kilometraje_actual = ?1 WHERE id_vehiculo = ?2",
         params![req.kilometraje_salida, ot.id_vehiculo],
+    )?;
+
+    // AUDITORÍA: Finalización de OT
+    let (username, user_rol): (String, String) = tx.query_row(
+        "SELECT username, rol FROM usuarios WHERE id_usuario = ?1",
+        [id_usuario],
+        |r| Ok((r.get(0)?, r.get(1)?)),
+    )?;
+
+    AuditoriaService::registrar_v5(
+        &tx,
+        Some(id_usuario),
+        "USUARIO",
+        Some(&username),
+        Some(&user_rol),
+        None,
+        "OT",
+        "FINALIZAR_OT",
+        Some("ordenes_trabajo"),
+        Some(&req.id_ot.to_string()),
+        None,
+        None,
+        Some(&format!("Km Salida: {}", req.kilometraje_salida)),
+        "OK",
     )?;
 
     tx.commit()
@@ -355,7 +555,13 @@ pub fn cancelar_ot(
     req: CancelarOtDto,
     id_usuario: i64,
     rol: &str,
-) -> Result<OrdenTrabajoHistorialDto, AppError> {
+) -> Result<CancelarOtDto, AppError> {
+    if rol.to_uppercase() != "ADMINISTRADOR" {
+        return Err(AppError::Validation(
+            "Solo un administrador puede cancelar una orden de trabajo.".to_string(),
+        ));
+    }
+
     let motivo_clean = req.motivo.trim();
     if motivo_clean.len() < 5 || motivo_clean.len() > 250 {
         return Err(AppError::Validation(
@@ -374,7 +580,6 @@ pub fn cancelar_ot(
         .transaction()
         .map_err(|e| AppError::Validation(e.to_string()))?;
 
-    // Mantiene id_zanja_ejecucion para evitar el fallo en trg_ot_transicion de DDL V7.0
     tx.execute(
         "UPDATE ordenes_trabajo 
          SET estado = 'CANCELADO', fecha_cancelacion = datetime('now', '-5 hours'),
@@ -383,10 +588,32 @@ pub fn cancelar_ot(
         params![id_usuario, motivo_clean, req.id_ot],
     )?;
 
+    // AUDITORÍA: Cancelación de OT
+    let (username, user_rol): (String, String) = tx.query_row(
+        "SELECT username, rol FROM usuarios WHERE id_usuario = ?1",
+        [id_usuario],
+        |r| Ok((r.get(0)?, r.get(1)?)),
+    )?;
+
+    AuditoriaService::registrar_v5(
+        &tx,
+        Some(id_usuario),
+        "USUARIO",
+        Some(&username),
+        Some(&user_rol),
+        None,
+        "OT",
+        "CANCELAR_OT",
+        Some("ordenes_trabajo"),
+        Some(&req.id_ot.to_string()),
+        None,
+        None,
+        Some(motivo_clean),
+        "OK",
+    )?;
+
     tx.commit()
         .map_err(|e| AppError::Validation(e.to_string()))?;
 
-    recalcular_kilometraje_vehiculo(conn, &ot.placa)?;
-
-    obtener_ot_por_id(conn, req.id_ot, id_usuario, rol)
+    Ok(req)
 }

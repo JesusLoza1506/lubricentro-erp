@@ -119,6 +119,13 @@ describe('OrdenesPage - Batería Frontend FASE 4 (Vitest React)', () => {
       ],
       cola_espera: [mockOrdenes[1]],
     });
+
+    (ordenesService.listarOrdenesTrabajoPaginado as any) = vi.fn().mockResolvedValue({
+      items: mockOrdenes,
+      total_registros: mockOrdenes.length,
+      pagina_actual: 1,
+      total_paginas: 1,
+    });
   });
 
   it('1. Debe renderizar el encabezado y el botón "+ Nueva OT" para Administrador', async () => {
@@ -126,7 +133,7 @@ describe('OrdenesPage - Batería Frontend FASE 4 (Vitest React)', () => {
       usuario: mockUsuarioAdmin,
       tienePermiso: () => true,
     });
-    (ordenesService.listarOrdenesTrabajo as any).mockResolvedValue(mockOrdenes);
+    (ordenesService.listarOrdenesTrabajo as any) = vi.fn().mockResolvedValue(mockOrdenes);
 
     render(<OrdenesPage />);
 
@@ -142,7 +149,7 @@ describe('OrdenesPage - Batería Frontend FASE 4 (Vitest React)', () => {
       usuario: mockUsuarioMecanico,
       tienePermiso: () => false,
     });
-    (ordenesService.listarOrdenesTrabajo as any).mockResolvedValue(mockOrdenes);
+    (ordenesService.listarOrdenesTrabajo as any) = vi.fn().mockResolvedValue(mockOrdenes);
 
     render(<OrdenesPage />);
 
@@ -157,7 +164,7 @@ describe('OrdenesPage - Batería Frontend FASE 4 (Vitest React)', () => {
       usuario: mockUsuarioAdmin,
       tienePermiso: () => true,
     });
-    (ordenesService.listarOrdenesTrabajo as any).mockResolvedValue(mockOrdenes);
+    (ordenesService.listarOrdenesTrabajo as any) = vi.fn().mockResolvedValue(mockOrdenes);
 
     render(<OrdenesPage />);
 
@@ -181,7 +188,7 @@ describe('OrdenesPage - Batería Frontend FASE 4 (Vitest React)', () => {
       usuario: mockUsuarioMecanico,
       tienePermiso: () => true,
     });
-    (ordenesService.listarOrdenesTrabajo as any).mockResolvedValue(mockOrdenes);
+    (ordenesService.listarOrdenesTrabajo as any) = vi.fn().mockResolvedValue(mockOrdenes);
 
     render(<OrdenesPage />);
 
@@ -196,16 +203,16 @@ describe('OrdenesPage - Batería Frontend FASE 4 (Vitest React)', () => {
       usuario: mockUsuarioAdmin,
       tienePermiso: () => true,
     });
-    (ordenesService.listarOrdenesTrabajo as any).mockResolvedValue(mockOrdenes);
+    (ordenesService.listarOrdenesTrabajo as any) = vi.fn().mockResolvedValue(mockOrdenes);
 
     render(<OrdenesPage />);
 
     await waitFor(() => {
-      expect(
-        screen.getByText(
-          /(Historial del Día|Historial \/ Finalizadas|Historial de Órdenes|Historial|Zanjas de Trabajo)/i
-        )
-      ).toBeInTheDocument();
+      const elementosHistorial = screen.getAllByText(
+        /(Historial del Día|Historial \/ Finalizadas|Historial de Órdenes|Historial Completo|Zanjas de Trabajo)/i
+      );
+      expect(elementosHistorial.length).toBeGreaterThan(0);
+      expect(elementosHistorial[0]).toBeInTheDocument();
       expect(screen.getByText('ABC-123')).toBeInTheDocument();
     });
   });
@@ -215,7 +222,7 @@ describe('OrdenesPage - Batería Frontend FASE 4 (Vitest React)', () => {
       usuario: mockUsuarioCajero,
       tienePermiso: () => true,
     });
-    (ordenesService.listarOrdenesTrabajo as any).mockResolvedValue(mockOrdenes);
+    (ordenesService.listarOrdenesTrabajo as any) = vi.fn().mockResolvedValue(mockOrdenes);
 
     render(<OrdenesPage />);
 

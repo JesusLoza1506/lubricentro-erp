@@ -6,12 +6,51 @@ use crate::errors::AppError;
 use rusqlite::{params, Connection};
 use uuid::Uuid;
 
+/// Valida la precisión según la unidad de medida
+fn validar_precision_cantidad(cantidad: f64, unidad_medida: &str) -> Result<(), AppError> {
+    let um_upper = unidad_medida.to_uppercase();
+    if um_upper == "UND" || um_upper == "UNIDAD" || um_upper == "CJ" || um_upper == "PAQ" {
+        if (cantidad - cantidad.round()).abs() > 0.0001 {
+            return Err(AppError::Validation(format!(
+                "La unidad de medida '{}' solo permite cantidades enteras sin decimales.",
+                unidad_medida
+            )));
+        }
+    } else {
+        // Para ML / L, máximo 3 decimales (1 mL)
+        let mult = cantidad * 1000.0;
+        if (mult - mult.round()).abs() > 0.001 {
+            return Err(AppError::Validation(
+                "Las cantidades a granel no pueden exceder 3 decimales de precisión.".to_string(),
+            ));
+        }
+    }
+    Ok(())
+}
+
 pub fn registrar_insumo_ot(
     conn: &mut Connection,
     req: RegistrarInsumoOtDto,
     id_usuario: i64,
     rol: &str,
 ) -> Result<OrdenTrabajoHistorialDto, AppError> {
+    let id_operacion_req = req
+        .id_operacion
+        .filter(|s| !s.trim().is_empty())
+        .unwrap_or_else(|| Uuid::new_v4().to_string());
+
+    // PROTECCIÓN DE IDEMPOTENCIA: Verificar si la operación ya fue procesada anteriormente
+    let ya_registrado: i32 = conn.query_row(
+        "SELECT COUNT(*) FROM detalle_ot_productos WHERE id_operacion = ?1",
+        [&id_operacion_req],
+        |row| row.get(0),
+    )?;
+
+    if ya_registrado > 0 {
+        // Retornar el estado actual sin volver a descontar inventario
+        return obtener_ot_por_id(conn, req.id_ot, id_usuario, rol);
+    }
+
     let ot = obtener_ot_por_id(conn, req.id_ot, id_usuario, rol)?;
 
     if ot.estado != "EN_PROCESO" {
@@ -42,7 +81,10 @@ pub fn registrar_insumo_ot(
         )
         .map_err(|_| AppError::NotFound("Producto no encontrado o inactivo.".to_string()))?;
 
-    let cant_base: i64 = if unidad_medida == "ML" {
+    validar_precision_cantidad(req.cantidad, &unidad_medida)?;
+
+    let um_upper = unidad_medida.to_uppercase();
+    let cant_base: i64 = if um_upper == "ML" {
         (req.cantidad * 1000.0).round() as i64
     } else {
         req.cantidad.round() as i64
@@ -59,7 +101,11 @@ pub fn registrar_insumo_ot(
         Some(c) if c >= 1 => c,
         _ => {
             if stock_actual > 0 && valor_stock_micro > 0 {
-                valor_stock_micro / stock_actual
+                if um_upper == "ML" {
+                    ((valor_stock_micro as f64 / stock_actual as f64) * 1000.0).round() as i64
+                } else {
+                    valor_stock_micro / stock_actual
+                }
             } else {
                 50000000
             }
@@ -67,8 +113,11 @@ pub fn registrar_insumo_ot(
     }
     .max(1);
 
-    let valor_consumido = costo_unitario * cant_base;
-    let id_op_det = Uuid::new_v4().to_string();
+    let valor_consumido: i64 = if um_upper == "ML" {
+        ((cant_base as f64 / 1000.0) * (costo_unitario as f64)).round() as i64
+    } else {
+        costo_unitario * cant_base
+    };
 
     let tx = conn
         .transaction()
@@ -80,7 +129,7 @@ pub fn registrar_insumo_ot(
             cantidad, precio_unitario_cent, costo_unitario_micro, valor_consumido_micro, id_usuario
         ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
         params![
-            id_op_det,
+            id_operacion_req,
             req.id_ot,
             req.id_producto,
             codigo,
@@ -100,7 +149,6 @@ pub fn registrar_insumo_ot(
     let nuevo_stock = stock_actual - cant_base;
     let nuevo_valor_stock = (valor_stock_micro - valor_consumido).max(0);
 
-    // 1. Primero se inserta el Kardex
     tx.execute(
         "INSERT INTO movimientos_inventario (
             id_operacion, id_producto, id_usuario, tipo_movimiento, id_consumo_ot, unidad_medida,
@@ -123,7 +171,6 @@ pub fn registrar_insumo_ot(
         ],
     )?;
 
-    // 2. Luego se actualiza la tabla productos (satisface trg_stock_directo_no_bypass)
     tx.execute(
         "UPDATE productos SET stock_actual = ?1, valor_stock_micro = ?2 WHERE id_producto = ?3",
         params![nuevo_stock, nuevo_valor_stock, req.id_producto],
@@ -141,6 +188,22 @@ pub fn devolver_insumo_ot(
     id_usuario: i64,
     rol: &str,
 ) -> Result<OrdenTrabajoHistorialDto, AppError> {
+    let id_operacion_req = req
+        .id_operacion
+        .filter(|s| !s.trim().is_empty())
+        .unwrap_or_else(|| Uuid::new_v4().to_string());
+
+    // PROTECCIÓN DE IDEMPOTENCIA: Verificar si la devolución ya fue aplicada previamente
+    let ya_devuelto: i32 = conn.query_row(
+        "SELECT COUNT(*) FROM movimientos_inventario WHERE id_operacion = ?1",
+        [&id_operacion_req],
+        |row| row.get(0),
+    )?;
+
+    if ya_devuelto > 0 {
+        return obtener_ot_por_id(conn, req.id_ot, id_usuario, rol);
+    }
+
     let motivo_clean = req.motivo.trim();
     if motivo_clean.len() < 5 || motivo_clean.len() > 250 {
         return Err(AppError::Validation(
@@ -163,7 +226,10 @@ pub fn devolver_insumo_ot(
         )
         .map_err(|_| AppError::NotFound("No se encontró el registro de consumo de producto.".to_string()))?;
 
-    let cant_dev_base: i64 = if unidad_medida == "ML" {
+    validar_precision_cantidad(req.cantidad_a_devolver, &unidad_medida)?;
+
+    let um_upper = unidad_medida.to_uppercase();
+    let cant_dev_base: i64 = if um_upper == "ML" {
         (req.cantidad_a_devolver * 1000.0).round() as i64
     } else {
         req.cantidad_a_devolver.round() as i64
@@ -189,7 +255,12 @@ pub fn devolver_insumo_ot(
         |row| Ok((row.get(0)?, row.get(1)?)),
     )?;
 
-    let valor_reposicion = costo_unitario * cant_dev_base;
+    let valor_reposicion: i64 = if um_upper == "ML" {
+        ((cant_dev_base as f64 / 1000.0) * (costo_unitario as f64)).round() as i64
+    } else {
+        costo_unitario * cant_dev_base
+    };
+
     let nuevo_stock = stock_actual + cant_dev_base;
     let nuevo_valor_stock = valor_stock_micro + valor_reposicion;
 
@@ -197,9 +268,6 @@ pub fn devolver_insumo_ot(
         .transaction()
         .map_err(|e| AppError::Validation(e.to_string()))?;
 
-    let id_op_kardex = Uuid::new_v4().to_string();
-
-    // 1. Insertar Kardex primero
     tx.execute(
         "INSERT INTO movimientos_inventario (
             id_operacion, id_producto, id_usuario, tipo_movimiento, id_consumo_ot, unidad_medida,
@@ -207,7 +275,7 @@ pub fn devolver_insumo_ot(
             valor_resultante_micro, costo_unitario_micro, motivo
         ) VALUES (?1, ?2, ?3, 'REPOSICION_OT', ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)",
         params![
-            id_op_kardex,
+            id_operacion_req,
             id_producto,
             id_usuario,
             req.id_detalle_producto,
@@ -223,7 +291,6 @@ pub fn devolver_insumo_ot(
         ],
     )?;
 
-    // 2. Actualizar productos después (cumple trg_stock_directo_no_bypass)
     tx.execute(
         "UPDATE productos SET stock_actual = ?1, valor_stock_micro = ?2 WHERE id_producto = ?3",
         params![nuevo_stock, nuevo_valor_stock, id_producto],

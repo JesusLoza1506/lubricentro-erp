@@ -22,7 +22,6 @@ export const ModalCrearOT: React.FC<ModalCrearOTProps> = ({
   onIrARegistrarVehiculo,
 }) => {
   const [listaVehiculosBD, setListaVehiculosBD] = useState<VehiculoCompletoDTO[]>([]);
-  const [_cargandoVehiculos, setCargandoVehiculos] = useState(false);
   const [busqueda, setBusqueda] = useState(
     vehiculoDirecto ? vehiculoDirecto.placa : placaInicial ? placaInicial.toUpperCase() : ''
   );
@@ -49,36 +48,37 @@ export const ModalCrearOT: React.FC<ModalCrearOTProps> = ({
   useEffect(() => {
     const init = async () => {
       try {
-        setCargandoVehiculos(true);
-        const [mecanicosList, serviciosList, vehiculosList] = await Promise.all([
+        const [mecanicosList, serviciosList] = await Promise.all([
           ordenesService.listarMecanicos(),
           ordenesService.listarServicios(),
-          vehiculoService.listarVehiculos(),
         ]);
         setMecanicos(mecanicosList);
         setServiciosDisponibles(serviciosList);
         if (serviciosList.length > 0) setIdServicioInicial(serviciosList[0].id_servicio);
 
-        let combinados = [...vehiculosList];
-        if (vehiculoDirecto && !combinados.some((v) => v.placa === vehiculoDirecto.placa)) {
-          combinados.unshift(vehiculoDirecto);
-        }
-        setListaVehiculosBD(combinados);
-
         if (vehiculoDirecto) {
           seleccionarVehiculoReal(vehiculoDirecto);
         } else if (placaInicial) {
-          const enc = combinados.find((v) => v.placa.toUpperCase() === placaInicial.toUpperCase());
-          if (enc) seleccionarVehiculoReal(enc);
+          const vehs = await vehiculoService.buscarVehiculosCandidatos(placaInicial);
+          if (vehs.length > 0) seleccionarVehiculoReal(vehs[0]);
         }
       } catch (err) {
         console.error('Error inicializando modal crear OT:', err);
-      } finally {
-        setCargandoVehiculos(false);
       }
     };
     init();
   }, [placaInicial, vehiculoDirecto]);
+
+  useEffect(() => {
+    if (busqueda.trim().length >= 2) {
+      vehiculoService
+        .buscarVehiculosCandidatos(busqueda)
+        .then(setListaVehiculosBD)
+        .catch(console.error);
+    } else {
+      setListaVehiculosBD([]);
+    }
+  }, [busqueda]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -107,13 +107,14 @@ export const ModalCrearOT: React.FC<ModalCrearOTProps> = ({
     }
 
     const kmNum = Number(kilometrajeIngreso);
+    // Validación estricta: Rechazar kilometraje cero o negativo
     if (isNaN(kmNum) || kmNum <= 0) {
-      setErrorMsg('El kilometraje de ingreso debe ser mayor a 0.');
+      setErrorMsg('El kilometraje de ingreso es obligatorio y debe ser estrictamente mayor a 0.');
       return;
     }
 
     if (!idServicioInicial) {
-      setErrorMsg('Debe seleccionar al menos un servicio inicial para aperturar la OT.');
+      setErrorMsg('Debe seleccionar obligatoriamente un servicio inicial.');
       return;
     }
 
@@ -141,12 +142,6 @@ export const ModalCrearOT: React.FC<ModalCrearOTProps> = ({
       setLoading(false);
     }
   };
-
-  const opcionesFiltradas = listaVehiculosBD.filter(
-    (v) =>
-      v.placa.toLowerCase().includes(busqueda.toLowerCase()) ||
-      (v.marca && v.marca.toLowerCase().includes(busqueda.toLowerCase()))
-  );
 
   return (
     <div
@@ -194,7 +189,6 @@ export const ModalCrearOT: React.FC<ModalCrearOTProps> = ({
         )}
 
         <form onSubmit={handleSubmit}>
-          {/* Búsqueda de Vehículo */}
           <div style={{ marginBottom: '16px', position: 'relative' }} ref={dropdownRef}>
             <label
               style={{ display: 'block', fontSize: '13px', color: '#94A3B8', marginBottom: '6px' }}
@@ -238,8 +232,8 @@ export const ModalCrearOT: React.FC<ModalCrearOTProps> = ({
                   zIndex: 1050,
                 }}
               >
-                {opcionesFiltradas.length > 0 ? (
-                  opcionesFiltradas.map((v) => (
+                {listaVehiculosBD.length > 0 ? (
+                  listaVehiculosBD.map((v) => (
                     <div
                       key={v.id_vehiculo}
                       onClick={() => seleccionarVehiculoReal(v)}
@@ -286,12 +280,11 @@ export const ModalCrearOT: React.FC<ModalCrearOTProps> = ({
             )}
           </div>
 
-          {/* Servicio Inicial Obligatorio */}
           <div style={{ marginBottom: '16px' }}>
             <label
               style={{ display: 'block', fontSize: '13px', color: '#94A3B8', marginBottom: '6px' }}
             >
-              Servicio Inicial *
+              Servicio Inicial Único * (Cantidad: 1)
             </label>
             <select
               value={idServicioInicial}
@@ -330,10 +323,11 @@ export const ModalCrearOT: React.FC<ModalCrearOTProps> = ({
                   marginBottom: '6px',
                 }}
               >
-                Km Ingreso *
+                Km Ingreso * (Mayor a 0)
               </label>
               <input
                 type="number"
+                min={1}
                 required
                 value={kilometrajeIngreso}
                 onChange={(e) => setKilometrajeIngreso(e.target.value)}
@@ -356,7 +350,7 @@ export const ModalCrearOT: React.FC<ModalCrearOTProps> = ({
                   marginBottom: '6px',
                 }}
               >
-                Mecánico (Opcional)
+                Mecánico Predeterminado
               </label>
               <select
                 value={idMecanico}
@@ -405,6 +399,7 @@ export const ModalCrearOT: React.FC<ModalCrearOTProps> = ({
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
             <button
               type="button"
+              disabled={loading}
               onClick={onClose}
               style={{
                 padding: '10px 16px',
@@ -427,7 +422,8 @@ export const ModalCrearOT: React.FC<ModalCrearOTProps> = ({
                 border: 'none',
                 borderRadius: '6px',
                 fontWeight: '600',
-                cursor: 'pointer',
+                cursor: loading ? 'not-allowed' : 'pointer',
+                opacity: loading ? 0.6 : 1,
               }}
             >
               {loading ? 'Recepcionando...' : 'Recepcionar OT'}

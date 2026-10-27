@@ -127,7 +127,7 @@ pub fn obtener_ficha_vehicular_completa(
     let total_paginas = ((total_registros as f64) / (limite_validado as f64)).ceil() as u32;
     let total_paginas_final = if total_paginas == 0 { 1 } else { total_paginas };
 
-    // Obtención del historial con paginación real en BD
+    // Obtención del historial con paginación real en BD sin bloqueos por ID de usuario
     let historial_raw = OrdenesService::obtener_historial_paginado_por_id_vehiculo(
         conn,
         vehiculo.id_vehiculo,
@@ -222,7 +222,7 @@ pub fn obtener_ficha_vehicular_completa(
         None
     };
 
-    // Consulta global e independiente del ÚLTIMO CAMBIO DE ACEITE por FECHA_FIN DESC, ID_OT DESC (Punto 3 de reevaluación)
+    // Consulta global e independiente del ÚLTIMO CAMBIO DE ACEITE por FECHA_FIN DESC, ID_OT DESC
     let ultimo_cambio_aceite = {
         let mut stmt = conn.prepare(
             "SELECT id_ot, codigo_ot, placa_snapshot FROM ordenes_trabajo 
@@ -281,7 +281,7 @@ pub fn obtener_ficha_vehicular_completa(
     })
 }
 
-/// Obtiene los próximos cambios de aceite con paginación y filtros dinámicos en SQL (Puntos 1 y 2 de reevaluación)
+/// Obtiene los próximos cambios de aceite con paginación y filtros dinámicos en SQL
 pub fn obtener_proximos_cambios_aceite_paginado(
     conn: &Connection,
     rol_ejecutor: Option<&str>,

@@ -6,6 +6,9 @@ export const styles: Record<string, CSSProperties> = {
     color: '#F8FAFC',
     minHeight: '100vh',
     backgroundColor: '#0F172A',
+    boxSizing: 'border-box',
+    overflowY: 'auto', // Scroll general de la página
+    maxHeight: '100vh',
   },
   header: {
     display: 'flex',
@@ -46,6 +49,8 @@ export const styles: Record<string, CSSProperties> = {
     borderRadius: '12px',
     padding: '20px',
     border: '1px solid #334155',
+    maxHeight: '650px',
+    overflowY: 'auto', // Scroll interno si las zanjas o contenidos crecen
   },
   tituloZanja: {
     fontSize: '18px',
@@ -69,6 +74,7 @@ export const styles: Record<string, CSSProperties> = {
     padding: '16px',
     border: '1px solid #334155',
     boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+    marginBottom: '12px', // Espaciado vertical entre tarjetas
   },
   badgeEstado: {
     padding: '4px 10px',
@@ -82,6 +88,7 @@ export const styles: Record<string, CSSProperties> = {
     borderRadius: '12px',
     padding: '20px',
     border: '1px solid #334155',
+    overflowX: 'auto', // Scroll horizontal para tablas anchas
   },
   tabla: {
     width: '100%',
