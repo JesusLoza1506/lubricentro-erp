@@ -6,8 +6,8 @@ import {
   CrearProductoDTO,
   EditarProductoDTO,
   ProductoForm,
-  DespacharProductoDTO,
   AjustarStockDTO,
+  ProductoAdminDTO,
 } from '../../types/inventario';
 import { inventarioService } from '../../services/inventarioService';
 import { InventarioHeader } from './components/InventarioHeader';
@@ -16,23 +16,26 @@ import { InventarioTabla } from './components/InventarioTabla';
 import { InventarioModal, ModoModal } from './components/InventarioModal';
 import { ModalDespacho } from './components/ModalDespacho';
 import { ModalAjusteStock } from './components/ModalAjusteStock';
+import { ModalRegistroCompra } from './components/ModalRegistroCompra';
 import { ConfirmModal } from '../../components/ConfirmModal';
 import { useAuth } from '../../context/AuthContext';
 
 const prodInicial: ProductoForm = {
-  id_categoria: 1,
+  codigo: '',
   nombre: '',
-  codigo_barras: '',
-  unidad_medida: 'UNIDAD',
-  stock_actual: 0,
+  descripcion: '',
+  categoria: 'ACEITE',
+  unidad_medida: 'UND',
   stock_minimo: 5,
-  precio_compra: 0,
-  precio_venta: 0,
+  precio_venta_soles: 0,
+  tiene_stock_inicial: false,
+  cantidad_inicial: 0,
+  costo_unitario_soles: 0,
+  referencia_inicial: '',
 };
 
 export const InventarioPage: React.FC = () => {
   const { usuario } = useAuth();
-  const idUsuarioActual = usuario?.id_usuario ?? 1;
   const esAdmin = usuario?.rol?.toUpperCase() === 'ADMINISTRADOR';
 
   const [productos, setProductos] = useState<Producto[]>([]);
@@ -46,6 +49,7 @@ export const InventarioPage: React.FC = () => {
   const [modalAbierto, setModalAbierto] = useState<boolean>(false);
   const [modoModal, setModoModal] = useState<ModoModal>('CREAR');
   const [prodForm, setProdForm] = useState<ProductoForm>(prodInicial);
+  const [modalCompraAbierto, setModalCompraAbierto] = useState<boolean>(false);
 
   const [modalDespacho, setModalDespacho] = useState<{
     abierto: boolean;
@@ -57,10 +61,18 @@ export const InventarioPage: React.FC = () => {
   const [modalAjuste, setModalAjuste] = useState<{
     abierto: boolean;
     producto: Producto | null;
-    tipo_movimiento: 'ENTRADA' | 'AJUSTE';
-    cantidad_nueva: number;
+    tipo_ajuste: 'ENTRADA' | 'SALIDA';
+    cantidad: number;
+    costo_unitario_soles: number;
     motivo: string;
-  }>({ abierto: false, producto: null, tipo_movimiento: 'AJUSTE', cantidad_nueva: 0, motivo: '' });
+  }>({
+    abierto: false,
+    producto: null,
+    tipo_ajuste: 'SALIDA',
+    cantidad: 1,
+    costo_unitario_soles: 0,
+    motivo: '',
+  });
 
   const [confirmModal, setConfirmModal] = useState<{
     abierto: boolean;
@@ -68,7 +80,6 @@ export const InventarioPage: React.FC = () => {
     nombre: string;
   }>({ abierto: false, id: null, nombre: '' });
 
-  // Notificaciones & Errores
   const [notificacion, setNotificacion] = useState<string | null>(null);
   const [errorModalMsg, setErrorModalMsg] = useState<string | null>(null);
 
@@ -82,9 +93,9 @@ export const InventarioPage: React.FC = () => {
     try {
       const [prodsData, catsData] = await Promise.all([
         filtroCritico
-          ? inventarioService.listarProductosCriticos(idUsuarioActual)
-          : inventarioService.listarProductos(idUsuarioActual),
-        inventarioService.listarCategorias(idUsuarioActual),
+          ? inventarioService.listarProductosCriticos()
+          : inventarioService.listarProductos(),
+        inventarioService.listarCategorias(),
       ]);
       setProductos(prodsData || []);
       setCategorias(catsData || []);
@@ -92,7 +103,7 @@ export const InventarioPage: React.FC = () => {
       const msg =
         typeof err === 'string'
           ? err
-          : (err as { message?: string })?.message || 'Error al cargar los datos del inventario';
+          : (err as { message?: string })?.message || 'Error al cargar inventario';
       setErrorModalMsg(msg);
     } finally {
       setCargando(false);
@@ -101,37 +112,50 @@ export const InventarioPage: React.FC = () => {
 
   useEffect(() => {
     cargarDatos();
-  }, [filtroCritico, idUsuarioActual]);
+  }, [filtroCritico]);
 
-  // Handlers para Productos
   const abrirModalCrear = () => {
     setModoModal('CREAR');
-    setProdForm({ ...prodInicial, id_categoria: categorias[0]?.id_categoria || 1 });
+    setProdForm(prodInicial);
     setModalAbierto(true);
   };
 
   const abrirModalVer = (p: Producto) => {
     setModoModal('VER');
-    const precioCompraSol = 'precio_compra' in p ? p.precio_compra / 100 : 0;
+    const pAdmin = p as ProductoAdminDTO;
+    const costoSol = pAdmin.ultimo_costo_micro ? pAdmin.ultimo_costo_micro / 1_000_000 : 0;
     setProdForm({
-      ...p,
       id_producto: p.id_producto,
-      id_categoria: p.id_categoria,
-      precio_compra: precioCompraSol,
-      precio_venta: p.precio_venta / 100,
+      codigo: p.codigo,
+      nombre: p.nombre,
+      descripcion: p.descripcion || '',
+      categoria: p.categoria,
+      unidad_medida: p.unidad_medida,
+      stock_minimo: p.stock_minimo,
+      precio_venta_soles: p.precio_venta_cent / 100,
+      tiene_stock_inicial: false,
+      cantidad_inicial: p.stock_actual,
+      costo_unitario_soles: costoSol,
+      referencia_inicial: '',
     });
     setModalAbierto(true);
   };
 
   const abrirModalEditar = (p: Producto) => {
     setModoModal('EDITAR');
-    const precioCompraSol = 'precio_compra' in p ? p.precio_compra / 100 : 0;
     setProdForm({
-      ...p,
       id_producto: p.id_producto,
-      id_categoria: p.id_categoria,
-      precio_compra: precioCompraSol,
-      precio_venta: p.precio_venta / 100,
+      codigo: p.codigo,
+      nombre: p.nombre,
+      descripcion: p.descripcion || '',
+      categoria: p.categoria,
+      unidad_medida: p.unidad_medida,
+      stock_minimo: p.stock_minimo,
+      precio_venta_soles: p.precio_venta_cent / 100,
+      tiene_stock_inicial: false,
+      cantidad_inicial: 0,
+      costo_unitario_soles: 0,
+      referencia_inicial: '',
     });
     setModalAbierto(true);
   };
@@ -139,36 +163,39 @@ export const InventarioPage: React.FC = () => {
   const handleGuardarProducto = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const precioCompraCentimos = Math.round(Number(prodForm.precio_compra || 0) * 100);
-      const precioVentaCentimos = Math.round(Number(prodForm.precio_venta || 0) * 100);
+      const precioVentaCentimos = Math.round(Number(prodForm.precio_venta_soles || 0) * 100);
 
       if (modoModal === 'CREAR') {
         const payloadCrear: CrearProductoDTO = {
-          id_categoria: Number(prodForm.id_categoria || 1),
+          codigo: prodForm.codigo.trim().toUpperCase(),
           nombre: prodForm.nombre.trim(),
-          codigo_barras: prodForm.codigo_barras?.trim() || null,
-          unidad_medida: prodForm.unidad_medida?.trim() || 'UNIDAD',
-          stock_actual: Number(prodForm.stock_actual || 0),
+          descripcion: prodForm.descripcion?.trim() || null,
+          categoria: prodForm.categoria,
+          unidad_medida: prodForm.categoria === 'GRANEL' ? 'ML' : 'UND',
           stock_minimo: Number(prodForm.stock_minimo || 0),
-          precio_compra: precioCompraCentimos,
-          precio_venta: precioVentaCentimos,
+          precio_venta_cent: precioVentaCentimos,
+          cantidad_inicial: prodForm.tiene_stock_inicial
+            ? Number(prodForm.cantidad_inicial || 0)
+            : null,
+          costo_unitario_inicial_micro: prodForm.tiene_stock_inicial
+            ? Math.round(Number(prodForm.costo_unitario_soles || 0) * 1_000_000)
+            : null,
+          referencia_inicial: prodForm.tiene_stock_inicial
+            ? prodForm.referencia_inicial.trim()
+            : null,
         };
-        await inventarioService.registrarProducto(payloadCrear, idUsuarioActual);
-        mostrarToast('Producto registrado con éxito');
+        await inventarioService.registrarProducto(payloadCrear);
+        mostrarToast('Producto registrado correctamente');
       } else if (modoModal === 'EDITAR') {
         const payloadEditar: EditarProductoDTO = {
           id_producto: Number(prodForm.id_producto),
-          id_categoria: Number(prodForm.id_categoria || 1),
           nombre: prodForm.nombre.trim(),
-          codigo_barras: prodForm.codigo_barras?.trim() || null,
-          unidad_medida: prodForm.unidad_medida?.trim() || 'UNIDAD',
-          stock_actual: Number(prodForm.stock_actual || 0),
+          descripcion: prodForm.descripcion?.trim() || null,
           stock_minimo: Number(prodForm.stock_minimo || 0),
-          precio_compra: precioCompraCentimos,
-          precio_venta: precioVentaCentimos,
+          precio_venta_cent: precioVentaCentimos,
         };
-        await inventarioService.actualizarProducto(payloadEditar, idUsuarioActual);
-        mostrarToast('Producto actualizado con éxito');
+        await inventarioService.actualizarProducto(payloadEditar);
+        mostrarToast('Producto actualizado correctamente');
       }
       setModalAbierto(false);
       cargarDatos();
@@ -181,18 +208,16 @@ export const InventarioPage: React.FC = () => {
     }
   };
 
-  // Handlers para Despacho
   const ejecutarDespacho = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!modalDespacho.producto || despachando) return;
     try {
       setDespachando(true);
-      const payload: DespacharProductoDTO = {
-        id_producto: modalDespacho.producto.id_producto,
-        cantidad: Number(modalDespacho.cantidad),
-        motivo: modalDespacho.motivo.trim() || undefined,
-      };
-      await inventarioService.despacharProductoGranel(payload, idUsuarioActual);
+      await inventarioService.despacharProductoGranel(
+        modalDespacho.producto.id_producto,
+        Number(modalDespacho.cantidad),
+        modalDespacho.motivo.trim() || undefined
+      );
       mostrarToast(`Despacho registrado para "${modalDespacho.producto.nombre}"`);
       setModalDespacho({ abierto: false, producto: null, cantidad: 1, motivo: '' });
       cargarDatos();
@@ -207,24 +232,28 @@ export const InventarioPage: React.FC = () => {
     }
   };
 
-  // Handlers para Ajuste de Stock
   const ejecutarAjuste = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!modalAjuste.producto) return;
     try {
       const payload: AjustarStockDTO = {
         id_producto: modalAjuste.producto.id_producto,
-        tipo_movimiento: modalAjuste.tipo_movimiento,
-        cantidad_nueva: Number(modalAjuste.cantidad_nueva),
+        tipo_ajuste: modalAjuste.tipo_ajuste,
+        cantidad: Number(modalAjuste.cantidad),
+        costo_unitario_micro:
+          modalAjuste.tipo_ajuste === 'ENTRADA'
+            ? Math.round(Number(modalAjuste.costo_unitario_soles) * 1_000_000)
+            : null,
         motivo: modalAjuste.motivo.trim(),
       };
-      await inventarioService.ajustarStock(payload, idUsuarioActual);
-      mostrarToast(`Ajuste de stock guardado para "${modalAjuste.producto.nombre}"`);
+      await inventarioService.ajustarStock(payload);
+      mostrarToast(`Ajuste registrado para "${modalAjuste.producto.nombre}"`);
       setModalAjuste({
         abierto: false,
         producto: null,
-        tipo_movimiento: 'AJUSTE',
-        cantidad_nueva: 0,
+        tipo_ajuste: 'SALIDA',
+        cantidad: 1,
+        costo_unitario_soles: 0,
         motivo: '',
       });
       cargarDatos();
@@ -232,25 +261,24 @@ export const InventarioPage: React.FC = () => {
       const msg =
         typeof err === 'string'
           ? err
-          : (err as { message?: string })?.message || 'Error al guardar el ajuste de stock';
+          : (err as { message?: string })?.message || 'Error al guardar el ajuste';
       setErrorModalMsg(msg);
     }
   };
 
-  // Handlers para Eliminación
   const ejecutarEliminacion = async () => {
     if (!confirmModal.id) return;
     try {
-      await inventarioService.eliminarProducto(confirmModal.id, idUsuarioActual);
+      await inventarioService.eliminarProducto(confirmModal.id);
       setConfirmModal({ abierto: false, id: null, nombre: '' });
-      mostrarToast(`Producto "${confirmModal.nombre}" eliminado correctamente`);
+      mostrarToast(`Producto "${confirmModal.nombre}" dado de baja correctamente`);
       cargarDatos();
     } catch (err: unknown) {
       setConfirmModal({ abierto: false, id: null, nombre: '' });
       const msg =
         typeof err === 'string'
           ? err
-          : (err as { message?: string })?.message || 'Error al eliminar el producto';
+          : (err as { message?: string })?.message || 'Error al dar de baja el producto';
       setErrorModalMsg(msg);
     }
   };
@@ -258,7 +286,7 @@ export const InventarioPage: React.FC = () => {
   const productosFiltrados = productos.filter(
     (p) =>
       p.nombre.toLowerCase().includes(busqueda.toLowerCase()) ||
-      (p.codigo_barras && p.codigo_barras.includes(busqueda))
+      p.codigo.toLowerCase().includes(busqueda.toLowerCase())
   );
 
   return (
@@ -275,7 +303,6 @@ export const InventarioPage: React.FC = () => {
         position: 'relative',
       }}
     >
-      {/* Toast Notificación */}
       {notificacion && (
         <div
           style={{
@@ -299,7 +326,6 @@ export const InventarioPage: React.FC = () => {
         </div>
       )}
 
-      {/* Modal Error */}
       {errorModalMsg && (
         <div
           style={{
@@ -361,8 +387,11 @@ export const InventarioPage: React.FC = () => {
         </div>
       )}
 
-      {/* Componentes Principales */}
-      <InventarioHeader esAdmin={esAdmin} onAbrirModalCrear={abrirModalCrear} />
+      <InventarioHeader
+        esAdmin={esAdmin}
+        onAbrirModalCrear={abrirModalCrear}
+        onAbrirModalCompra={() => setModalCompraAbierto(true)}
+      />
 
       <InventarioFiltros
         busqueda={busqueda}
@@ -384,8 +413,9 @@ export const InventarioPage: React.FC = () => {
           setModalAjuste({
             abierto: true,
             producto: p,
-            tipo_movimiento: 'AJUSTE',
-            cantidad_nueva: p.stock_actual,
+            tipo_ajuste: 'SALIDA',
+            cantidad: 1,
+            costo_unitario_soles: 0,
             motivo: '',
           })
         }
@@ -393,7 +423,6 @@ export const InventarioPage: React.FC = () => {
         onEliminar={(id, nombre) => setConfirmModal({ abierto: true, id, nombre })}
       />
 
-      {/* Modales Desacoplados */}
       <InventarioModal
         modalAbierto={modalAbierto}
         setModalAbierto={setModalAbierto}
@@ -421,28 +450,44 @@ export const InventarioPage: React.FC = () => {
       <ModalAjusteStock
         abierto={modalAjuste.abierto}
         producto={modalAjuste.producto}
-        tipoMovimiento={modalAjuste.tipo_movimiento}
-        setTipoMovimiento={(tipo) => setModalAjuste({ ...modalAjuste, tipo_movimiento: tipo })}
-        cantidadNueva={modalAjuste.cantidad_nueva}
-        setCantidadNueva={(cant) => setModalAjuste({ ...modalAjuste, cantidad_nueva: cant })}
+        tipoAjuste={modalAjuste.tipo_ajuste}
+        setTipoAjuste={(tipo) => setModalAjuste({ ...modalAjuste, tipo_ajuste: tipo })}
+        cantidad={modalAjuste.cantidad}
+        setCantidad={(cant) => setModalAjuste({ ...modalAjuste, cantidad: cant })}
+        costoUnitarioSoles={modalAjuste.costo_unitario_soles}
+        setCostoUnitarioSoles={(costo) =>
+          setModalAjuste({ ...modalAjuste, costo_unitario_soles: costo })
+        }
         motivo={modalAjuste.motivo}
         setMotivo={(mot) => setModalAjuste({ ...modalAjuste, motivo: mot })}
         onClose={() =>
           setModalAjuste({
             abierto: false,
             producto: null,
-            tipo_movimiento: 'AJUSTE',
-            cantidad_nueva: 0,
+            tipo_ajuste: 'SALIDA',
+            cantidad: 1,
+            costo_unitario_soles: 0,
             motivo: '',
           })
         }
         onSubmit={ejecutarAjuste}
       />
 
+      <ModalRegistroCompra
+        abierto={modalCompraAbierto}
+        productos={productos}
+        onClose={() => setModalCompraAbierto(false)}
+        onCompraExitosa={() => {
+          mostrarToast('Compra e ingreso de stock registrados con éxito');
+          cargarDatos();
+        }}
+        onError={(msg) => setErrorModalMsg(msg)}
+      />
+
       <ConfirmModal
         abierto={confirmModal.abierto}
-        titulo="Confirmar Eliminación"
-        mensaje={`¿Estás seguro de que deseas eliminar "${confirmModal.nombre}"? Esta acción removerá el producto del catálogo.`}
+        titulo="Dar de Baja Producto"
+        mensaje={`¿Estás seguro de que deseas dar de baja "${confirmModal.nombre}"? Esta acción desactivará el producto.`}
         onConfirmar={ejecutarEliminacion}
         onCancelar={() => setConfirmModal({ abierto: false, id: null, nombre: '' })}
       />

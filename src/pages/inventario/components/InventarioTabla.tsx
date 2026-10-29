@@ -50,8 +50,9 @@ export const InventarioTabla: React.FC<InventarioTablaProps> = ({
           <tr style={{ borderBottom: '1px solid #334155', color: '#94A3B8' }}>
             <th style={{ padding: '16px' }}>CÓDIGO</th>
             <th style={{ padding: '16px' }}>PRODUCTO</th>
+            <th style={{ padding: '16px' }}>CATEGORÍA</th>
             <th style={{ padding: '16px' }}>UNIDAD</th>
-            {esAdmin && <th style={{ padding: '16px' }}>P. COMPRA</th>}
+            {esAdmin && <th style={{ padding: '16px' }}>ÚLTIMO COSTO</th>}
             <th style={{ padding: '16px' }}>P. VENTA</th>
             <th style={{ padding: '16px' }}>STOCK</th>
             <th style={{ padding: '16px' }}>ESTADO</th>
@@ -62,7 +63,7 @@ export const InventarioTabla: React.FC<InventarioTablaProps> = ({
           {cargando ? (
             <tr>
               <td
-                colSpan={esAdmin ? 8 : 7}
+                colSpan={esAdmin ? 9 : 8}
                 style={{ padding: '32px', textAlign: 'center', color: '#94A3B8' }}
               >
                 Cargando productos...
@@ -71,7 +72,7 @@ export const InventarioTabla: React.FC<InventarioTablaProps> = ({
           ) : productos.length === 0 ? (
             <tr>
               <td
-                colSpan={esAdmin ? 8 : 7}
+                colSpan={esAdmin ? 9 : 8}
                 style={{ padding: '32px', textAlign: 'center', color: '#94A3B8' }}
               >
                 No se encontraron productos en el inventario.
@@ -80,29 +81,29 @@ export const InventarioTabla: React.FC<InventarioTablaProps> = ({
           ) : (
             productos.map((p) => {
               const esCritico = p.es_critico ?? p.stock_actual <= p.stock_minimo;
-              const precioCompraCentimos =
-                'precio_compra' in p ? (p as ProductoAdminDTO).precio_compra : null;
+              const pAdmin = p as ProductoAdminDTO;
+              const ultimoCostoSol =
+                esAdmin && pAdmin.ultimo_costo_micro
+                  ? (pAdmin.ultimo_costo_micro / 1_000_000).toFixed(2)
+                  : null;
 
               return (
                 <tr key={p.id_producto} style={{ borderBottom: '1px solid rgba(51, 65, 85, 0.4)' }}>
                   <td style={{ padding: '16px', color: '#38BDF8', fontFamily: 'monospace' }}>
-                    {p.codigo_barras || 'N/A'}
+                    {p.codigo}
                   </td>
                   <td style={{ padding: '16px', fontWeight: '600', color: '#F8FAFC' }}>
                     {p.nombre}
                   </td>
-                  <td style={{ padding: '16px', color: '#94A3B8' }}>
-                    {p.unidad_medida || 'UNIDAD'}
-                  </td>
+                  <td style={{ padding: '16px', color: '#94A3B8' }}>{p.categoria}</td>
+                  <td style={{ padding: '16px', color: '#94A3B8' }}>{p.unidad_medida}</td>
                   {esAdmin && (
                     <td style={{ padding: '16px', color: '#CBD5E1' }}>
-                      {precioCompraCentimos !== null
-                        ? `S/ ${(precioCompraCentimos / 100).toFixed(2)}`
-                        : 'N/A'}
+                      {ultimoCostoSol ? `S/ ${ultimoCostoSol}` : 'Sin costo'}
                     </td>
                   )}
                   <td style={{ padding: '16px', fontWeight: '700', color: '#34D399' }}>
-                    S/ {(p.precio_venta / 100).toFixed(2)}
+                    S/ {(p.precio_venta_cent / 100).toFixed(2)}
                   </td>
                   <td
                     style={{
@@ -111,11 +112,11 @@ export const InventarioTabla: React.FC<InventarioTablaProps> = ({
                       color: esCritico ? '#EF4444' : '#F8FAFC',
                     }}
                   >
-                    {p.stock_actual}
+                    {p.stock_actual} {p.unidad_medida}
                   </td>
                   <td style={{ padding: '16px' }}>
                     <span style={getBadgeStyles(esCritico)}>
-                      {esCritico ? 'STOCK CRÍTICO' : 'NORMAL'}
+                      {esCritico ? 'CRÍTICO' : 'NORMAL'}
                     </span>
                   </td>
                   <td style={{ padding: '16px', textAlign: 'center' }}>
@@ -124,17 +125,19 @@ export const InventarioTabla: React.FC<InventarioTablaProps> = ({
                         <Eye size={16} color="#38BDF8" />
                       </button>
 
-                      <button
-                        onClick={() => onDespachar(p)}
-                        title="Despachar / Usar en taller"
-                        style={{
-                          ...btnAccionStyle,
-                          backgroundColor: 'rgba(16, 185, 129, 0.15)',
-                          border: '1px solid rgba(16, 185, 129, 0.3)',
-                        }}
-                      >
-                        <PackageCheck size={16} color="#10B981" />
-                      </button>
+                      {p.categoria === 'GRANEL' && (
+                        <button
+                          onClick={() => onDespachar(p)}
+                          title="Despachar Granel (Taller)"
+                          style={{
+                            ...btnAccionStyle,
+                            backgroundColor: 'rgba(16, 185, 129, 0.15)',
+                            border: '1px solid rgba(16, 185, 129, 0.3)',
+                          }}
+                        >
+                          <PackageCheck size={16} color="#10B981" />
+                        </button>
+                      )}
 
                       {esAdmin && (
                         <>
@@ -158,7 +161,7 @@ export const InventarioTabla: React.FC<InventarioTablaProps> = ({
                           </button>
                           <button
                             onClick={() => onEliminar(p.id_producto, p.nombre)}
-                            title="Eliminar Producto"
+                            title="Dar de Baja Producto"
                             style={{
                               ...btnAccionStyle,
                               backgroundColor: 'rgba(239, 68, 68, 0.15)',

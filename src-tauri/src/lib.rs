@@ -72,7 +72,7 @@ pub fn run() {
             obtener_ficha_vehicular_completa_cmd,
             obtener_proximos_cambios_aceite_cmd,
             buscar_vehiculos_candidatos_cmd,
-            // Inventario
+            // Inventario & Stock V7.0 (Módulo 05)
             listar_productos_cmd,
             listar_productos_publicos_cmd,
             listar_productos_criticos_cmd,
@@ -82,6 +82,9 @@ pub fn run() {
             despachar_producto_granel_cmd,
             ajustar_stock_cmd,
             listar_categorias_cmd,
+            registrar_ingreso_compra_cmd,
+            listar_proveedores_cmd,
+            crear_proveedor_cmd,
             // Órdenes de Trabajo V7.0
             obtener_ot_por_id_cmd,
             obtener_tablero_zanjas_cmd,
@@ -97,7 +100,7 @@ pub fn run() {
             agregar_servicio_ot_cmd,
             modificar_servicio_ot_cmd,
             eliminar_servicio_ot_cmd,
-            modificar_nota_interna_ot_cmd, // <--- REGISTRADO
+            modificar_nota_interna_ot_cmd,
             obtener_historial_por_placa_cmd,
             listar_mecanicos_cmd,
             listar_servicios_cmd,

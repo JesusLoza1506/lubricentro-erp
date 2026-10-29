@@ -1,7 +1,8 @@
+use crate::dto::ingreso_dto::RegistrarIngresoDto;
 use crate::dto::producto_dto::{
-    ActualizarProductoDto, AjustarStockDto, CrearProductoDto, DespacharProductoDto,
-    ProductoAdminDto, ProductoPublicoDto,
+    ActualizarProductoDto, AjustarStockDto, CrearProductoDto, ProductoAdminDto, ProductoPublicoDto,
 };
+use crate::dto::proveedor_dto::{CrearProveedorDto, ProveedorDto};
 use crate::entities::categoria::CategoriaEntity;
 use crate::errors::AppError;
 use crate::services::inventario_service::InventarioService;
@@ -21,7 +22,7 @@ fn verificar_permiso_sesion(
 
     if !roles_permitidos.contains(&rol.as_str()) {
         return Err(AppError::Validation(format!(
-            "Acceso denegado: El rol '{}' no tiene permisos para realizar esta operación.",
+            "Acceso denegado: El rol '{}' no tiene permisos para esta operación.",
             rol
         )));
     }
@@ -43,11 +44,10 @@ pub fn listar_productos_cmd(
 ) -> Result<ListarProductosResponse, AppError> {
     let mut session = session_state
         .lock()
-        .map_err(|_| AppError::Validation("Fallo al obtener estado de sesión".to_string()))?;
-
-    let conn = db_state.lock().map_err(|_| {
-        AppError::Validation("Fallo al obtener estado de la base de datos".to_string())
-    })?;
+        .map_err(|_| AppError::Validation("Error de sesión".into()))?;
+    let conn = db_state
+        .lock()
+        .map_err(|_| AppError::Validation("Error de BD".into()))?;
 
     let (_, rol) = verificar_permiso_sesion(
         &mut session,
@@ -56,11 +56,13 @@ pub fn listar_productos_cmd(
     )?;
 
     if rol == "ADMINISTRADOR" {
-        let prods = InventarioService::listar_productos_admin(&conn)?;
-        Ok(ListarProductosResponse::Admin(prods))
+        Ok(ListarProductosResponse::Admin(
+            InventarioService::listar_productos_admin(&conn)?,
+        ))
     } else {
-        let prods = InventarioService::listar_productos_publicos(&conn)?;
-        Ok(ListarProductosResponse::Publico(prods))
+        Ok(ListarProductosResponse::Publico(
+            InventarioService::listar_productos_publicos(&conn)?,
+        ))
     }
 }
 
@@ -71,11 +73,10 @@ pub fn listar_productos_publicos_cmd(
 ) -> Result<Vec<ProductoPublicoDto>, AppError> {
     let mut session = session_state
         .lock()
-        .map_err(|_| AppError::Validation("Fallo al obtener estado de sesión".to_string()))?;
-
-    let conn = db_state.lock().map_err(|_| {
-        AppError::Validation("Fallo al obtener estado de la base de datos".to_string())
-    })?;
+        .map_err(|_| AppError::Validation("Error de sesión".into()))?;
+    let conn = db_state
+        .lock()
+        .map_err(|_| AppError::Validation("Error de BD".into()))?;
 
     verificar_permiso_sesion(
         &mut session,
@@ -93,11 +94,10 @@ pub fn listar_productos_criticos_cmd(
 ) -> Result<ListarProductosResponse, AppError> {
     let mut session = session_state
         .lock()
-        .map_err(|_| AppError::Validation("Fallo al obtener estado de sesión".to_string()))?;
-
-    let conn = db_state.lock().map_err(|_| {
-        AppError::Validation("Fallo al obtener estado de la base de datos".to_string())
-    })?;
+        .map_err(|_| AppError::Validation("Error de sesión".into()))?;
+    let conn = db_state
+        .lock()
+        .map_err(|_| AppError::Validation("Error de BD".into()))?;
 
     let (_, rol) = verificar_permiso_sesion(
         &mut session,
@@ -106,11 +106,13 @@ pub fn listar_productos_criticos_cmd(
     )?;
 
     if rol == "ADMINISTRADOR" {
-        let prods = InventarioService::listar_productos_criticos_admin(&conn)?;
-        Ok(ListarProductosResponse::Admin(prods))
+        Ok(ListarProductosResponse::Admin(
+            InventarioService::listar_productos_criticos_admin(&conn)?,
+        ))
     } else {
-        let prods = InventarioService::listar_productos_criticos_publicos(&conn)?;
-        Ok(ListarProductosResponse::Publico(prods))
+        Ok(ListarProductosResponse::Publico(
+            InventarioService::listar_productos_criticos_publicos(&conn)?,
+        ))
     }
 }
 
@@ -122,15 +124,14 @@ pub fn registrar_producto_cmd(
 ) -> Result<i64, AppError> {
     let mut session = session_state
         .lock()
-        .map_err(|_| AppError::Validation("Fallo al obtener estado de sesión".to_string()))?;
-
-    let conn = db_state.lock().map_err(|_| {
-        AppError::Validation("Fallo al obtener estado de la base de datos".to_string())
-    })?;
+        .map_err(|_| AppError::Validation("Error de sesión".into()))?;
+    let mut conn = db_state
+        .lock()
+        .map_err(|_| AppError::Validation("Error de BD".into()))?;
 
     let (id_u, _) = verificar_permiso_sesion(&mut session, &conn, &["ADMINISTRADOR"])?;
 
-    InventarioService::registrar_producto(&conn, payload, id_u)
+    InventarioService::registrar_producto(&mut conn, payload, id_u)
 }
 
 #[tauri::command]
@@ -141,11 +142,10 @@ pub fn actualizar_producto_cmd(
 ) -> Result<(), AppError> {
     let mut session = session_state
         .lock()
-        .map_err(|_| AppError::Validation("Fallo al obtener estado de sesión".to_string()))?;
-
-    let conn = db_state.lock().map_err(|_| {
-        AppError::Validation("Fallo al obtener estado de la base de datos".to_string())
-    })?;
+        .map_err(|_| AppError::Validation("Error de sesión".into()))?;
+    let conn = db_state
+        .lock()
+        .map_err(|_| AppError::Validation("Error de BD".into()))?;
 
     verificar_permiso_sesion(&mut session, &conn, &["ADMINISTRADOR"])?;
 
@@ -160,11 +160,10 @@ pub fn eliminar_producto_cmd(
 ) -> Result<(), AppError> {
     let mut session = session_state
         .lock()
-        .map_err(|_| AppError::Validation("Fallo al obtener estado de sesión".to_string()))?;
-
-    let conn = db_state.lock().map_err(|_| {
-        AppError::Validation("Fallo al obtener estado de la base de datos".to_string())
-    })?;
+        .map_err(|_| AppError::Validation("Error de sesión".into()))?;
+    let conn = db_state
+        .lock()
+        .map_err(|_| AppError::Validation("Error de BD".into()))?;
 
     verificar_permiso_sesion(&mut session, &conn, &["ADMINISTRADOR"])?;
 
@@ -175,15 +174,16 @@ pub fn eliminar_producto_cmd(
 pub fn despachar_producto_granel_cmd(
     db_state: State<'_, Mutex<Connection>>,
     session_state: State<'_, Mutex<SessionState>>,
-    payload: DespacharProductoDto,
+    id_producto: i64,
+    cantidad: i64,
+    motivo: Option<String>,
 ) -> Result<(), AppError> {
     let mut session = session_state
         .lock()
-        .map_err(|_| AppError::Validation("Fallo al obtener estado de sesión".to_string()))?;
-
-    let conn = db_state.lock().map_err(|_| {
-        AppError::Validation("Fallo al obtener estado de la base de datos".to_string())
-    })?;
+        .map_err(|_| AppError::Validation("Error de sesión".into()))?;
+    let mut conn = db_state
+        .lock()
+        .map_err(|_| AppError::Validation("Error de BD".into()))?;
 
     let (id_u, _) = verificar_permiso_sesion(
         &mut session,
@@ -191,7 +191,33 @@ pub fn despachar_producto_granel_cmd(
         &["ADMINISTRADOR", "CAJERO", "MECANICO"],
     )?;
 
-    InventarioService::despachar_producto_granel(&conn, payload, id_u)
+    let payload = AjustarStockDto {
+        id_producto,
+        tipo_ajuste: "SALIDA".to_string(),
+        cantidad,
+        costo_unitario_micro: None,
+        motivo: motivo.unwrap_or_else(|| "Despacho a Granel".to_string()),
+    };
+
+    InventarioService::ajustar_stock(&mut conn, payload, id_u)
+}
+
+#[tauri::command]
+pub fn registrar_ingreso_compra_cmd(
+    db_state: State<'_, Mutex<Connection>>,
+    session_state: State<'_, Mutex<SessionState>>,
+    payload: RegistrarIngresoDto,
+) -> Result<i64, AppError> {
+    let mut session = session_state
+        .lock()
+        .map_err(|_| AppError::Validation("Error de sesión".into()))?;
+    let mut conn = db_state
+        .lock()
+        .map_err(|_| AppError::Validation("Error de BD".into()))?;
+
+    let (id_u, _) = verificar_permiso_sesion(&mut session, &conn, &["ADMINISTRADOR"])?;
+
+    InventarioService::registrar_ingreso_compra(&mut conn, payload, id_u)
 }
 
 #[tauri::command]
@@ -202,15 +228,14 @@ pub fn ajustar_stock_cmd(
 ) -> Result<(), AppError> {
     let mut session = session_state
         .lock()
-        .map_err(|_| AppError::Validation("Fallo al obtener estado de sesión".to_string()))?;
-
-    let conn = db_state.lock().map_err(|_| {
-        AppError::Validation("Fallo al obtener estado de la base de datos".to_string())
-    })?;
+        .map_err(|_| AppError::Validation("Error de sesión".into()))?;
+    let mut conn = db_state
+        .lock()
+        .map_err(|_| AppError::Validation("Error de BD".into()))?;
 
     let (id_u, _) = verificar_permiso_sesion(&mut session, &conn, &["ADMINISTRADOR"])?;
 
-    InventarioService::ajustar_stock(&conn, payload, id_u)
+    InventarioService::ajustar_stock(&mut conn, payload, id_u)
 }
 
 #[tauri::command]
@@ -220,11 +245,10 @@ pub fn listar_categorias_cmd(
 ) -> Result<Vec<CategoriaEntity>, AppError> {
     let mut session = session_state
         .lock()
-        .map_err(|_| AppError::Validation("Fallo al obtener estado de sesión".to_string()))?;
-
-    let conn = db_state.lock().map_err(|_| {
-        AppError::Validation("Fallo al obtener estado de la base de datos".to_string())
-    })?;
+        .map_err(|_| AppError::Validation("Error de sesión".into()))?;
+    let conn = db_state
+        .lock()
+        .map_err(|_| AppError::Validation("Error de BD".into()))?;
 
     verificar_permiso_sesion(
         &mut session,
@@ -233,4 +257,39 @@ pub fn listar_categorias_cmd(
     )?;
 
     InventarioService::listar_categorias(&conn)
+}
+
+#[tauri::command]
+pub fn listar_proveedores_cmd(
+    db_state: State<'_, Mutex<Connection>>,
+    session_state: State<'_, Mutex<SessionState>>,
+) -> Result<Vec<ProveedorDto>, AppError> {
+    let mut session = session_state
+        .lock()
+        .map_err(|_| AppError::Validation("Error de sesión".into()))?;
+    let conn = db_state
+        .lock()
+        .map_err(|_| AppError::Validation("Error de BD".into()))?;
+
+    verificar_permiso_sesion(&mut session, &conn, &["ADMINISTRADOR"])?;
+
+    InventarioService::listar_proveedores(&conn)
+}
+
+#[tauri::command]
+pub fn crear_proveedor_cmd(
+    db_state: State<'_, Mutex<Connection>>,
+    session_state: State<'_, Mutex<SessionState>>,
+    payload: CrearProveedorDto,
+) -> Result<i64, AppError> {
+    let mut session = session_state
+        .lock()
+        .map_err(|_| AppError::Validation("Error de sesión".into()))?;
+    let conn = db_state
+        .lock()
+        .map_err(|_| AppError::Validation("Error de BD".into()))?;
+
+    verificar_permiso_sesion(&mut session, &conn, &["ADMINISTRADOR"])?;
+
+    InventarioService::crear_proveedor(&conn, payload)
 }

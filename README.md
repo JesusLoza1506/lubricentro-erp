@@ -43,20 +43,20 @@
 
 ## 2. Estado del proyecto
 
-Desarrollo secuencial, módulo por módulo, conforme al alcance funcional v7. La última revisión sitúa **Login y Sesión en 95/100**, **Ficha Vehicular e Historial en 93/100** y **Órdenes de Trabajo Taller en 92/100**. El ciclo principal del taller está implementado y continúa en ajustes de cierre y validación. **El siguiente módulo de la secuencia es Inventario y Stock.** Inicio Dashboard se desarrollará al final para integrar datos de los demás módulos.
+Desarrollo secuencial, módulo por módulo, conforme al alcance funcional v7. La última revisión sitúa **Login y Sesión en 95/100**, **Ficha Vehicular e Historial en 93/100** y **Órdenes de Trabajo Taller en 92/100**. Los tres módulos se encuentran en **ajustes finales**, con pendientes de cierre y validación. **La implementación continúa con Inventario y Stock**, cuya evaluación actual es **40/100**; se revisará y mejorará de forma progresiva con el objetivo de alcanzar una calificación de **90/100 o superior**. Inicio Dashboard se desarrollará al final para integrar datos de los demás módulos.
 
-| Orden | Módulo                                                             | Estado                                 | Evaluación |
-| ----- | ------------------------------------------------------------------ | -------------------------------------- | ---------- |
-| 01    | [Login y Sesión](#modulo-login-y-sesion)                           | 🟢 Ajustes finales                     | 95/100     |
-| 02    | [Ficha Vehicular e Historial](#modulo-ficha-vehicular-e-historial) | 🟢 Ajustes finales                     | 93/100     |
-| 03    | [Órdenes de Trabajo Taller](#modulo-ordenes-de-trabajo-taller)     | 🟡 En curso · ajustes de cierre        | 92/100     |
-| 04    | Inventario y Stock                                                 | ⚪ Pendiente de revisión y adaptación  | —          |
-| 05    | Punto de Venta POS                                                 | ⚪ Pendiente                           | —          |
-| 06    | Caja Chica                                                         | ⚪ Pendiente                           | —          |
-| 07    | Backup y Copias                                                    | ⚪ Pendiente                           | —          |
-| 08    | Administración                                                     | ⚪ Pendiente                           | —          |
-| 09    | Reportes                                                           | ⚪ Pendiente                           | —          |
-| 10    | Inicio Dashboard                                                   | ⚪ Pendiente; se desarrollará al final | —          |
+| Orden | Módulo | Estado | Evaluación |
+| --- | --- | --- | --- |
+| 01 | [Login y Sesión](#modulo-login-y-sesion) | 🟢 Ajustes finales | 95/100 |
+| 02 | [Ficha Vehicular e Historial](#modulo-ficha-vehicular-e-historial) | 🟢 Ajustes finales | 93/100 |
+| 03 | [Órdenes de Trabajo Taller](#modulo-ordenes-de-trabajo-taller) | 🟢 Ajustes finales | 92/100 |
+| 04 | Inventario y Stock | 🟡 En curso · implementación y mejoras | 40/100 |
+| 05 | Punto de Venta POS | ⚪ Pendiente | — |
+| 06 | Caja Chica | ⚪ Pendiente | — |
+| 07 | Backup y Copias | ⚪ Pendiente | — |
+| 08 | Administración | ⚪ Pendiente | — |
+| 09 | Reportes | ⚪ Pendiente | — |
+| 10 | Inicio Dashboard | ⚪ Pendiente; se desarrollará al final | — |
 
 **Leyenda:** ⚪ Pendiente · 🟡 En curso · 🟢 Ajustes finales · ✅ Completado.
 
@@ -196,7 +196,7 @@ _Próximos cambios de aceite_
 <a id="modulo-ordenes-de-trabajo-taller"></a>
 
 <details>
-<summary><b>03 · Órdenes de Trabajo Taller</b> — 🟡 En curso · Evaluación: 92/100</summary>
+<summary><b>03 · Órdenes de Trabajo Taller</b> — 🟢 Ajustes finales · Evaluación: 92/100</summary>
 
 **Qué hace:** organiza la atención del vehículo desde la recepción hasta la finalización o cancelación. Reúne servicios, responsable, zanja, materiales y resultado del trabajo, vinculados con Ficha Vehicular e Inventario.
 
@@ -229,11 +229,11 @@ _Próximos cambios de aceite_
 
 **Acceso por rol:**
 
-| Rol           | Alcance                                                                                                                                                                                   |
-| ------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Administrador | Recepción y gestión del taller; asignación y reasignación, notas, servicios, consumos, devolución de materiales y cancelación con motivo.                                                 |
-| Mecánico      | Consulta de propias y libres; inicio de las permitidas y ejecución de sus órdenes. Gestiona servicios y nota interna en las condiciones autorizadas, sin costos internos ni notas ajenas. |
-| Cajero        | Recepción y consulta pública autorizada, sin notas internas ni costos ni operaciones de ejecución reservadas.                                                                             |
+| Rol | Alcance |
+| --- | --- |
+| Administrador | Recepción y gestión del taller; asignación y reasignación, notas, servicios, consumos, devolución de materiales y cancelación con motivo. |
+| Mecánico | Consulta de propias y libres; inicio de las permitidas y ejecución de sus órdenes. Gestiona servicios y nota interna en las condiciones autorizadas, sin costos internos ni notas ajenas. |
+| Cajero | Recepción y consulta pública autorizada, sin notas internas ni costos ni operaciones de ejecución reservadas. |
 
 **Capturas:**
 
@@ -266,28 +266,29 @@ _Aviso de resultado de una operación_
 - Incorporar pruebas permanentes de reintentos, auditoría y reversión ante fallos.
 - Completar los recorridos en escritorio y las cinco mediciones con **2.000 OT**.
 
-**Estado:** **92/100 en la última revisión**. El ciclo principal del taller está implementado; el cierre se concentra en completar la protección de reintentos desde la interfaz, la auditoría restante, los ajustes de recepción y la evidencia de validación.
+**Estado:** 🟢 **Ajustes finales · Evaluación: 92/100**. El ciclo principal del taller está implementado; el cierre se concentra en completar la protección de reintentos desde la interfaz, la auditoría restante, los ajustes de recepción y la evidencia de validación.
 
 </details>
 
-**Trabajo actual:** completar los ajustes de cierre de Taller (**92/100**) y mantener el seguimiento de los pendientes de Login y Ficha Vehicular. **Siguiente módulo de la secuencia:** Inventario y Stock, con revisión de catálogos, entradas, consumos y ajustes.
+**Trabajo actual:** implementar y mejorar **Inventario y Stock (40/100)**, con revisión de catálogos, entradas, consumos y ajustes, manteniendo la consistencia con Taller. El objetivo es alcanzar una evaluación de **90/100 o superior**. Login, Ficha Vehicular y Taller permanecen en ajustes finales, con seguimiento de sus pendientes de cierre.
+
 
 <a id="roles"></a>
 
 ## 4. Roles y permisos
 
-| Módulo                      | Administrador                                                          | Mecánico                                                                    | Cajero                                                      |
-| --------------------------- | ---------------------------------------------------------------------- | --------------------------------------------------------------------------- | ----------------------------------------------------------- |
-| Login y Sesión              | Cuenta propia y gestión autorizada.                                    | Cuenta propia.                                                              | Cuenta propia.                                              |
-| Ficha Vehicular e Historial | Gestión y correcciones autorizadas.                                    | Consulta de información pública de atención.                                | Registro, edición de datos comunes y consulta.              |
-| Órdenes de Trabajo Taller   | Gestión del taller, reasignación, devolución y cancelación con motivo. | Inicio de OT permitidas y ejecución de propias; sin notas ajenas ni costos. | Recepción y consulta pública; sin notas internas ni costos. |
-| Inventario y Stock          | Catálogos, entradas, costos, kardex y ajustes.                         | Consulta de activos, stock y precios.                                       | Consulta de activos, stock y precios.                       |
-| Punto de Venta POS          | Operaciones con caja propia y gestión documental.                      | Sin acceso.                                                                 | Ventas propias; excepciones con autorización.               |
-| Caja Chica                  | Turno propio; consulta y cierre administrativo autorizado.             | Sin acceso.                                                                 | Turnos propios.                                             |
-| Backup y Copias             | Configuración, copias y recuperación.                                  | Sin acceso.                                                                 | Sin acceso.                                                 |
-| Administración              | Usuarios, empresa, facturación y taller.                               | Sin acceso.                                                                 | Sin acceso.                                                 |
-| Reportes                    | Consulta y exportación.                                                | Sin acceso.                                                                 | Sin acceso.                                                 |
-| Inicio Dashboard            | Resumen del negocio.                                                   | Resumen de trabajos propios y disponibles.                                  | Resumen de caja y OT por cobrar.                            |
+| Módulo                      | Administrador                                              | Mecánico                                                    | Cajero                                         |
+| --------------------------- | ---------------------------------------------------------- | ----------------------------------------------------------- | ---------------------------------------------- |
+| Login y Sesión              | Cuenta propia y gestión autorizada.                        | Cuenta propia.                                              | Cuenta propia.                                 |
+| Ficha Vehicular e Historial | Gestión y correcciones autorizadas.                        | Consulta de información pública de atención.                | Registro, edición de datos comunes y consulta. |
+| Órdenes de Trabajo Taller | Gestión del taller, reasignación, devolución y cancelación con motivo. | Inicio de OT permitidas y ejecución de propias; sin notas ajenas ni costos. | Recepción y consulta pública; sin notas internas ni costos. |
+| Inventario y Stock          | Catálogos, entradas, costos, kardex y ajustes.             | Consulta de activos, stock y precios.                       | Consulta de activos, stock y precios.          |
+| Punto de Venta POS          | Operaciones con caja propia y gestión documental.          | Sin acceso.                                                 | Ventas propias; excepciones con autorización.  |
+| Caja Chica                  | Turno propio; consulta y cierre administrativo autorizado. | Sin acceso.                                                 | Turnos propios.                                |
+| Backup y Copias             | Configuración, copias y recuperación.                      | Sin acceso.                                                 | Sin acceso.                                    |
+| Administración              | Usuarios, empresa, facturación y taller.                   | Sin acceso.                                                 | Sin acceso.                                    |
+| Reportes                    | Consulta y exportación.                                    | Sin acceso.                                                 | Sin acceso.                                    |
+| Inicio Dashboard            | Resumen del negocio.                                       | Resumen de trabajos propios y disponibles.                  | Resumen de caja y OT por cobrar.               |
 
 Las autorizaciones se validan en Rust. Los costos y las notas internas se restringen por rol; ocultar botones no sustituye el control del backend.
 
@@ -298,7 +299,7 @@ Las autorizaciones se validan en Rust. Los costos y las notas internas se restri
 | Paso                     | Acción                                                              | Resultado esperado                                                     |
 | ------------------------ | ------------------------------------------------------------------- | ---------------------------------------------------------------------- |
 | **1. Identificar**       | Buscar la placa y verificar cliente y kilometraje.                  | Ficha seleccionada o registro de un vehículo nuevo.                    |
-| **2. Recibir**           | Crear una OT con servicio inicial y mecánico opcional.              | Orden en espera, sin reserva ni descuento de stock.                    |
+| **2. Recibir**           | Crear una OT con servicio inicial y mecánico opcional.                     | Orden en espera, sin reserva ni descuento de stock.                    |
 | **3. Ejecutar**          | Iniciar trabajo en una zanja libre y registrar consumos reales.     | Materiales descontados una vez y trabajo asignado.                     |
 | **4. Finalizar**         | Confirmar kilometraje, resumen y tipo de aceite cuando corresponda. | OT finalizada, historial actualizado y zanja libre.                    |
 | **5. Cobrar**            | Recuperar la OT desde POS y confirmar el pago.                      | Venta y cobro registrados sin repetir la salida de insumos del taller. |
@@ -417,7 +418,7 @@ La revisión reportada registró **30 pruebas de autenticación**, **16 de vehí
 
 Por separado, la validación del frontend realizada al incorporar los avisos de Taller aprobó **46 pruebas**, incluidas **19 nuevas** para mensajes, errores, datos conservados, fallos de recarga y cierre automático; también pasaron la comprobación de tipos y la compilación Vite. Esta validación usó servicios simulados y no acredita el funcionamiento completo en Windows/Tauri ni contra la BD real.
 
-**Evaluación de implementación y alineación con los PDF:** Login **95/100**, Ficha Vehicular **93/100** y Taller **92/100**. Quedan pendientes los recorridos de escritorio y las mediciones indicadas en cada módulo; para Taller se requieren cinco mediciones con **2.000 OT**.
+**Evaluación de implementación y alineación con los PDF:** Login **95/100**, Ficha Vehicular **93/100** Taller **92/100** e Inventario y Stock **40/100**. Quedan pendientes los recorridos de escritorio y las mediciones indicadas en cada módulo; para Taller se requieren cinco mediciones con **2.000 OT**.
 
 **Esquema verificado en SQLite:** 27 casos satisfactorios sobre creación, restricciones, relaciones y flujos seleccionados, correspondientes al esquema revisado. Esta evidencia se distingue de las pruebas de los módulos y no acredita la integración completa con NubeFact. Las revisiones de Login disponibles se enlazan en Documentación.
 
@@ -444,7 +445,7 @@ La implementación seguirá este orden:
 1. **Login y Sesión (evaluación: 95/100):** cerrar el manejo de errores iniciales, el aviso de cambios pendientes y las evidencias de escritorio.
 2. **Ficha Vehicular e Historial (evaluación: 93/100):** afinar estados y errores de consulta; consolidar pruebas y mediciones.
 3. **Órdenes de Trabajo Taller (evaluación: 92/100):** cerrar reintentos con el mismo identificador, auditoría pendiente, ajustes de recepción y validaciones de escritorio y rendimiento.
-4. **Inventario y Stock — siguiente módulo:** revisar catálogos, entradas, consumos y ajustes, manteniendo la consistencia con Taller.
+4. **Inventario y Stock — en curso (evaluación: 40/100):** continuar su implementación y mejorar catálogos, entradas, consumos y ajustes, manteniendo la consistencia con Taller y buscando una evaluación de **90/100 o superior**.
 5. **Punto de Venta POS:** completar ventas, cobros y gestión de comprobantes.
 6. **Caja Chica:** completar aperturas, movimientos y cierres.
 7. **Backup y Copias:** completar copias de seguridad y recuperación.

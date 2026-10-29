@@ -1,44 +1,48 @@
-export type UnidadMedida = 'ML' | 'UNIDAD' | 'LITRO' | 'GALON' | 'BARRIL';
+export type CategoriaEnum = 'ACEITE' | 'FILTRO' | 'ADITIVO' | 'GRANEL' | 'OTRO';
+export type UnidadMedida = 'UND' | 'ML';
 
-// DTO Público (CAJERO / MECANICO) - Evita fugas de datos de costo
+// DTO Público (CAJERO / MECANICO) - Oculta costo y valoración de stock
 export interface ProductoPublicoDTO {
   id_producto: number;
-  id_categoria: number;
-  nombre_categoria?: string;
-  categoria?: string;
+  codigo: string;
   nombre: string;
-  codigo_barras: string | null;
-  codigo?: string;
-  unidad_medida: string | null;
+  descripcion?: string | null;
+  categoria: CategoriaEnum;
+  unidad_medida: UnidadMedida;
   stock_actual: number;
   stock_minimo: number;
-  precio_venta: number; // En céntimos desde el backend
-  precio_venta_soles?: number; // Calculado en frontend
-  es_critico: boolean;
+  precio_venta_cent: number; // En céntimos
+  activo: number;
+  es_critico?: boolean;
 }
 
-// DTO Interno (ADMINISTRADOR) - Incluye precio_compra y margen
+// DTO Interno (ADMINISTRADOR) - Incluye valoración y costos
 export interface ProductoAdminDTO extends ProductoPublicoDTO {
-  precio_compra: number; // En céntimos
-  margen: number; // En céntimos
+  valor_stock_micro: number; // En microsoles
+  ultimo_costo_micro?: number | null; // En microsoles
 }
 
-// Tipo flexible para vistas/tablas de React
 export type Producto = ProductoPublicoDTO | ProductoAdminDTO;
 
 export interface CrearProductoDTO {
-  id_categoria: number;
+  codigo: string;
   nombre: string;
-  codigo_barras?: string | null;
-  unidad_medida?: string | null;
-  stock_actual: number;
+  descripcion?: string | null;
+  categoria: CategoriaEnum;
+  unidad_medida: UnidadMedida;
   stock_minimo: number;
-  precio_compra: number; // En céntimos
-  precio_venta: number; // En céntimos
+  precio_venta_cent: number; // En céntimos
+  cantidad_inicial?: number | null;
+  costo_unitario_inicial_micro?: number | null; // En microsoles
+  referencia_inicial?: string | null;
 }
 
-export interface EditarProductoDTO extends CrearProductoDTO {
+export interface EditarProductoDTO {
   id_producto: number;
+  nombre: string;
+  descripcion?: string | null;
+  stock_minimo: number;
+  precio_venta_cent: number; // En céntimos
 }
 
 export interface DespacharProductoDTO {
@@ -49,28 +53,68 @@ export interface DespacharProductoDTO {
 
 export interface AjustarStockDTO {
   id_producto: number;
-  tipo_movimiento: 'ENTRADA' | 'AJUSTE';
-  cantidad_nueva: number;
-  motivo: string; // Obligatorio
+  tipo_ajuste: 'ENTRADA' | 'SALIDA';
+  cantidad: number;
+  costo_unitario_micro?: number | null;
+  motivo: string;
 }
 
 export interface Categoria {
-  id_categoria?: number;
-  idCategoria?: number;
-  nombre_categoria?: string;
-  nombreCategoria?: string;
+  id_categoria: number;
+  nombre: CategoriaEnum;
+  activo: number;
 }
 
-// Formulario reactivo para crear/editar productos
+export interface ProveedorDTO {
+  id_proveedor: number;
+  tipo_documento: string;
+  numero_documento: string;
+  nombre_razon_social: string;
+  telefono?: string | null;
+  correo?: string | null;
+  direccion?: string | null;
+  contacto_asesor?: string | null;
+}
+
+export interface CrearProveedorDTO {
+  tipo_documento: string;
+  numero_documento: string;
+  nombre_razon_social: string;
+  telefono?: string | null;
+  correo?: string | null;
+  direccion?: string | null;
+  contacto_asesor?: string | null;
+}
+
+export interface DetalleIngresoRequestDTO {
+  id_producto: number;
+  cantidad: number;
+  costo_efectivo_micro: number; // En microsoles
+}
+
+export interface RegistrarIngresoDTO {
+  origen: 'COMPRA' | 'INICIAL';
+  id_proveedor?: number | null;
+  tipo_documento?: string | null;
+  numero_documento?: string | null;
+  fecha_documento?: string | null;
+  referencia_inicial?: string | null;
+  observacion?: string | null;
+  detalles: DetalleIngresoRequestDTO[];
+}
+
 export interface ProductoForm {
   id_producto?: number;
-  id_categoria: number;
+  codigo: string;
   nombre: string;
-  nombre_categoria?: string;
-  codigo_barras?: string | null;
-  unidad_medida?: string | null;
-  stock_actual: number;
+  descripcion?: string;
+  categoria: CategoriaEnum;
+  unidad_medida: UnidadMedida;
   stock_minimo: number;
-  precio_compra: number; // En Soles en la UI
-  precio_venta: number; // En Soles en la UI
+  precio_venta_soles: number; // En Soles UI
+  // Campos opcionales para Alta con Stock Inicial
+  tiene_stock_inicial: boolean;
+  cantidad_inicial: number;
+  costo_unitario_soles: number; // En Soles UI
+  referencia_inicial: string;
 }

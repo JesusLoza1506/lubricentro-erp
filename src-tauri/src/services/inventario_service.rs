@@ -1,7 +1,8 @@
+use crate::dto::ingreso_dto::RegistrarIngresoDto;
 use crate::dto::producto_dto::{
-    ActualizarProductoDto, AjustarStockDto, CrearProductoDto, DespacharProductoDto,
-    ProductoAdminDto, ProductoPublicoDto,
+    ActualizarProductoDto, AjustarStockDto, CrearProductoDto, ProductoAdminDto, ProductoPublicoDto,
 };
+use crate::dto::proveedor_dto::{CrearProveedorDto, ProveedorDto};
 use crate::entities::categoria::CategoriaEntity;
 use crate::entities::producto::ProductoEntity;
 use crate::errors::AppError;
@@ -9,156 +10,121 @@ use rusqlite::{params, Connection};
 
 pub struct InventarioService;
 
-const UNIDADES_VALIDAS: [&str; 2] = ["UND", "ML"];
+const CATEGORIAS_VALIDAS: [&str; 5] = ["ACEITE", "FILTRO", "ADITIVO", "GRANEL", "OTRO"];
 
 impl InventarioService {
-    #[allow(clippy::too_many_arguments)]
-    pub fn validar_datos_producto(
-        conn: &Connection,
-        _id_categoria: i64,
-        nombre: &str,
-        codigo_barras: Option<&str>,
-        unidad_medida: Option<&str>,
-        stock_actual: f64,
-        stock_minimo: f64,
-        precio_compra: i64,
-        precio_venta: i64,
-        id_producto_excluir: Option<i64>,
-    ) -> Result<(), AppError> {
-        let nombre_trim = nombre.trim();
-        if nombre_trim.is_empty() {
-            return Err(AppError::Validation(
-                "El nombre del producto no puede estar vacío.".to_string(),
-            ));
-        }
-
-        if stock_actual < 0.0 {
-            return Err(AppError::Validation(
-                "El stock actual no puede ser negativo.".to_string(),
-            ));
-        }
-        if stock_minimo < 0.0 {
-            return Err(AppError::Validation(
-                "El stock mínimo no puede ser negativo.".to_string(),
-            ));
-        }
-        if precio_compra < 0 {
-            return Err(AppError::Validation(
-                "El precio de compra no puede ser negativo.".to_string(),
-            ));
-        }
-        if precio_venta < 0 {
-            return Err(AppError::Validation(
-                "El precio de venta no puede ser negativo.".to_string(),
-            ));
-        }
-
-        if let Some(u) = unidad_medida {
-            let u_upper = u.trim().to_uppercase();
-            if !u_upper.is_empty() && !UNIDADES_VALIDAS.contains(&u_upper.as_str()) {
-                return Err(AppError::Validation(format!(
-                    "Unidad de medida inválida ('{}'). Solo se permiten: UND, ML.",
-                    u
-                )));
-            }
-        }
-
-        if let Some(cb) = codigo_barras {
-            let cb_trim = cb.trim();
-            if !cb_trim.is_empty() {
-                let mut query =
-                    "SELECT COUNT(*) FROM productos WHERE codigo = ?1 AND activo = 1".to_string();
-                let mut params_vec: Vec<rusqlite::types::Value> = vec![cb_trim.to_string().into()];
-
-                if let Some(id_excluir) = id_producto_excluir {
-                    query.push_str(" AND id_producto != ?2");
-                    params_vec.push(id_excluir.into());
-                }
-
-                let count: i32 =
-                    conn.query_row(&query, rusqlite::params_from_iter(params_vec), |row| {
-                        row.get(0)
-                    })?;
-                if count > 0 {
-                    return Err(AppError::Validation(format!(
-                        "El código de barras '{}' ya está registrado en otro producto.",
-                        cb_trim
-                    )));
-                }
-            }
-        }
-
-        Ok(())
-    }
-
     pub fn registrar_producto(
-        conn: &Connection,
+        conn: &mut Connection,
         req: CrearProductoDto,
         id_usuario: i64,
     ) -> Result<i64, AppError> {
-        let unidad = req
-            .unidad_medida
-            .as_deref()
-            .map(|u| u.trim().to_uppercase())
-            .filter(|u| !u.is_empty())
-            .unwrap_or_else(|| "UND".to_string());
+        let cat_upper = req.categoria.trim().to_uppercase();
+        let un_upper = req.unidad_medida.trim().to_uppercase();
 
-        Self::validar_datos_producto(
-            conn,
-            req.id_categoria,
-            &req.nombre,
-            req.codigo_barras.as_deref(),
-            Some(&unidad),
-            req.stock_actual,
-            req.stock_minimo,
-            req.precio_compra,
-            req.precio_venta,
-            None,
-        )?;
+        if !CATEGORIAS_VALIDAS.contains(&cat_upper.as_str()) {
+            return Err(AppError::Validation(format!(
+                "Categoría inválida: '{}'. Permitidas: ACEITE, FILTRO, ADITIVO, GRANEL, OTRO.",
+                cat_upper
+            )));
+        }
 
-        let categoria_db = if unidad == "ML" { "GRANEL" } else { "ACEITE" };
+        if cat_upper == "GRANEL" && un_upper != "ML" {
+            return Err(AppError::Validation(
+                "La categoría GRANEL debe usar estrictamente la unidad ML.".to_string(),
+            ));
+        }
+        if cat_upper != "GRANEL" && un_upper != "UND" {
+            return Err(AppError::Validation(
+                "Las categorías distintas de GRANEL deben usar la unidad UND.".to_string(),
+            ));
+        }
 
-        let cb = req
-            .codigo_barras
-            .as_deref()
-            .map(|s| s.trim())
-            .filter(|s| !s.is_empty())
-            .map(|s| s.to_string())
-            .unwrap_or_else(|| {
-                format!(
-                    "PROD-{}",
-                    uuid::Uuid::new_v4().to_string()[..8].to_uppercase()
-                )
-            });
+        let tx = conn.transaction()?;
 
-        conn.execute(
-            "INSERT INTO productos (codigo, nombre, categoria, unidad_medida, stock_actual, stock_minimo, precio_venta_cent, activo)
-             VALUES (?1, ?2, ?3, ?4, 0, ?5, ?6, 1)",
+        tx.execute(
+            "INSERT INTO productos (codigo, nombre, descripcion, categoria, unidad_medida, stock_actual, stock_minimo, valor_stock_micro, precio_venta_cent, activo)
+             VALUES (?1, ?2, ?3, ?4, ?5, 0, ?6, 0, ?7, 1)",
             params![
-                cb,
+                req.codigo.trim().to_uppercase(),
                 req.nombre.trim(),
-                categoria_db,
-                unidad,
-                req.stock_minimo as i64,
-                req.precio_venta,
+                req.descripcion.as_deref().map(|d| d.trim()),
+                cat_upper,
+                un_upper,
+                req.stock_minimo,
+                req.precio_venta_cent,
             ],
         )?;
 
-        let id_producto = conn.last_insert_rowid();
+        let id_producto = tx.last_insert_rowid();
 
-        if req.stock_actual > 0.0 {
-            Self::ajustar_stock(
-                conn,
-                AjustarStockDto {
-                    id_producto,
-                    tipo_movimiento: "AJUSTE".to_string(),
-                    cantidad_nueva: req.stock_actual,
-                    motivo: "Inventario Inicial".to_string(),
-                },
-                id_usuario,
-            )?;
+        if let Some(cant_init) = req.cantidad_inicial {
+            if cant_init > 0 {
+                let costo_micro = req.costo_unitario_inicial_micro.ok_or_else(|| {
+                    AppError::Validation(
+                        "Costo unitario inicial obligatorio si hay stock inicial.".to_string(),
+                    )
+                })?;
+                let ref_init = req.referencia_inicial.ok_or_else(|| {
+                    AppError::Validation(
+                        "Referencia inicial obligatoria para stock inicial.".to_string(),
+                    )
+                })?;
+
+                let id_op_ingreso = uuid::Uuid::new_v4().to_string();
+                let cod_ingreso = format!("ING-{}", id_op_ingreso[..8].to_uppercase());
+                let total_aporte = cant_init * costo_micro;
+
+                tx.execute(
+                    "INSERT INTO ingresos_stock (id_operacion, codigo, origen, referencia_inicial, estado, total_costo_micro, id_usuario, observacion)
+                     VALUES (?1, ?2, 'INICIAL', ?3, 'PREPARANDO', ?4, ?5, 'Alta con Stock Inicial')",
+                    params![id_op_ingreso, cod_ingreso, ref_init.trim(), total_aporte, id_usuario],
+                )?;
+                let id_ingreso = tx.last_insert_rowid();
+
+                tx.execute(
+                    "INSERT INTO detalle_ingreso (id_ingreso, id_producto, codigo_snapshot, nombre_snapshot, unidad_medida, cantidad, costo_efectivo_micro, valor_aporte_micro)
+                     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+                    params![
+                        id_ingreso,
+                        id_producto,
+                        req.codigo.trim().to_uppercase(),
+                        req.nombre.trim(),
+                        un_upper,
+                        cant_init,
+                        costo_micro,
+                        total_aporte,
+                    ],
+                )?;
+                let id_det_ingreso = tx.last_insert_rowid();
+
+                tx.execute(
+                    "INSERT INTO movimientos_inventario (id_operacion, id_producto, id_usuario, tipo_movimiento, id_detalle_ingreso, unidad_medida, stock_anterior, diferencia, stock_resultante, valor_anterior_micro, valor_delta_micro, valor_resultante_micro, costo_unitario_micro)
+                     VALUES (?1, ?2, ?3, 'STOCK_INICIAL', ?4, ?5, 0, ?6, ?6, 0, ?7, ?7, ?8)",
+                    params![
+                        uuid::Uuid::new_v4().to_string(),
+                        id_producto,
+                        id_usuario,
+                        id_det_ingreso,
+                        un_upper,
+                        cant_init,
+                        total_aporte,
+                        costo_micro,
+                    ],
+                )?;
+
+                tx.execute(
+                    "UPDATE productos SET stock_actual = ?1, valor_stock_micro = ?2, ultimo_costo_micro = ?3 WHERE id_producto = ?4",
+                    params![cant_init, total_aporte, costo_micro, id_producto],
+                )?;
+
+                tx.execute(
+                    "UPDATE ingresos_stock SET estado = 'REGISTRADO' WHERE id_ingreso = ?1",
+                    params![id_ingreso],
+                )?;
+            }
         }
 
+        tx.commit()?;
         Ok(id_producto)
     }
 
@@ -166,50 +132,25 @@ impl InventarioService {
         conn: &Connection,
         req: ActualizarProductoDto,
     ) -> Result<(), AppError> {
-        let stock_actual: i64 = conn
-            .query_row(
-                "SELECT stock_actual FROM productos WHERE id_producto = ?1 AND activo = 1",
-                [req.id_producto],
-                |row| row.get(0),
-            )
-            .map_err(|_| AppError::NotFound("Producto no encontrado o inactivo.".to_string()))?;
-
-        let unidad = req
-            .unidad_medida
-            .as_deref()
-            .map(|u| u.trim().to_uppercase())
-            .filter(|u| !u.is_empty())
-            .unwrap_or_else(|| "UND".to_string());
-
-        Self::validar_datos_producto(
-            conn,
-            req.id_categoria,
-            &req.nombre,
-            req.codigo_barras.as_deref(),
-            Some(&unidad),
-            stock_actual as f64,
-            req.stock_minimo,
-            req.precio_compra,
-            req.precio_venta,
-            Some(req.id_producto),
+        let count: i32 = conn.query_row(
+            "SELECT COUNT(*) FROM productos WHERE id_producto = ?1 AND activo = 1",
+            [req.id_producto],
+            |r| r.get(0),
         )?;
 
-        let cb = req
-            .codigo_barras
-            .as_deref()
-            .map(|s| s.trim())
-            .filter(|s| !s.is_empty());
+        if count == 0 {
+            return Err(AppError::NotFound(
+                "Producto no encontrado o inactivo.".to_string(),
+            ));
+        }
 
         conn.execute(
-            "UPDATE productos 
-             SET nombre = ?1, codigo = COALESCE(?2, codigo), unidad_medida = ?3, stock_minimo = ?4, precio_venta_cent = ?5
-             WHERE id_producto = ?6 AND activo = 1",
+            "UPDATE productos SET nombre = ?1, descripcion = ?2, stock_minimo = ?3, precio_venta_cent = ?4 WHERE id_producto = ?5 AND activo = 1",
             params![
                 req.nombre.trim(),
-                cb,
-                unidad,
-                req.stock_minimo as i64,
-                req.precio_venta,
+                req.descripcion.as_deref().map(|d| d.trim()),
+                req.stock_minimo,
+                req.precio_venta_cent,
                 req.id_producto
             ],
         )?;
@@ -218,31 +159,15 @@ impl InventarioService {
     }
 
     pub fn eliminar_producto(conn: &Connection, id_producto: i64) -> Result<(), AppError> {
-        let existe: i32 = conn
-            .query_row(
-                "SELECT COUNT(*) FROM productos WHERE id_producto = ?1 AND activo = 1",
-                [id_producto],
-                |r| r.get(0),
-            )
-            .unwrap_or(0);
+        let movs: i32 = conn.query_row(
+            "SELECT COUNT(*) FROM movimientos_inventario WHERE id_producto = ?1",
+            [id_producto],
+            |r| r.get(0),
+        )?;
 
-        if existe == 0 {
-            return Err(AppError::NotFound(
-                "Producto no encontrado o ya eliminado.".to_string(),
-            ));
-        }
-
-        let movs_count: i32 = conn
-            .query_row(
-                "SELECT COUNT(*) FROM movimientos_inventario WHERE id_producto = ?1",
-                [id_producto],
-                |r| r.get(0),
-            )
-            .unwrap_or(0);
-
-        if movs_count > 0 {
+        if movs > 0 {
             return Err(AppError::Validation(
-                "No se puede eliminar el producto porque tiene movimientos de inventario asociados."
+                "No se puede dar de baja un producto que tiene movimientos en el Kardex."
                     .to_string(),
             ));
         }
@@ -255,105 +180,174 @@ impl InventarioService {
         Ok(())
     }
 
-    pub fn despachar_producto_granel(
-        conn: &Connection,
-        req: DespacharProductoDto,
+    pub fn registrar_ingreso_compra(
+        conn: &mut Connection,
+        req: RegistrarIngresoDto,
         id_usuario: i64,
-    ) -> Result<(), AppError> {
-        if req.cantidad <= 0.0 {
+    ) -> Result<i64, AppError> {
+        if req.detalles.is_empty() || req.detalles.len() > 100 {
             return Err(AppError::Validation(
-                "La cantidad a despachar debe ser mayor a 0.".to_string(),
+                "El ingreso debe contener entre 1 y 100 productos.".to_string(),
             ));
         }
 
-        let (stock_actual, desc, unidad_medida): (i64, String, String) = conn
-            .query_row(
-                "SELECT stock_actual, nombre, unidad_medida FROM productos WHERE id_producto = ?1 AND activo = 1",
-                [req.id_producto],
-                |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
-            )
-            .map_err(|_| AppError::NotFound("Producto no encontrado o inactivo.".to_string()))?;
+        let id_prov = req
+            .id_proveedor
+            .ok_or_else(|| AppError::Validation("Proveedor requerido para compras.".to_string()))?;
+        let tipo_doc = req
+            .tipo_documento
+            .ok_or_else(|| AppError::Validation("Tipo de documento requerido.".to_string()))?;
+        let num_doc = req
+            .numero_documento
+            .ok_or_else(|| AppError::Validation("Número de documento requerido.".to_string()))?;
+        let fec_doc = req
+            .fecha_documento
+            .ok_or_else(|| AppError::Validation("Fecha de documento requerida.".to_string()))?;
 
-        let req_cant_i64 = req.cantidad as i64;
+        let tx = conn.transaction()?;
 
-        if req_cant_i64 > stock_actual {
-            return Err(AppError::Validation(format!(
-                "Stock insuficiente para '{}'. Disponible: {}, Solicitado: {}",
-                desc, stock_actual, req_cant_i64
-            )));
+        let prov_snapshot: String = tx.query_row(
+            "SELECT json_object('id_proveedor', id_proveedor, 'tipo_documento', tipo_documento, 'numero_documento', numero_documento, 'nombre_razon_social', nombre_razon_social)
+             FROM proveedores WHERE id_proveedor = ?1",
+            [id_prov],
+            |r| r.get(0),
+        ).map_err(|_| AppError::NotFound("Proveedor no encontrado.".to_string()))?;
+
+        let mut total_costo_micro = 0i64;
+        for d in &req.detalles {
+            total_costo_micro += d.cantidad * d.costo_efectivo_micro;
         }
 
-        let id_op_kardex = uuid::Uuid::new_v4().to_string();
-        let motivo_despacho = req
-            .motivo
-            .as_deref()
-            .map(|m| m.trim())
-            .filter(|m| !m.is_empty())
-            .unwrap_or("Despacho a Granel");
+        let id_op = uuid::Uuid::new_v4().to_string();
+        let cod_ingreso = format!("ING-{}", id_op[..8].to_uppercase());
 
-        conn.execute(
-            "INSERT INTO movimientos_inventario (id_operacion, id_producto, id_usuario, tipo_movimiento, unidad_medida, stock_anterior, diferencia, stock_resultante, valor_anterior_micro, valor_delta_micro, valor_resultante_micro, costo_unitario_micro, motivo)
-             VALUES (?1, ?2, ?3, 'AJUSTE', ?4, ?5, ?6, ?5 + ?6, 0, 0, 0, 0, ?7)",
-            params![
-                id_op_kardex,
-                req.id_producto,
-                id_usuario,
-                unidad_medida,
-                stock_actual,
-                -req_cant_i64,
-                motivo_despacho
-            ],
+        tx.execute(
+            "INSERT INTO ingresos_stock (id_operacion, codigo, origen, id_proveedor, proveedor_snapshot, tipo_documento, numero_documento, fecha_documento, estado, total_costo_micro, id_usuario, observacion)
+             VALUES (?1, ?2, 'COMPRA', ?3, ?4, ?5, ?6, ?7, 'PREPARANDO', ?8, ?9, ?10)",
+            params![id_op, cod_ingreso, id_prov, prov_snapshot, tipo_doc, num_doc, fec_doc, total_costo_micro, id_usuario, req.observacion],
+        )?;
+        let id_ingreso = tx.last_insert_rowid();
+
+        for d in &req.detalles {
+            let (cod_prod, nom_prod, un_prod, stock_ant, val_ant_micro): (String, String, String, i64, i64) = tx.query_row(
+                "SELECT codigo, nombre, unidad_medida, stock_actual, valor_stock_micro FROM productos WHERE id_producto = ?1 AND activo = 1",
+                [d.id_producto],
+                |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?, r.get(4)?)),
+            ).map_err(|_| AppError::NotFound(format!("Producto ID {} no encontrado.", d.id_producto)))?;
+
+            let aporte_micro = d.cantidad * d.costo_efectivo_micro;
+
+            tx.execute(
+                "INSERT INTO detalle_ingreso (id_ingreso, id_producto, codigo_snapshot, nombre_snapshot, unidad_medida, cantidad, costo_efectivo_micro, valor_aporte_micro)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+                params![id_ingreso, d.id_producto, cod_prod, nom_prod, un_prod, d.cantidad, d.costo_efectivo_micro, aporte_micro],
+            )?;
+            let id_det = tx.last_insert_rowid();
+
+            let stock_res = stock_ant + d.cantidad;
+            let val_res_micro = val_ant_micro + aporte_micro;
+
+            tx.execute(
+                "INSERT INTO movimientos_inventario (id_operacion, id_producto, id_usuario, tipo_movimiento, id_detalle_ingreso, unidad_medida, stock_anterior, diferencia, stock_resultante, valor_anterior_micro, valor_delta_micro, valor_resultante_micro, costo_unitario_micro)
+                 VALUES (?1, ?2, ?3, 'COMPRA', ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)",
+                params![uuid::Uuid::new_v4().to_string(), d.id_producto, id_usuario, id_det, un_prod, stock_ant, d.cantidad, stock_res, val_ant_micro, aporte_micro, val_res_micro, d.costo_efectivo_micro],
+            )?;
+
+            tx.execute(
+                "UPDATE productos SET stock_actual = ?1, valor_stock_micro = ?2, ultimo_costo_micro = ?3 WHERE id_producto = ?4",
+                params![stock_res, val_res_micro, d.costo_efectivo_micro, d.id_producto],
+            )?;
+        }
+
+        tx.execute(
+            "UPDATE ingresos_stock SET estado = 'REGISTRADO' WHERE id_ingreso = ?1",
+            params![id_ingreso],
         )?;
 
-        Ok(())
+        tx.commit()?;
+        Ok(id_ingreso)
     }
 
     pub fn ajustar_stock(
-        conn: &Connection,
+        conn: &mut Connection,
         req: AjustarStockDto,
         id_usuario: i64,
     ) -> Result<(), AppError> {
         let motivo_trim = req.motivo.trim();
-        if motivo_trim.is_empty() {
+        if motivo_trim.len() < 5 || motivo_trim.len() > 250 {
             return Err(AppError::Validation(
-                "El motivo del ajuste manual de stock es obligatorio.".to_string(),
+                "El motivo del ajuste debe tener entre 5 y 250 caracteres.".to_string(),
             ));
         }
 
-        if req.cantidad_nueva < 0.0 {
-            return Err(AppError::Validation(
-                "La nueva cantidad de stock no puede ser negativa.".to_string(),
-            ));
-        }
+        let tipo_mov = match req.tipo_ajuste.to_uppercase().as_str() {
+            "ENTRADA" => "AJUSTE_ENTRADA",
+            "SALIDA" => "AJUSTE_SALIDA",
+            _ => {
+                return Err(AppError::Validation(
+                    "Tipo de ajuste inválido. Use ENTRADA o SALIDA.".to_string(),
+                ))
+            }
+        };
 
-        let (stock_anterior, unidad_medida): (i64, String) = conn
-            .query_row(
-                "SELECT stock_actual, unidad_medida FROM productos WHERE id_producto = ?1 AND activo = 1",
-                [req.id_producto],
-                |r| Ok((r.get(0)?, r.get(1)?)),
-            )
-            .map_err(|_| AppError::NotFound("Producto no encontrado o inactivo.".to_string()))?;
+        let tx = conn.transaction()?;
 
-        let cant_nueva_i64 = req.cantidad_nueva as i64;
-        let diferencia = cant_nueva_i64 - stock_anterior;
+        let (stock_ant, val_ant, un_med, ultimo_costo): (i64, i64, String, Option<i64>) = tx.query_row(
+            "SELECT stock_actual, valor_stock_micro, unidad_medida, ultimo_costo_micro FROM productos WHERE id_producto = ?1 AND activo = 1",
+            [req.id_producto],
+            |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?)),
+        ).map_err(|_| AppError::NotFound("Producto no encontrado o inactivo.".to_string()))?;
 
-        let id_op_kardex = uuid::Uuid::new_v4().to_string();
+        let (diferencia, val_delta_micro, costo_unit_micro) = if tipo_mov == "AJUSTE_ENTRADA" {
+            let costo = req.costo_unitario_micro.ok_or_else(|| {
+                AppError::Validation("Costo unitario requerido para ajuste de entrada.".to_string())
+            })?;
+            let delta_val = req.cantidad * costo;
+            (req.cantidad, delta_val, costo)
+        } else {
+            if req.cantidad > stock_ant {
+                return Err(AppError::Validation(
+                    "La cantidad a descontar supera el stock actual.".to_string(),
+                ));
+            }
+            let costo = if stock_ant > 0 {
+                val_ant / stock_ant
+            } else {
+                ultimo_costo.unwrap_or(0)
+            };
+            let delta_val = -(req.cantidad * costo);
+            (-req.cantidad, delta_val, costo)
+        };
 
-        conn.execute(
+        let stock_res = stock_ant + diferencia;
+        let val_res = val_ant + val_delta_micro;
+
+        tx.execute(
             "INSERT INTO movimientos_inventario (id_operacion, id_producto, id_usuario, tipo_movimiento, unidad_medida, stock_anterior, diferencia, stock_resultante, valor_anterior_micro, valor_delta_micro, valor_resultante_micro, costo_unitario_micro, motivo)
-             VALUES (?1, ?2, ?3, 'AJUSTE', ?4, ?5, ?6, ?7, 0, 0, 0, 0, ?8)",
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)",
             params![
-                id_op_kardex,
+                uuid::Uuid::new_v4().to_string(),
                 req.id_producto,
                 id_usuario,
-                unidad_medida,
-                stock_anterior,
+                tipo_mov,
+                un_med,
+                stock_ant,
                 diferencia,
-                cant_nueva_i64,
+                stock_res,
+                val_ant,
+                val_delta_micro,
+                val_res,
+                costo_unit_micro,
                 motivo_trim
             ],
         )?;
 
+        tx.execute(
+            "UPDATE productos SET stock_actual = ?1, valor_stock_micro = ?2 WHERE id_producto = ?3",
+            params![stock_res, val_res, req.id_producto],
+        )?;
+
+        tx.commit()?;
         Ok(())
     }
 
@@ -361,138 +355,130 @@ impl InventarioService {
         conn: &Connection,
     ) -> Result<Vec<ProductoPublicoDto>, AppError> {
         let mut stmt = conn.prepare(
-            "SELECT p.id_producto, 1 AS id_categoria, p.categoria AS nombre_categoria, p.nombre, p.codigo, p.unidad_medida, p.stock_actual, p.stock_minimo, 0 AS precio_compra, p.precio_venta_cent, p.activo
-             FROM productos p
-             WHERE p.activo = 1
-             ORDER BY p.nombre ASC",
+            "SELECT id_producto, codigo, nombre, descripcion, categoria, unidad_medida, stock_actual, stock_minimo, valor_stock_micro, ultimo_costo_micro, precio_venta_cent, activo
+             FROM productos WHERE activo = 1 ORDER BY nombre ASC",
         )?;
 
         let iter = stmt.query_map([], |row| {
             let entity = ProductoEntity {
                 id_producto: row.get(0)?,
-                id_categoria: row.get(1)?,
-                nombre: row.get(3)?,
-                codigo_barras: row.get(4)?,
+                codigo: row.get(1)?,
+                nombre: row.get(2)?,
+                descripcion: row.get(3)?,
+                categoria: row.get(4)?,
                 unidad_medida: row.get(5)?,
-                stock_actual: row.get::<_, i64>(6)? as f64,
-                stock_minimo: row.get::<_, i64>(7)? as f64,
-                precio_compra: row.get(8)?,
-                precio_venta: row.get(9)?,
-                activo: row.get(10)?,
+                stock_actual: row.get(6)?,
+                stock_minimo: row.get(7)?,
+                valor_stock_micro: row.get(8)?,
+                ultimo_costo_micro: row.get(9)?,
+                precio_venta_cent: row.get(10)?,
+                activo: row.get(11)?,
             };
-            let cat_nombre: Option<String> = row.get(2)?;
-            Ok(ProductoPublicoDto::desde_entity(entity, cat_nombre))
+            Ok(ProductoPublicoDto::desde_entity(entity))
         })?;
 
-        let mut productos = Vec::new();
-        for item in iter {
-            productos.push(item?);
+        let mut list = Vec::new();
+        for i in iter {
+            list.push(i?);
         }
-
-        Ok(productos)
+        Ok(list)
     }
 
     pub fn listar_productos_admin(conn: &Connection) -> Result<Vec<ProductoAdminDto>, AppError> {
         let mut stmt = conn.prepare(
-            "SELECT p.id_producto, 1 AS id_categoria, p.categoria AS nombre_categoria, p.nombre, p.codigo, p.unidad_medida, p.stock_actual, p.stock_minimo, 0 AS precio_compra, p.precio_venta_cent, p.activo
-             FROM productos p
-             WHERE p.activo = 1
-             ORDER BY p.nombre ASC",
+            "SELECT id_producto, codigo, nombre, descripcion, categoria, unidad_medida, stock_actual, stock_minimo, valor_stock_micro, ultimo_costo_micro, precio_venta_cent, activo
+             FROM productos WHERE activo = 1 ORDER BY nombre ASC",
         )?;
 
         let iter = stmt.query_map([], |row| {
             let entity = ProductoEntity {
                 id_producto: row.get(0)?,
-                id_categoria: row.get(1)?,
-                nombre: row.get(3)?,
-                codigo_barras: row.get(4)?,
+                codigo: row.get(1)?,
+                nombre: row.get(2)?,
+                descripcion: row.get(3)?,
+                categoria: row.get(4)?,
                 unidad_medida: row.get(5)?,
-                stock_actual: row.get::<_, i64>(6)? as f64,
-                stock_minimo: row.get::<_, i64>(7)? as f64,
-                precio_compra: row.get(8)?,
-                precio_venta: row.get(9)?,
-                activo: row.get(10)?,
+                stock_actual: row.get(6)?,
+                stock_minimo: row.get(7)?,
+                valor_stock_micro: row.get(8)?,
+                ultimo_costo_micro: row.get(9)?,
+                precio_venta_cent: row.get(10)?,
+                activo: row.get(11)?,
             };
-            let cat_nombre: Option<String> = row.get(2)?;
-            Ok(ProductoAdminDto::desde_entity(entity, cat_nombre))
+            Ok(ProductoAdminDto::desde_entity(entity))
         })?;
 
-        let mut productos = Vec::new();
-        for item in iter {
-            productos.push(item?);
+        let mut list = Vec::new();
+        for i in iter {
+            list.push(i?);
         }
-
-        Ok(productos)
+        Ok(list)
     }
 
     pub fn listar_productos_criticos_publicos(
         conn: &Connection,
     ) -> Result<Vec<ProductoPublicoDto>, AppError> {
         let mut stmt = conn.prepare(
-            "SELECT p.id_producto, 1 AS id_categoria, p.categoria AS nombre_categoria, p.nombre, p.codigo, p.unidad_medida, p.stock_actual, p.stock_minimo, 0 AS precio_compra, p.precio_venta_cent, p.activo
-             FROM productos p
-             WHERE p.activo = 1 AND p.stock_actual <= p.stock_minimo
-             ORDER BY (p.stock_actual - p.stock_minimo) ASC, p.nombre ASC",
+            "SELECT id_producto, codigo, nombre, descripcion, categoria, unidad_medida, stock_actual, stock_minimo, valor_stock_micro, ultimo_costo_micro, precio_venta_cent, activo
+             FROM productos WHERE activo = 1 AND stock_actual <= stock_minimo ORDER BY (stock_actual - stock_minimo) ASC, nombre ASC",
         )?;
 
         let iter = stmt.query_map([], |row| {
             let entity = ProductoEntity {
                 id_producto: row.get(0)?,
-                id_categoria: row.get(1)?,
-                nombre: row.get(3)?,
-                codigo_barras: row.get(4)?,
+                codigo: row.get(1)?,
+                nombre: row.get(2)?,
+                descripcion: row.get(3)?,
+                categoria: row.get(4)?,
                 unidad_medida: row.get(5)?,
-                stock_actual: row.get::<_, i64>(6)? as f64,
-                stock_minimo: row.get::<_, i64>(7)? as f64,
-                precio_compra: row.get(8)?,
-                precio_venta: row.get(9)?,
-                activo: row.get(10)?,
+                stock_actual: row.get(6)?,
+                stock_minimo: row.get(7)?,
+                valor_stock_micro: row.get(8)?,
+                ultimo_costo_micro: row.get(9)?,
+                precio_venta_cent: row.get(10)?,
+                activo: row.get(11)?,
             };
-            let cat_nombre: Option<String> = row.get(2)?;
-            Ok(ProductoPublicoDto::desde_entity(entity, cat_nombre))
+            Ok(ProductoPublicoDto::desde_entity(entity))
         })?;
 
-        let mut productos = Vec::new();
-        for item in iter {
-            productos.push(item?);
+        let mut list = Vec::new();
+        for i in iter {
+            list.push(i?);
         }
-
-        Ok(productos)
+        Ok(list)
     }
 
     pub fn listar_productos_criticos_admin(
         conn: &Connection,
     ) -> Result<Vec<ProductoAdminDto>, AppError> {
         let mut stmt = conn.prepare(
-            "SELECT p.id_producto, 1 AS id_categoria, p.categoria AS nombre_categoria, p.nombre, p.codigo, p.unidad_medida, p.stock_actual, p.stock_minimo, 0 AS precio_compra, p.precio_venta_cent, p.activo
-             FROM productos p
-             WHERE p.activo = 1 AND p.stock_actual <= p.stock_minimo
-             ORDER BY (p.stock_actual - p.stock_minimo) ASC, p.nombre ASC",
+            "SELECT id_producto, codigo, nombre, descripcion, categoria, unidad_medida, stock_actual, stock_minimo, valor_stock_micro, ultimo_costo_micro, precio_venta_cent, activo
+             FROM productos WHERE activo = 1 AND stock_actual <= stock_minimo ORDER BY (stock_actual - stock_minimo) ASC, nombre ASC",
         )?;
 
         let iter = stmt.query_map([], |row| {
             let entity = ProductoEntity {
                 id_producto: row.get(0)?,
-                id_categoria: row.get(1)?,
-                nombre: row.get(3)?,
-                codigo_barras: row.get(4)?,
+                codigo: row.get(1)?,
+                nombre: row.get(2)?,
+                descripcion: row.get(3)?,
+                categoria: row.get(4)?,
                 unidad_medida: row.get(5)?,
-                stock_actual: row.get::<_, i64>(6)? as f64,
-                stock_minimo: row.get::<_, i64>(7)? as f64,
-                precio_compra: row.get(8)?,
-                precio_venta: row.get(9)?,
-                activo: row.get(10)?,
+                stock_actual: row.get(6)?,
+                stock_minimo: row.get(7)?,
+                valor_stock_micro: row.get(8)?,
+                ultimo_costo_micro: row.get(9)?,
+                precio_venta_cent: row.get(10)?,
+                activo: row.get(11)?,
             };
-            let cat_nombre: Option<String> = row.get(2)?;
-            Ok(ProductoAdminDto::desde_entity(entity, cat_nombre))
+            Ok(ProductoAdminDto::desde_entity(entity))
         })?;
 
-        let mut productos = Vec::new();
-        for item in iter {
-            productos.push(item?);
+        let mut list = Vec::new();
+        for i in iter {
+            list.push(i?);
         }
-
-        Ok(productos)
+        Ok(list)
     }
 
     pub fn listar_categorias(_conn: &Connection) -> Result<Vec<CategoriaEntity>, AppError> {
@@ -504,9 +490,55 @@ impl InventarioService {
             },
             CategoriaEntity {
                 id_categoria: 2,
+                nombre: "FILTRO".to_string(),
+                activo: 1,
+            },
+            CategoriaEntity {
+                id_categoria: 3,
+                nombre: "ADITIVO".to_string(),
+                activo: 1,
+            },
+            CategoriaEntity {
+                id_categoria: 4,
                 nombre: "GRANEL".to_string(),
                 activo: 1,
             },
+            CategoriaEntity {
+                id_categoria: 5,
+                nombre: "OTRO".to_string(),
+                activo: 1,
+            },
         ])
+    }
+
+    pub fn listar_proveedores(conn: &Connection) -> Result<Vec<ProveedorDto>, AppError> {
+        let mut stmt = conn.prepare("SELECT id_proveedor, tipo_documento, numero_documento, nombre_razon_social, telefono, correo, direccion, contacto_asesor FROM proveedores ORDER BY nombre_razon_social ASC")?;
+        let iter = stmt.query_map([], |r| {
+            Ok(ProveedorDto {
+                id_proveedor: r.get(0)?,
+                tipo_documento: r.get(1)?,
+                numero_documento: r.get(2)?,
+                nombre_razon_social: r.get(3)?,
+                telefono: r.get(4)?,
+                correo: r.get(5)?,
+                direccion: r.get(6)?,
+                contacto_asesor: r.get(7)?,
+            })
+        })?;
+
+        let mut list = Vec::new();
+        for p in iter {
+            list.push(p?);
+        }
+        Ok(list)
+    }
+
+    pub fn crear_proveedor(conn: &Connection, req: CrearProveedorDto) -> Result<i64, AppError> {
+        conn.execute(
+            "INSERT INTO proveedores (tipo_documento, numero_documento, nombre_razon_social, telefono, correo, direccion, contacto_asesor)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+            params![req.tipo_documento.trim(), req.numero_documento.trim(), req.nombre_razon_social.trim(), req.telefono, req.correo, req.direccion, req.contacto_asesor],
+        )?;
+        Ok(conn.last_insert_rowid())
     }
 }

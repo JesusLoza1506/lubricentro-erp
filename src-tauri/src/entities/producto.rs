@@ -3,13 +3,15 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct ProductoEntity {
     pub id_producto: i64,
-    pub id_categoria: i64,
+    pub codigo: String,
     pub nombre: String,
-    pub codigo_barras: Option<String>,
-    pub unidad_medida: Option<String>,
-    pub stock_actual: f64,
-    pub stock_minimo: f64,
-    pub precio_compra: i64, // Almacenado en céntimos (ej. S/ 15.00 -> 1500)
-    pub precio_venta: i64,  // Almacenado en céntimos (ej. S/ 25.00 -> 2500)
+    pub descripcion: Option<String>,
+    pub categoria: String,     // ACEITE | FILTRO | ADITIVO | GRANEL | OTRO
+    pub unidad_medida: String, // UND | ML
+    pub stock_actual: i64,     // Unidades enteras o mililitros
+    pub stock_minimo: i64,
+    pub valor_stock_micro: i64,          // Micro-soles
+    pub ultimo_costo_micro: Option<i64>, // Micro-soles
+    pub precio_venta_cent: i64,          // Céntimos de Sol
     pub activo: i32,
 }

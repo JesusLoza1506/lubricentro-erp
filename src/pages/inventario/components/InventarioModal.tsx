@@ -1,6 +1,5 @@
 import React from 'react';
-import { AlertTriangle } from 'lucide-react';
-import { Categoria, ProductoForm, UnidadMedida } from '../../../types/inventario';
+import { Categoria, CategoriaEnum, ProductoForm } from '../../../types/inventario';
 import { modalInputStyle } from '../inventarioStyles';
 
 export type ModoModal = 'CREAR' | 'EDITAR' | 'VER';
@@ -15,7 +14,7 @@ interface InventarioModalProps {
   handleGuardar: (e: React.FormEvent) => void;
 }
 
-const UNIDADES_OPCIONES: UnidadMedida[] = ['LITRO', 'GALON', 'UNIDAD', 'BARRIL'];
+const CATEGORIAS_LISTA: CategoriaEnum[] = ['ACEITE', 'FILTRO', 'ADITIVO', 'GRANEL', 'OTRO'];
 
 export const InventarioModal: React.FC<InventarioModalProps> = ({
   modalAbierto,
@@ -23,7 +22,6 @@ export const InventarioModal: React.FC<InventarioModalProps> = ({
   modo,
   prodForm,
   setProdForm,
-  categorias,
   handleGuardar,
 }) => {
   if (!modalAbierto) return null;
@@ -36,25 +34,6 @@ export const InventarioModal: React.FC<InventarioModalProps> = ({
       : modo === 'EDITAR'
         ? 'Editar Producto'
         : 'Detalles del Producto';
-
-  const categoriaActualId = prodForm.id_categoria ?? 1;
-
-  const categoriaEncontrada = categorias.find(
-    (c) => (c.id_categoria ?? c.idCategoria) === Number(categoriaActualId)
-  );
-
-  const categoriaNombreActual =
-    prodForm.nombre_categoria ||
-    categoriaEncontrada?.nombre_categoria ||
-    categoriaEncontrada?.nombreCategoria ||
-    (categoriaEncontrada as any)?.nombre ||
-    'Sin Categoría';
-
-  const advertenciaPrecioBajo =
-    !esSoloLectura &&
-    prodForm.precio_compra > 0 &&
-    prodForm.precio_venta > 0 &&
-    prodForm.precio_venta < prodForm.precio_compra;
 
   return (
     <div
@@ -74,12 +53,14 @@ export const InventarioModal: React.FC<InventarioModalProps> = ({
     >
       <div
         style={{
-          width: '520px',
+          width: '560px',
           backgroundColor: '#0F172A',
           border: '1px solid #334155',
           borderRadius: '16px',
           padding: '28px',
           boxShadow: '0 20px 40px rgba(0,0,0,0.5)',
+          maxHeight: '90vh',
+          overflowY: 'auto',
         }}
       >
         <h3
@@ -98,67 +79,109 @@ export const InventarioModal: React.FC<InventarioModalProps> = ({
           onSubmit={handleGuardar}
           style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}
         >
-          <div>
-            <label
-              style={{ display: 'block', fontSize: '12px', color: '#94A3B8', marginBottom: '6px' }}
-            >
-              Nombre del Producto *
-            </label>
-            <input
-              required
-              disabled={esSoloLectura}
-              type="text"
-              value={prodForm.nombre || ''}
-              onChange={(e) => setProdForm({ ...prodForm, nombre: e.target.value })}
-              style={{ ...modalInputStyle, opacity: esSoloLectura ? 0.7 : 1 }}
-              placeholder="Ej. Aceite Mobil Super 3000 5W-30 1L"
-            />
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '12px' }}>
+            <div>
+              <label
+                style={{
+                  display: 'block',
+                  fontSize: '12px',
+                  color: '#94A3B8',
+                  marginBottom: '6px',
+                }}
+              >
+                Código *
+              </label>
+              <input
+                required
+                disabled={esSoloLectura || modo === 'EDITAR'}
+                type="text"
+                value={prodForm.codigo || ''}
+                onChange={(e) => setProdForm({ ...prodForm, codigo: e.target.value.toUpperCase() })}
+                style={{
+                  ...modalInputStyle,
+                  opacity: esSoloLectura || modo === 'EDITAR' ? 0.7 : 1,
+                }}
+                placeholder="MOBIL-5W30"
+              />
+            </div>
+            <div>
+              <label
+                style={{
+                  display: 'block',
+                  fontSize: '12px',
+                  color: '#94A3B8',
+                  marginBottom: '6px',
+                }}
+              >
+                Nombre del Producto *
+              </label>
+              <input
+                required
+                disabled={esSoloLectura}
+                type="text"
+                value={prodForm.nombre || ''}
+                onChange={(e) => setProdForm({ ...prodForm, nombre: e.target.value })}
+                style={{ ...modalInputStyle, opacity: esSoloLectura ? 0.7 : 1 }}
+                placeholder="Ej. Aceite Mobil Super 3000 5W-30 1L"
+              />
+            </div>
           </div>
 
           <div>
             <label
               style={{ display: 'block', fontSize: '12px', color: '#94A3B8', marginBottom: '6px' }}
             >
-              Categoría *
+              Descripción u Observaciones
             </label>
-            {esSoloLectura ? (
-              <input
-                disabled
-                type="text"
-                value={categoriaNombreActual}
-                style={{ ...modalInputStyle, opacity: 0.7 }}
-              />
-            ) : (
+            <input
+              disabled={esSoloLectura}
+              type="text"
+              value={prodForm.descripcion || ''}
+              onChange={(e) => setProdForm({ ...prodForm, descripcion: e.target.value })}
+              style={{ ...modalInputStyle, opacity: esSoloLectura ? 0.7 : 1 }}
+              placeholder="Ej. Sintético 100% para motores a gasolina"
+            />
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+            <div>
+              <label
+                style={{
+                  display: 'block',
+                  fontSize: '12px',
+                  color: '#94A3B8',
+                  marginBottom: '6px',
+                }}
+              >
+                Categoría *
+              </label>
               <select
                 required
-                value={categoriaActualId}
-                onChange={(e) => setProdForm({ ...prodForm, id_categoria: Number(e.target.value) })}
+                disabled={esSoloLectura || modo === 'EDITAR'}
+                value={prodForm.categoria}
+                onChange={(e) => {
+                  const cat = e.target.value as CategoriaEnum;
+                  setProdForm({
+                    ...prodForm,
+                    categoria: cat,
+                    unidad_medida: cat === 'GRANEL' ? 'ML' : 'UND',
+                  });
+                }}
                 style={{
                   ...modalInputStyle,
                   backgroundColor: '#1E293B',
                   color: '#F8FAFC',
-                  cursor: 'pointer',
+                  opacity: esSoloLectura || modo === 'EDITAR' ? 0.7 : 1,
                 }}
               >
-                {categorias.map((cat: any) => {
-                  const id = cat.id_categoria ?? cat.idCategoria ?? 1;
-                  const nombre =
-                    cat.nombre_categoria ?? cat.nombreCategoria ?? cat.nombre ?? `Categoría ${id}`;
-                  return (
-                    <option
-                      key={id}
-                      value={id}
-                      style={{ backgroundColor: '#0F172A', color: '#F8FAFC' }}
-                    >
-                      {nombre}
-                    </option>
-                  );
-                })}
+                {CATEGORIAS_LISTA.map((cat) => (
+                  <option key={cat} value={cat}>
+                    {cat}
+                  </option>
+                ))}
               </select>
-            )}
-          </div>
+            </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
             <div>
               <label
                 style={{
@@ -168,88 +191,18 @@ export const InventarioModal: React.FC<InventarioModalProps> = ({
                   marginBottom: '6px',
                 }}
               >
-                Código Barras
+                Unidad de Medida
               </label>
               <input
-                disabled={esSoloLectura}
+                disabled
                 type="text"
-                value={prodForm.codigo_barras || ''}
-                onChange={(e) => setProdForm({ ...prodForm, codigo_barras: e.target.value })}
-                style={{ ...modalInputStyle, opacity: esSoloLectura ? 0.7 : 1 }}
-                placeholder="775..."
+                value={prodForm.categoria === 'GRANEL' ? 'ML' : 'UND'}
+                style={{ ...modalInputStyle, opacity: 0.7, fontWeight: '700', color: '#38BDF8' }}
               />
-            </div>
-            <div>
-              <label
-                style={{
-                  display: 'block',
-                  fontSize: '12px',
-                  color: '#94A3B8',
-                  marginBottom: '6px',
-                }}
-              >
-                Unidad Medida *
-              </label>
-              {esSoloLectura ? (
-                <input
-                  disabled
-                  type="text"
-                  value={prodForm.unidad_medida || 'UNIDAD'}
-                  style={{ ...modalInputStyle, opacity: 0.7 }}
-                />
-              ) : (
-                <select
-                  required
-                  value={prodForm.unidad_medida || 'UNIDAD'}
-                  onChange={(e) =>
-                    setProdForm({ ...prodForm, unidad_medida: e.target.value as UnidadMedida })
-                  }
-                  style={{
-                    ...modalInputStyle,
-                    backgroundColor: '#1E293B',
-                    color: '#F8FAFC',
-                    cursor: 'pointer',
-                  }}
-                >
-                  {UNIDADES_OPCIONES.map((unid) => (
-                    <option
-                      key={unid}
-                      value={unid}
-                      style={{ backgroundColor: '#0F172A', color: '#F8FAFC' }}
-                    >
-                      {unid}
-                    </option>
-                  ))}
-                </select>
-              )}
             </div>
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-            <div>
-              <label
-                style={{
-                  display: 'block',
-                  fontSize: '12px',
-                  color: '#94A3B8',
-                  marginBottom: '6px',
-                }}
-              >
-                Precio Compra (S/) *
-              </label>
-              <input
-                required
-                disabled={esSoloLectura}
-                type="number"
-                step="0.01"
-                min="0"
-                value={prodForm.precio_compra ?? 0}
-                onChange={(e) =>
-                  setProdForm({ ...prodForm, precio_compra: parseFloat(e.target.value) || 0 })
-                }
-                style={{ ...modalInputStyle, opacity: esSoloLectura ? 0.7 : 1 }}
-              />
-            </div>
             <div>
               <label
                 style={{
@@ -267,63 +220,14 @@ export const InventarioModal: React.FC<InventarioModalProps> = ({
                 type="number"
                 step="0.01"
                 min="0"
-                value={prodForm.precio_venta ?? 0}
+                value={prodForm.precio_venta_soles ?? 0}
                 onChange={(e) =>
-                  setProdForm({ ...prodForm, precio_venta: parseFloat(e.target.value) || 0 })
+                  setProdForm({ ...prodForm, precio_venta_soles: parseFloat(e.target.value) || 0 })
                 }
                 style={{ ...modalInputStyle, opacity: esSoloLectura ? 0.7 : 1 }}
               />
             </div>
-          </div>
 
-          {advertenciaPrecioBajo && (
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                padding: '10px 14px',
-                backgroundColor: 'rgba(245, 158, 11, 0.15)',
-                border: '1px solid #F59E0B',
-                borderRadius: '8px',
-                color: '#FBBF24',
-                fontSize: '12px',
-                fontWeight: '600',
-              }}
-            >
-              <AlertTriangle size={16} color="#F59E0B" style={{ flexShrink: 0 }} />
-              <span>Este precio de venta está por debajo del costo registrado</span>
-            </div>
-          )}
-
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-            <div>
-              <label
-                style={{
-                  display: 'block',
-                  fontSize: '12px',
-                  color: '#94A3B8',
-                  marginBottom: '6px',
-                }}
-              >
-                Stock Actual *
-              </label>
-              <input
-                required
-                disabled={esSoloLectura || modo === 'EDITAR'}
-                type="number"
-                step="0.01"
-                min="0"
-                value={prodForm.stock_actual ?? 0}
-                onChange={(e) =>
-                  setProdForm({ ...prodForm, stock_actual: parseFloat(e.target.value) || 0 })
-                }
-                style={{
-                  ...modalInputStyle,
-                  opacity: esSoloLectura || modo === 'EDITAR' ? 0.7 : 1,
-                }}
-              />
-            </div>
             <div>
               <label
                 style={{
@@ -339,16 +243,113 @@ export const InventarioModal: React.FC<InventarioModalProps> = ({
                 required
                 disabled={esSoloLectura}
                 type="number"
-                step="0.01"
+                step="1"
                 min="0"
                 value={prodForm.stock_minimo ?? 0}
                 onChange={(e) =>
-                  setProdForm({ ...prodForm, stock_minimo: parseFloat(e.target.value) || 0 })
+                  setProdForm({ ...prodForm, stock_minimo: parseInt(e.target.value, 10) || 0 })
                 }
                 style={{ ...modalInputStyle, opacity: esSoloLectura ? 0.7 : 1 }}
               />
             </div>
           </div>
+
+          {modo === 'CREAR' && (
+            <div
+              style={{
+                backgroundColor: '#1E293B',
+                border: '1px dashed #334155',
+                borderRadius: '12px',
+                padding: '16px',
+                marginTop: '8px',
+              }}
+            >
+              <label
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  color: '#F8FAFC',
+                  fontWeight: '600',
+                  fontSize: '13px',
+                  cursor: 'pointer',
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={prodForm.tiene_stock_inicial}
+                  onChange={(e) =>
+                    setProdForm({ ...prodForm, tiene_stock_inicial: e.target.checked })
+                  }
+                />
+                ¿Dar de alta con Stock Inicial?
+              </label>
+
+              {prodForm.tiene_stock_inicial && (
+                <div
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: '1fr 1fr 1fr',
+                    gap: '10px',
+                    marginTop: '12px',
+                  }}
+                >
+                  <div>
+                    <label style={{ display: 'block', fontSize: '11px', color: '#94A3B8' }}>
+                      Cantidad Inicial
+                    </label>
+                    <input
+                      required={prodForm.tiene_stock_inicial}
+                      type="number"
+                      min="1"
+                      value={prodForm.cantidad_inicial || 0}
+                      onChange={(e) =>
+                        setProdForm({
+                          ...prodForm,
+                          cantidad_inicial: parseInt(e.target.value, 10) || 0,
+                        })
+                      }
+                      style={modalInputStyle}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '11px', color: '#94A3B8' }}>
+                      Costo Unitario (S/)
+                    </label>
+                    <input
+                      required={prodForm.tiene_stock_inicial}
+                      type="number"
+                      step="0.01"
+                      min="0.01"
+                      value={prodForm.costo_unitario_soles || 0}
+                      onChange={(e) =>
+                        setProdForm({
+                          ...prodForm,
+                          costo_unitario_soles: parseFloat(e.target.value) || 0,
+                        })
+                      }
+                      style={modalInputStyle}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '11px', color: '#94A3B8' }}>
+                      Referencia / Guía
+                    </label>
+                    <input
+                      required={prodForm.tiene_stock_inicial}
+                      type="text"
+                      placeholder="INV-INIT-01"
+                      value={prodForm.referencia_inicial || ''}
+                      onChange={(e) =>
+                        setProdForm({ ...prodForm, referencia_inicial: e.target.value })
+                      }
+                      style={modalInputStyle}
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
 
           <div
             style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '12px' }}
