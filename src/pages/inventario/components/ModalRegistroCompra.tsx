@@ -23,8 +23,8 @@ interface ItemDetalleForm {
   id_producto: number;
   nombre: string;
   unidad: string;
-  cantidad: number;
-  costo_soles: number;
+  cantidadInput: number; // En UND o Litros
+  costoUnitarioSoles: number; // En Soles por unidad o litro
 }
 
 export const ModalRegistroCompra: React.FC<ModalRegistroCompraProps> = ({
@@ -47,7 +47,6 @@ export const ModalRegistroCompra: React.FC<ModalRegistroCompraProps> = ({
   const [modalProvAbierto, setModalProvAbierto] = useState<boolean>(false);
   const [guardando, setGuardando] = useState<boolean>(false);
 
-  // Selector para agregar item
   const [prodSeleccionadoId, setProdSeleccionadoId] = useState<number | ''>('');
   const [cantInput, setCantInput] = useState<number>(1);
   const [costoInput, setCostoInput] = useState<number>(0);
@@ -68,8 +67,7 @@ export const ModalRegistroCompra: React.FC<ModalRegistroCompraProps> = ({
     const prod = productos.find((p) => p.id_producto === Number(prodSeleccionadoId));
     if (!prod) return;
 
-    const yaExiste = detalles.some((d) => d.id_producto === prod.id_producto);
-    if (yaExiste) {
+    if (detalles.some((d) => d.id_producto === prod.id_producto)) {
       onError('El producto ya está en la lista de la compra');
       return;
     }
@@ -80,8 +78,8 @@ export const ModalRegistroCompra: React.FC<ModalRegistroCompraProps> = ({
         id_producto: prod.id_producto,
         nombre: prod.nombre,
         unidad: prod.unidad_medida,
-        cantidad: cantInput,
-        costo_soles: costoInput,
+        cantidadInput: cantInput,
+        costoUnitarioSoles: costoInput,
       },
     ]);
 
@@ -110,7 +108,7 @@ export const ModalRegistroCompra: React.FC<ModalRegistroCompraProps> = ({
   };
 
   const totalCompraSoles = detalles.reduce(
-    (acc, item) => acc + item.cantidad * item.costo_soles,
+    (acc, item) => acc + item.cantidadInput * item.costoUnitarioSoles,
     0
   );
 
@@ -127,18 +125,38 @@ export const ModalRegistroCompra: React.FC<ModalRegistroCompraProps> = ({
 
     try {
       setGuardando(true);
-      const detallesPayload: DetalleIngresoRequestDTO[] = detalles.map((d) => ({
-        id_producto: d.id_producto,
-        cantidad: d.cantidad,
-        costo_efectivo_micro: Math.round(d.costo_soles * 1_000_000),
-      }));
+
+      const detallesPayload: DetalleIngresoRequestDTO[] = detalles.map((d) => {
+        const esML = d.unidad.toUpperCase() === 'ML';
+        const cantidadBase = esML
+          ? Math.round(d.cantidadInput * 1000)
+          : Math.round(d.cantidadInput);
+
+        let costoMicroCalculado = 0;
+        if (esML) {
+          const costoSolesPorML = d.costoUnitarioSoles / 1000;
+          const microRaw = Math.round(costoSolesPorML * 1_000_000);
+          costoMicroCalculado = Math.round(microRaw / 10_000) * 10_000;
+        } else {
+          const microRaw = Math.round(d.costoUnitarioSoles * 1_000_000);
+          costoMicroCalculado = Math.round(microRaw / 10_000) * 10_000;
+        }
+
+        const costoEfectivoMicro = Math.max(costoMicroCalculado, 10_000);
+
+        return {
+          id_producto: d.id_producto,
+          cantidad: cantidadBase,
+          costo_efectivo_micro: costoEfectivoMicro,
+        };
+      });
 
       const payload: RegistrarIngresoDTO = {
         origen: 'COMPRA',
         id_proveedor: Number(idProveedor),
         tipo_documento: tipoDocumento,
-        numero_documento: numeroDocumento.trim(),
-        fecha_documento: fechaDocumento,
+        numero_documento: tipoDocumento === 'SIN_DOCUMENTO' ? null : numeroDocumento.trim(),
+        fecha_documento: tipoDocumento === 'SIN_DOCUMENTO' ? null : fechaDocumento,
         observacion: observacion.trim() || null,
         detalles: detallesPayload,
       };
@@ -175,7 +193,7 @@ export const ModalRegistroCompra: React.FC<ModalRegistroCompraProps> = ({
     >
       <div
         style={{
-          width: '720px',
+          width: '740px',
           backgroundColor: '#0F172A',
           border: '1px solid #334155',
           borderRadius: '16px',
@@ -193,7 +211,6 @@ export const ModalRegistroCompra: React.FC<ModalRegistroCompraProps> = ({
           onSubmit={handleSubmit}
           style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}
         >
-          {/* Cabecera del Documento */}
           <div
             style={{
               display: 'grid',
@@ -267,7 +284,8 @@ export const ModalRegistroCompra: React.FC<ModalRegistroCompraProps> = ({
               >
                 <option value="FACTURA">FACTURA</option>
                 <option value="BOLETA">BOLETA</option>
-                <option value="GUIA">GUÍA DE REMISIÓN</option>
+                <option value="OTRO">OTRO COMPROBANTE</option>
+                <option value="SIN_DOCUMENTO">SIN DOCUMENTO (Interno)</option>
               </select>
             </div>
             <div>
@@ -279,15 +297,19 @@ export const ModalRegistroCompra: React.FC<ModalRegistroCompraProps> = ({
                   marginBottom: '4px',
                 }}
               >
-                N° Comprobante *
+                N° Comprobante {tipoDocumento === 'SIN_DOCUMENTO' ? '(Autogenerado)' : '*'}
               </label>
               <input
-                required
+                required={tipoDocumento !== 'SIN_DOCUMENTO'}
+                disabled={tipoDocumento === 'SIN_DOCUMENTO'}
                 type="text"
-                placeholder="F001-0001234"
-                value={numeroDocumento}
+                placeholder={tipoDocumento === 'SIN_DOCUMENTO' ? 'SD-Autogenerado' : 'F001-0001234'}
+                value={tipoDocumento === 'SIN_DOCUMENTO' ? '' : numeroDocumento}
                 onChange={(e) => setNumeroDocumento(e.target.value)}
-                style={modalInputStyle}
+                style={{
+                  ...modalInputStyle,
+                  opacity: tipoDocumento === 'SIN_DOCUMENTO' ? 0.5 : 1,
+                }}
               />
             </div>
             <div>
@@ -302,11 +324,15 @@ export const ModalRegistroCompra: React.FC<ModalRegistroCompraProps> = ({
                 Fecha Documento *
               </label>
               <input
-                required
+                required={tipoDocumento !== 'SIN_DOCUMENTO'}
+                disabled={tipoDocumento === 'SIN_DOCUMENTO'}
                 type="date"
                 value={fechaDocumento}
                 onChange={(e) => setFechaDocumento(e.target.value)}
-                style={modalInputStyle}
+                style={{
+                  ...modalInputStyle,
+                  opacity: tipoDocumento === 'SIN_DOCUMENTO' ? 0.5 : 1,
+                }}
               />
             </div>
           </div>
@@ -319,14 +345,13 @@ export const ModalRegistroCompra: React.FC<ModalRegistroCompraProps> = ({
             </label>
             <input
               type="text"
-              placeholder="Ej. Lote entregado en almacén principal con crédito a 30 días"
+              placeholder="Ej. Recepción de lote con guía interna o factura crédito"
               value={observacion}
               onChange={(e) => setObservacion(e.target.value)}
               style={modalInputStyle}
             />
           </div>
 
-          {/* Selector de Items */}
           <div
             style={{
               backgroundColor: '#1E293B',
@@ -363,7 +388,7 @@ export const ModalRegistroCompra: React.FC<ModalRegistroCompraProps> = ({
                   <option value="">Buscar Producto...</option>
                   {productos.map((p) => (
                     <option key={p.id_producto} value={p.id_producto}>
-                      {p.nombre} ({p.codigo})
+                      {p.nombre} ({p.codigo}) - [{p.unidad_medida}]
                     </option>
                   ))}
                 </select>
@@ -371,10 +396,11 @@ export const ModalRegistroCompra: React.FC<ModalRegistroCompraProps> = ({
               <div>
                 <input
                   type="number"
-                  min="1"
-                  placeholder="Cant"
+                  step="0.001"
+                  min="0.001"
+                  placeholder="Cant / Litros"
                   value={cantInput}
-                  onChange={(e) => setCantInput(parseInt(e.target.value, 10) || 1)}
+                  onChange={(e) => setCantInput(parseFloat(e.target.value) || 0)}
                   style={modalInputStyle}
                 />
               </div>
@@ -409,7 +435,6 @@ export const ModalRegistroCompra: React.FC<ModalRegistroCompraProps> = ({
             </div>
           </div>
 
-          {/* Tabla de Detalle */}
           <div
             style={{
               maxHeight: '180px',
@@ -422,8 +447,8 @@ export const ModalRegistroCompra: React.FC<ModalRegistroCompraProps> = ({
               <thead>
                 <tr style={{ backgroundColor: '#1E293B', color: '#94A3B8', textAlign: 'left' }}>
                   <th style={{ padding: '8px 12px' }}>Producto</th>
-                  <th style={{ padding: '8px 12px' }}>Cant</th>
-                  <th style={{ padding: '8px 12px' }}>Costo U.</th>
+                  <th style={{ padding: '8px 12px' }}>Cantidad</th>
+                  <th style={{ padding: '8px 12px' }}>Costo U. (S/)</th>
                   <th style={{ padding: '8px 12px' }}>Subtotal</th>
                   <th style={{ padding: '8px 12px', textAlign: 'center' }}>Acción</th>
                 </tr>
@@ -446,11 +471,11 @@ export const ModalRegistroCompra: React.FC<ModalRegistroCompraProps> = ({
                     >
                       <td style={{ padding: '8px 12px' }}>{d.nombre}</td>
                       <td style={{ padding: '8px 12px' }}>
-                        {d.cantidad} {d.unidad}
+                        {d.cantidadInput} {d.unidad === 'ML' ? 'Litros (L)' : 'UND'}
                       </td>
-                      <td style={{ padding: '8px 12px' }}>S/ {d.costo_soles.toFixed(2)}</td>
+                      <td style={{ padding: '8px 12px' }}>S/ {d.costoUnitarioSoles.toFixed(2)}</td>
                       <td style={{ padding: '8px 12px', fontWeight: '700', color: '#34D399' }}>
-                        S/ {(d.cantidad * d.costo_soles).toFixed(2)}
+                        S/ {(d.cantidadInput * d.costoUnitarioSoles).toFixed(2)}
                       </td>
                       <td style={{ padding: '8px 12px', textAlign: 'center' }}>
                         <button
@@ -472,7 +497,6 @@ export const ModalRegistroCompra: React.FC<ModalRegistroCompraProps> = ({
             </table>
           </div>
 
-          {/* Pie de Totales */}
           <div
             style={{
               display: 'flex',

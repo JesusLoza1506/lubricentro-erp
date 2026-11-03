@@ -1,14 +1,21 @@
-import React, { useState } from 'react';
-import { CrearProveedorDTO } from '../../../types/inventario';
+import React, { useState, useEffect } from 'react';
+import { AlertCircle } from 'lucide-react';
+import { ProveedorDTO, CrearProveedorDTO, ActualizarProveedorDTO } from '../../../types/inventario';
 import { modalInputStyle } from '../inventarioStyles';
 
 interface ModalProveedorProps {
   abierto: boolean;
+  proveedorAEditar?: ProveedorDTO | null;
   onClose: () => void;
-  onGuardar: (proveedor: CrearProveedorDTO) => Promise<void>;
+  onGuardar: (proveedor: CrearProveedorDTO | ActualizarProveedorDTO) => Promise<void>;
 }
 
-export const ModalProveedor: React.FC<ModalProveedorProps> = ({ abierto, onClose, onGuardar }) => {
+export const ModalProveedor: React.FC<ModalProveedorProps> = ({
+  abierto,
+  proveedorAEditar,
+  onClose,
+  onGuardar,
+}) => {
   const [form, setForm] = useState<CrearProveedorDTO>({
     tipo_documento: 'RUC',
     numero_documento: '',
@@ -19,19 +26,61 @@ export const ModalProveedor: React.FC<ModalProveedorProps> = ({ abierto, onClose
     contacto_asesor: '',
   });
   const [guardando, setGuardando] = useState(false);
+  const [errorModal, setErrorModal] = useState<string | null>(null);
+
+  useEffect(() => {
+    setErrorModal(null);
+    if (proveedorAEditar) {
+      setForm({
+        tipo_documento: proveedorAEditar.tipo_documento,
+        numero_documento: proveedorAEditar.numero_documento,
+        nombre_razon_social: proveedorAEditar.nombre_razon_social,
+        telefono: proveedorAEditar.telefono || '',
+        correo: proveedorAEditar.correo || '',
+        direccion: proveedorAEditar.direccion || '',
+        contacto_asesor: proveedorAEditar.contacto_asesor || '',
+      });
+    } else {
+      setForm({
+        tipo_documento: 'RUC',
+        numero_documento: '',
+        nombre_razon_social: '',
+        telefono: '',
+        correo: '',
+        direccion: '',
+        contacto_asesor: '',
+      });
+    }
+  }, [proveedorAEditar, abierto]);
 
   if (!abierto) return null;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setErrorModal(null);
     try {
       setGuardando(true);
-      await onGuardar({
-        ...form,
-        numero_documento: form.numero_documento.trim(),
-        nombre_razon_social: form.nombre_razon_social.trim(),
-      });
+      if (proveedorAEditar) {
+        await onGuardar({
+          ...form,
+          id_proveedor: proveedorAEditar.id_proveedor,
+          numero_documento: form.numero_documento.trim(),
+          nombre_razon_social: form.nombre_razon_social.trim(),
+        } as ActualizarProveedorDTO);
+      } else {
+        await onGuardar({
+          ...form,
+          numero_documento: form.numero_documento.trim(),
+          nombre_razon_social: form.nombre_razon_social.trim(),
+        });
+      }
       onClose();
+    } catch (err: unknown) {
+      const msg =
+        typeof err === 'string'
+          ? err
+          : (err as { message?: string })?.message || 'Error al guardar el proveedor.';
+      setErrorModal(msg);
     } finally {
       setGuardando(false);
     }
@@ -64,8 +113,28 @@ export const ModalProveedor: React.FC<ModalProveedorProps> = ({ abierto, onClose
         }}
       >
         <h3 style={{ fontSize: '18px', fontWeight: '800', color: '#F8FAFC', margin: '0 0 16px 0' }}>
-          Nuevo Proveedor
+          {proveedorAEditar ? 'Editar Proveedor' : 'Nuevo Proveedor'}
         </h3>
+
+        {errorModal && (
+          <div
+            style={{
+              backgroundColor: 'rgba(239, 68, 68, 0.15)',
+              border: '1px solid #EF4444',
+              color: '#F87171',
+              padding: '10px 14px',
+              borderRadius: '8px',
+              marginBottom: '14px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              fontSize: '12px',
+            }}
+          >
+            <AlertCircle size={16} />
+            <span>{errorModal}</span>
+          </div>
+        )}
 
         <form
           onSubmit={handleSubmit}
@@ -90,6 +159,7 @@ export const ModalProveedor: React.FC<ModalProveedorProps> = ({ abierto, onClose
               >
                 <option value="RUC">RUC</option>
                 <option value="DNI">DNI</option>
+                <option value="CE">CE (Carné Extr.)</option>
               </select>
             </div>
             <div>
@@ -199,7 +269,11 @@ export const ModalProveedor: React.FC<ModalProveedorProps> = ({ abierto, onClose
                 cursor: 'pointer',
               }}
             >
-              {guardando ? 'Guardando...' : 'Crear Proveedor'}
+              {guardando
+                ? 'Guardando...'
+                : proveedorAEditar
+                  ? 'Guardar Cambios'
+                  : 'Crear Proveedor'}
             </button>
           </div>
         </form>

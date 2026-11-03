@@ -1,7 +1,6 @@
 use crate::entities::producto::ProductoEntity;
 use serde::{Deserialize, Serialize};
 
-/// DTO Público (Cajeros y Mecánicos): Jamás expone costos ni valores de almacén
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct ProductoPublicoDto {
     pub id_producto: i64,
@@ -14,6 +13,7 @@ pub struct ProductoPublicoDto {
     pub stock_minimo: i64,
     pub precio_venta_cent: i64,
     pub es_critico: bool,
+    pub activo: bool,
 }
 
 impl ProductoPublicoDto {
@@ -30,11 +30,11 @@ impl ProductoPublicoDto {
             stock_minimo: entity.stock_minimo,
             precio_venta_cent: entity.precio_venta_cent,
             es_critico,
+            activo: entity.activo == 1,
         }
     }
 }
 
-/// DTO Administración: Incluye valoración en micro-soles, costos y márgenes
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct ProductoAdminDto {
     pub id_producto: i64,
@@ -49,6 +49,7 @@ pub struct ProductoAdminDto {
     pub ultimo_costo_micro: Option<i64>,
     pub precio_venta_cent: i64,
     pub es_critico: bool,
+    pub activo: bool,
 }
 
 impl ProductoAdminDto {
@@ -67,6 +68,7 @@ impl ProductoAdminDto {
             ultimo_costo_micro: entity.ultimo_costo_micro,
             precio_venta_cent: entity.precio_venta_cent,
             es_critico,
+            activo: entity.activo == 1,
         }
     }
 }
@@ -80,8 +82,7 @@ pub struct CrearProductoDto {
     pub unidad_medida: String, // UND | ML
     pub stock_minimo: i64,
     pub precio_venta_cent: i64,
-    // Stock e ingreso inicial opcional
-    pub cantidad_inicial: Option<i64>,
+    pub cantidad_inicial: Option<f64>,
     pub costo_unitario_inicial_micro: Option<i64>,
     pub referencia_inicial: Option<String>,
 }
@@ -99,7 +100,34 @@ pub struct ActualizarProductoDto {
 pub struct AjustarStockDto {
     pub id_producto: i64,
     pub tipo_ajuste: String,               // "ENTRADA" | "SALIDA"
-    pub cantidad: i64,                     // Cantidad positiva a ajustar
+    pub cantidad: i64,                     // Cantidad en UND o ML
     pub costo_unitario_micro: Option<i64>, // Requerido para ENTRADA
     pub motivo: String,                    // Obligatorio de 5 a 250 caracteres
+}
+
+#[derive(Debug, Deserialize)]
+pub struct ConteoFisicoDto {
+    pub id_producto: i64,
+    pub stock_fisico_contado: f64, // En unidades o litros según el caso
+    pub stock_observado: Option<f64>, // Concurrencia Optimista: Stock en pantalla antes de contar
+    pub costo_unitario_micro: Option<i64>, // Solo para sobrantes cuando stock_actual es 0
+    pub motivo: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MovimientoKardexDto {
+    pub id_movimiento: i64,
+    pub id_producto: i64,
+    pub tipo_movimiento: String,
+    pub unidad_medida: String,
+    pub stock_anterior: i64,
+    pub diferencia: i64,
+    pub stock_resultante: i64,
+    pub valor_anterior_micro: i64,
+    pub valor_delta_micro: i64,
+    pub valor_resultante_micro: i64,
+    pub costo_unitario_micro: i64,
+    pub motivo: Option<String>,
+    pub fecha_movimiento: String,
+    pub usuario_nombre: Option<String>,
 }

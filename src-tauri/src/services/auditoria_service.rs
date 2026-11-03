@@ -1,5 +1,5 @@
 use crate::errors::AppError;
-use rusqlite::{params, Connection};
+use rusqlite::{params, Connection, Transaction};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -25,6 +25,108 @@ pub struct AuditoriaDto {
 pub struct AuditoriaService;
 
 impl AuditoriaService {
+    pub fn obtener_snapshot_usuario(
+        conn: &Connection,
+        id_usuario: i64,
+    ) -> (Option<String>, Option<String>) {
+        conn.query_row(
+            "SELECT username, rol FROM usuarios WHERE id_usuario = ?1",
+            [id_usuario],
+            |r| Ok((r.get(0)?, r.get(1)?)),
+        )
+        .unwrap_or((None, None))
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub fn registrar_transaccion_v5(
+        tx: &Transaction,
+        id_usuario: Option<i64>,
+        actor: &str,
+        username_snapshot: Option<&str>,
+        rol_snapshot: Option<&str>,
+        id_autorizante: Option<i64>,
+        modulo: &str,
+        accion: &str,
+        entidad: Option<&str>,
+        id_entidad: Option<&str>,
+        antes_json: Option<&str>,
+        despues_json: Option<&str>,
+        motivo: Option<&str>,
+        resultado: &str,
+    ) -> Result<(), AppError> {
+        let id_op = format!("aud_{}", uuid::Uuid::new_v4().simple());
+
+        let (snap_user_fetched, snap_rol_fetched) =
+            match (id_usuario, username_snapshot, rol_snapshot) {
+                (Some(uid), None, _) | (Some(uid), _, None) => {
+                    Self::obtener_snapshot_usuario(tx, uid)
+                }
+                _ => (
+                    username_snapshot.map(|s| s.to_string()),
+                    rol_snapshot.map(|s| s.to_string()),
+                ),
+            };
+
+        let user_ref = username_snapshot.or(snap_user_fetched.as_deref());
+        let rol_ref = rol_snapshot.or(snap_rol_fetched.as_deref());
+
+        let es_actor_usuario = actor == "USUARIO" && id_usuario.is_some();
+
+        let actor_final = if es_actor_usuario {
+            "USUARIO"
+        } else if actor == "SISTEMA" {
+            "SISTEMA"
+        } else {
+            "NO_IDENTIFICADO"
+        };
+
+        let id_usr_final = if actor_final == "USUARIO" {
+            id_usuario
+        } else {
+            None
+        };
+        let user_snap_final = if actor_final == "USUARIO" {
+            user_ref
+        } else {
+            None
+        };
+        let rol_snap_final = if actor_final == "USUARIO" {
+            rol_ref
+        } else {
+            None
+        };
+
+        tx.execute(
+            "INSERT INTO auditoria (
+                id_operacion, id_usuario, actor, username_snapshot, rol_snapshot,
+                id_autorizante, modulo, accion, entidad, id_entidad,
+                antes_json, despues_json, motivo, resultado
+            ) VALUES (
+                ?1, ?2, ?3, ?4, ?5,
+                ?6, ?7, ?8, ?9, ?10,
+                ?11, ?12, ?13, ?14
+            )",
+            params![
+                id_op,
+                id_usr_final,
+                actor_final,
+                user_snap_final,
+                rol_snap_final,
+                id_autorizante,
+                modulo,
+                accion,
+                entidad,
+                id_entidad,
+                antes_json,
+                despues_json,
+                motivo,
+                resultado
+            ],
+        )?;
+
+        Ok(())
+    }
+
     #[allow(clippy::too_many_arguments)]
     pub fn registrar_v5(
         conn: &Connection,
@@ -44,10 +146,21 @@ impl AuditoriaService {
     ) -> Result<(), AppError> {
         let id_op = format!("aud_{}", uuid::Uuid::new_v4().simple());
 
-        let es_actor_usuario = actor == "USUARIO"
-            && id_usuario.is_some()
-            && username_snapshot.is_some()
-            && rol_snapshot.is_some();
+        let (snap_user_fetched, snap_rol_fetched) =
+            match (id_usuario, username_snapshot, rol_snapshot) {
+                (Some(uid), None, _) | (Some(uid), _, None) => {
+                    Self::obtener_snapshot_usuario(conn, uid)
+                }
+                _ => (
+                    username_snapshot.map(|s| s.to_string()),
+                    rol_snapshot.map(|s| s.to_string()),
+                ),
+            };
+
+        let user_ref = username_snapshot.or(snap_user_fetched.as_deref());
+        let rol_ref = rol_snapshot.or(snap_rol_fetched.as_deref());
+
+        let es_actor_usuario = actor == "USUARIO" && id_usuario.is_some();
 
         let actor_final = if es_actor_usuario {
             "USUARIO"
@@ -63,12 +176,12 @@ impl AuditoriaService {
             None
         };
         let user_snap_final = if actor_final == "USUARIO" {
-            username_snapshot
+            user_ref
         } else {
             None
         };
         let rol_snap_final = if actor_final == "USUARIO" {
-            rol_snapshot
+            rol_ref
         } else {
             None
         };

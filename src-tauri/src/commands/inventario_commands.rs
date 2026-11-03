@@ -1,11 +1,17 @@
-use crate::dto::ingreso_dto::RegistrarIngresoDto;
+use crate::dto::ingreso_dto::{AnularIngresoDto, IngresoStockResponseDto, RegistrarIngresoDto};
 use crate::dto::producto_dto::{
-    ActualizarProductoDto, AjustarStockDto, CrearProductoDto, ProductoAdminDto, ProductoPublicoDto,
+    ActualizarProductoDto, AjustarStockDto, ConteoFisicoDto, CrearProductoDto, MovimientoKardexDto,
+    ProductoAdminDto, ProductoPublicoDto,
 };
-use crate::dto::proveedor_dto::{CrearProveedorDto, ProveedorDto};
+use crate::dto::proveedor_dto::{
+    ActualizarProveedorDto, ActualizarServicioDto, CrearProveedorDto, CrearServicioDto,
+    ProveedorDto, ServicioMantenimientoDto,
+};
 use crate::entities::categoria::CategoriaEntity;
 use crate::errors::AppError;
-use crate::services::inventario_service::InventarioService;
+use crate::services::inventario_service::{
+    InventarioService, ProductosPaginadosDto, ResumenSaldosKardexDto,
+};
 use crate::services::session_manager::SessionState;
 use rusqlite::Connection;
 use serde::Serialize;
@@ -41,6 +47,7 @@ pub enum ListarProductosResponse {
 pub fn listar_productos_cmd(
     db_state: State<'_, Mutex<Connection>>,
     session_state: State<'_, Mutex<SessionState>>,
+    incluir_inactivos: Option<bool>,
 ) -> Result<ListarProductosResponse, AppError> {
     let mut session = session_state
         .lock()
@@ -57,13 +64,42 @@ pub fn listar_productos_cmd(
 
     if rol == "ADMINISTRADOR" {
         Ok(ListarProductosResponse::Admin(
-            InventarioService::listar_productos_admin(&conn)?,
+            InventarioService::listar_productos_admin(&conn, incluir_inactivos.unwrap_or(false))?,
         ))
     } else {
         Ok(ListarProductosResponse::Publico(
             InventarioService::listar_productos_publicos(&conn)?,
         ))
     }
+}
+
+#[tauri::command]
+pub fn listar_productos_admin_paginado_cmd(
+    db_state: State<'_, Mutex<Connection>>,
+    session_state: State<'_, Mutex<SessionState>>,
+    busqueda: Option<String>,
+    categoria: Option<String>,
+    incluir_inactivos: Option<bool>,
+    limite: Option<i64>,
+    offset: Option<i64>,
+) -> Result<ProductosPaginadosDto, AppError> {
+    let mut session = session_state
+        .lock()
+        .map_err(|_| AppError::Validation("Error de sesión".into()))?;
+    let conn = db_state
+        .lock()
+        .map_err(|_| AppError::Validation("Error de BD".into()))?;
+
+    verificar_permiso_sesion(&mut session, &conn, &["ADMINISTRADOR"])?;
+
+    InventarioService::listar_productos_admin_paginado(
+        &conn,
+        busqueda,
+        categoria,
+        incluir_inactivos,
+        limite.unwrap_or(20),
+        offset.unwrap_or(0),
+    )
 }
 
 #[tauri::command]
@@ -143,13 +179,13 @@ pub fn actualizar_producto_cmd(
     let mut session = session_state
         .lock()
         .map_err(|_| AppError::Validation("Error de sesión".into()))?;
-    let conn = db_state
+    let mut conn = db_state
         .lock()
         .map_err(|_| AppError::Validation("Error de BD".into()))?;
 
-    verificar_permiso_sesion(&mut session, &conn, &["ADMINISTRADOR"])?;
+    let (id_u, _) = verificar_permiso_sesion(&mut session, &conn, &["ADMINISTRADOR"])?;
 
-    InventarioService::actualizar_producto(&conn, payload)
+    InventarioService::actualizar_producto(&mut conn, payload, id_u)
 }
 
 #[tauri::command]
@@ -161,13 +197,31 @@ pub fn eliminar_producto_cmd(
     let mut session = session_state
         .lock()
         .map_err(|_| AppError::Validation("Error de sesión".into()))?;
-    let conn = db_state
+    let mut conn = db_state
         .lock()
         .map_err(|_| AppError::Validation("Error de BD".into()))?;
 
-    verificar_permiso_sesion(&mut session, &conn, &["ADMINISTRADOR"])?;
+    let (id_u, _) = verificar_permiso_sesion(&mut session, &conn, &["ADMINISTRADOR"])?;
 
-    InventarioService::eliminar_producto(&conn, id_producto)
+    InventarioService::eliminar_producto(&mut conn, id_producto, id_u)
+}
+
+#[tauri::command]
+pub fn reactivar_producto_cmd(
+    db_state: State<'_, Mutex<Connection>>,
+    session_state: State<'_, Mutex<SessionState>>,
+    id_producto: i64,
+) -> Result<(), AppError> {
+    let mut session = session_state
+        .lock()
+        .map_err(|_| AppError::Validation("Error de sesión".into()))?;
+    let mut conn = db_state
+        .lock()
+        .map_err(|_| AppError::Validation("Error de BD".into()))?;
+
+    let (id_u, _) = verificar_permiso_sesion(&mut session, &conn, &["ADMINISTRADOR"])?;
+
+    InventarioService::reactivar_producto(&mut conn, id_producto, id_u)
 }
 
 #[tauri::command]
@@ -191,12 +245,17 @@ pub fn despachar_producto_granel_cmd(
         &["ADMINISTRADOR", "CAJERO", "MECANICO"],
     )?;
 
+    let motivo_valido = match motivo {
+        Some(m) if m.trim().len() >= 5 => m.trim().to_string(),
+        _ => "Despacho directo de lubricante a granel".to_string(),
+    };
+
     let payload = AjustarStockDto {
         id_producto,
         tipo_ajuste: "SALIDA".to_string(),
         cantidad,
         costo_unitario_micro: None,
-        motivo: motivo.unwrap_or_else(|| "Despacho a Granel".to_string()),
+        motivo: motivo_valido,
     };
 
     InventarioService::ajustar_stock(&mut conn, payload, id_u)
@@ -221,6 +280,51 @@ pub fn registrar_ingreso_compra_cmd(
 }
 
 #[tauri::command]
+pub fn listar_ingresos_stock_cmd(
+    db_state: State<'_, Mutex<Connection>>,
+    session_state: State<'_, Mutex<SessionState>>,
+    limite: Option<i64>,
+    offset: Option<i64>,
+    estado: Option<String>,
+    origen: Option<String>,
+) -> Result<Vec<IngresoStockResponseDto>, AppError> {
+    let mut session = session_state
+        .lock()
+        .map_err(|_| AppError::Validation("Error de sesión".into()))?;
+    let conn = db_state
+        .lock()
+        .map_err(|_| AppError::Validation("Error de BD".into()))?;
+
+    verificar_permiso_sesion(&mut session, &conn, &["ADMINISTRADOR"])?;
+
+    InventarioService::listar_ingresos_stock(
+        &conn,
+        limite.unwrap_or(20),
+        offset.unwrap_or(0),
+        estado,
+        origen,
+    )
+}
+
+#[tauri::command]
+pub fn anular_ingreso_compra_cmd(
+    db_state: State<'_, Mutex<Connection>>,
+    session_state: State<'_, Mutex<SessionState>>,
+    payload: AnularIngresoDto,
+) -> Result<(), AppError> {
+    let mut session = session_state
+        .lock()
+        .map_err(|_| AppError::Validation("Error de sesión".into()))?;
+    let mut conn = db_state
+        .lock()
+        .map_err(|_| AppError::Validation("Error de BD".into()))?;
+
+    let (id_u, _) = verificar_permiso_sesion(&mut session, &conn, &["ADMINISTRADOR"])?;
+
+    InventarioService::anular_ingreso_compra(&mut conn, payload, id_u)
+}
+
+#[tauri::command]
 pub fn ajustar_stock_cmd(
     db_state: State<'_, Mutex<Connection>>,
     session_state: State<'_, Mutex<SessionState>>,
@@ -236,6 +340,83 @@ pub fn ajustar_stock_cmd(
     let (id_u, _) = verificar_permiso_sesion(&mut session, &conn, &["ADMINISTRADOR"])?;
 
     InventarioService::ajustar_stock(&mut conn, payload, id_u)
+}
+
+#[tauri::command]
+pub fn procesar_conteo_fisico_cmd(
+    db_state: State<'_, Mutex<Connection>>,
+    session_state: State<'_, Mutex<SessionState>>,
+    payload: ConteoFisicoDto,
+) -> Result<(), AppError> {
+    let mut session = session_state
+        .lock()
+        .map_err(|_| AppError::Validation("Error de sesión".into()))?;
+    let mut conn = db_state
+        .lock()
+        .map_err(|_| AppError::Validation("Error de BD".into()))?;
+
+    let (id_u, _) = verificar_permiso_sesion(&mut session, &conn, &["ADMINISTRADOR"])?;
+
+    InventarioService::procesar_conteo_fisico(&mut conn, payload, id_u)
+}
+
+#[tauri::command]
+#[allow(clippy::too_many_arguments)]
+pub fn listar_kardex_producto_cmd(
+    db_state: State<'_, Mutex<Connection>>,
+    session_state: State<'_, Mutex<SessionState>>,
+    id_producto: i64,
+    limite: Option<i64>,
+    offset: Option<i64>,
+    fecha_inicio: Option<String>,
+    fecha_fin: Option<String>,
+    tipo_movimiento: Option<String>,
+) -> Result<Vec<MovimientoKardexDto>, AppError> {
+    let mut session = session_state
+        .lock()
+        .map_err(|_| AppError::Validation("Error de sesión".into()))?;
+    let conn = db_state
+        .lock()
+        .map_err(|_| AppError::Validation("Error de BD".into()))?;
+
+    verificar_permiso_sesion(&mut session, &conn, &["ADMINISTRADOR"])?;
+
+    InventarioService::listar_kardex_producto(
+        &conn,
+        id_producto,
+        limite.unwrap_or(20),
+        offset.unwrap_or(0),
+        fecha_inicio,
+        fecha_fin,
+        tipo_movimiento,
+    )
+}
+
+#[tauri::command]
+pub fn obtener_resumen_saldos_kardex_cmd(
+    db_state: State<'_, Mutex<Connection>>,
+    session_state: State<'_, Mutex<SessionState>>,
+    id_producto: i64,
+    fecha_inicio: Option<String>,
+    fecha_fin: Option<String>,
+    tipo_movimiento: Option<String>,
+) -> Result<ResumenSaldosKardexDto, AppError> {
+    let mut session = session_state
+        .lock()
+        .map_err(|_| AppError::Validation("Error de sesión".into()))?;
+    let conn = db_state
+        .lock()
+        .map_err(|_| AppError::Validation("Error de BD".into()))?;
+
+    verificar_permiso_sesion(&mut session, &conn, &["ADMINISTRADOR"])?;
+
+    InventarioService::obtener_resumen_saldos_kardex(
+        &conn,
+        id_producto,
+        fecha_inicio,
+        fecha_fin,
+        tipo_movimiento,
+    )
 }
 
 #[tauri::command]
@@ -292,4 +473,115 @@ pub fn crear_proveedor_cmd(
     verificar_permiso_sesion(&mut session, &conn, &["ADMINISTRADOR"])?;
 
     InventarioService::crear_proveedor(&conn, payload)
+}
+
+#[tauri::command]
+pub fn actualizar_proveedor_cmd(
+    db_state: State<'_, Mutex<Connection>>,
+    session_state: State<'_, Mutex<SessionState>>,
+    payload: ActualizarProveedorDto,
+) -> Result<(), AppError> {
+    let mut session = session_state
+        .lock()
+        .map_err(|_| AppError::Validation("Error de sesión".into()))?;
+    let conn = db_state
+        .lock()
+        .map_err(|_| AppError::Validation("Error de BD".into()))?;
+
+    verificar_permiso_sesion(&mut session, &conn, &["ADMINISTRADOR"])?;
+
+    InventarioService::actualizar_proveedor(&conn, payload)
+}
+
+#[tauri::command]
+pub fn listar_servicios_admin_cmd(
+    db_state: State<'_, Mutex<Connection>>,
+    session_state: State<'_, Mutex<SessionState>>,
+) -> Result<Vec<ServicioMantenimientoDto>, AppError> {
+    let mut session = session_state
+        .lock()
+        .map_err(|_| AppError::Validation("Error de sesión".into()))?;
+    let conn = db_state
+        .lock()
+        .map_err(|_| AppError::Validation("Error de BD".into()))?;
+
+    verificar_permiso_sesion(&mut session, &conn, &["ADMINISTRADOR"])?;
+
+    InventarioService::listar_servicios_admin(&conn)
+}
+
+#[tauri::command]
+pub fn listar_servicios_publicos_cmd(
+    db_state: State<'_, Mutex<Connection>>,
+    session_state: State<'_, Mutex<SessionState>>,
+) -> Result<Vec<ServicioMantenimientoDto>, AppError> {
+    let mut session = session_state
+        .lock()
+        .map_err(|_| AppError::Validation("Error de sesión".into()))?;
+    let conn = db_state
+        .lock()
+        .map_err(|_| AppError::Validation("Error de BD".into()))?;
+
+    verificar_permiso_sesion(
+        &mut session,
+        &conn,
+        &["ADMINISTRADOR", "CAJERO", "MECANICO"],
+    )?;
+
+    InventarioService::listar_servicios_admin(&conn)
+}
+
+#[tauri::command]
+pub fn crear_servicio_cmd(
+    db_state: State<'_, Mutex<Connection>>,
+    session_state: State<'_, Mutex<SessionState>>,
+    payload: CrearServicioDto,
+) -> Result<i64, AppError> {
+    let mut session = session_state
+        .lock()
+        .map_err(|_| AppError::Validation("Error de sesión".into()))?;
+    let mut conn = db_state
+        .lock()
+        .map_err(|_| AppError::Validation("Error de BD".into()))?;
+
+    let (id_u, _) = verificar_permiso_sesion(&mut session, &conn, &["ADMINISTRADOR"])?;
+
+    InventarioService::crear_servicio(&mut conn, payload, id_u)
+}
+
+#[tauri::command]
+pub fn actualizar_servicio_cmd(
+    db_state: State<'_, Mutex<Connection>>,
+    session_state: State<'_, Mutex<SessionState>>,
+    payload: ActualizarServicioDto,
+) -> Result<(), AppError> {
+    let mut session = session_state
+        .lock()
+        .map_err(|_| AppError::Validation("Error de sesión".into()))?;
+    let mut conn = db_state
+        .lock()
+        .map_err(|_| AppError::Validation("Error de BD".into()))?;
+
+    let (id_u, _) = verificar_permiso_sesion(&mut session, &conn, &["ADMINISTRADOR"])?;
+
+    InventarioService::actualizar_servicio(&mut conn, payload, id_u)
+}
+
+#[tauri::command]
+pub fn cambiar_estado_servicio_cmd(
+    db_state: State<'_, Mutex<Connection>>,
+    session_state: State<'_, Mutex<SessionState>>,
+    id_servicio: i64,
+    activo: bool,
+) -> Result<(), AppError> {
+    let mut session = session_state
+        .lock()
+        .map_err(|_| AppError::Validation("Error de sesión".into()))?;
+    let mut conn = db_state
+        .lock()
+        .map_err(|_| AppError::Validation("Error de BD".into()))?;
+
+    let (id_u, _) = verificar_permiso_sesion(&mut session, &conn, &["ADMINISTRADOR"])?;
+
+    InventarioService::cambiar_estado_servicio(&mut conn, id_servicio, activo, id_u)
 }

@@ -1,13 +1,16 @@
 import React, { useEffect, useState } from 'react';
-import { CheckCircle2, XCircle } from 'lucide-react';
+import { CheckCircle2, XCircle, Wrench, Package, History } from 'lucide-react';
 import {
   Producto,
   Categoria,
   CrearProductoDTO,
   EditarProductoDTO,
   ProductoForm,
-  AjustarStockDTO,
+  ConteoFisicoDTO,
   ProductoAdminDTO,
+  ServicioDTO,
+  CrearServicioDTO,
+  ActualizarServicioDTO,
 } from '../../types/inventario';
 import { inventarioService } from '../../services/inventarioService';
 import { InventarioHeader } from './components/InventarioHeader';
@@ -17,6 +20,9 @@ import { InventarioModal, ModoModal } from './components/InventarioModal';
 import { ModalDespacho } from './components/ModalDespacho';
 import { ModalAjusteStock } from './components/ModalAjusteStock';
 import { ModalRegistroCompra } from './components/ModalRegistroCompra';
+import { ModalKardex } from './components/ModalKardex';
+import { ModalServicio } from './components/ModalServicio';
+import { ModalHistorialEntradas } from './components/ModalHistorialEntradas';
 import { ConfirmModal } from '../../components/ConfirmModal';
 import { useAuth } from '../../context/AuthContext';
 
@@ -38,18 +44,40 @@ export const InventarioPage: React.FC = () => {
   const { usuario } = useAuth();
   const esAdmin = usuario?.rol?.toUpperCase() === 'ADMINISTRADOR';
 
+  // Pestaña principal: 'PRODUCTOS' | 'SERVICIOS'
+  const [tabActiva, setTabActiva] = useState<'PRODUCTOS' | 'SERVICIOS'>('PRODUCTOS');
+
+  // Estado de Productos (Paginados backend)
   const [productos, setProductos] = useState<Producto[]>([]);
+  const [totalRegistros, setTotalRegistros] = useState<number>(0);
+  const [paginaActual, setPaginaActual] = useState<number>(1);
+  const limitePagina = 20;
+
+  // Estado de Servicios
+  const [servicios, setServicios] = useState<ServicioDTO[]>([]);
+
   const [categorias, setCategorias] = useState<Categoria[]>([]);
   const [cargando, setCargando] = useState<boolean>(true);
   const [despachando, setDespachando] = useState<boolean>(false);
   const [busqueda, setBusqueda] = useState<string>('');
   const [filtroCritico, setFiltroCritico] = useState<boolean>(false);
+  const [mostrarInactivos, setMostrarInactivos] = useState<boolean>(false);
 
-  // Modales
+  // Modales Productos
   const [modalAbierto, setModalAbierto] = useState<boolean>(false);
   const [modoModal, setModoModal] = useState<ModoModal>('CREAR');
   const [prodForm, setProdForm] = useState<ProductoForm>(prodInicial);
   const [modalCompraAbierto, setModalCompraAbierto] = useState<boolean>(false);
+  const [modalHistorialEntradas, setModalHistorialEntradas] = useState<boolean>(false);
+
+  // Modales Servicios
+  const [modalServicioAbierto, setModalServicioAbierto] = useState(false);
+  const [servicioAEditar, setServicioAEditar] = useState<ServicioDTO | null>(null);
+
+  const [modalKardex, setModalKardex] = useState<{ abierto: boolean; producto: Producto | null }>({
+    abierto: false,
+    producto: null,
+  });
 
   const [modalDespacho, setModalDespacho] = useState<{
     abierto: boolean;
@@ -61,24 +89,14 @@ export const InventarioPage: React.FC = () => {
   const [modalAjuste, setModalAjuste] = useState<{
     abierto: boolean;
     producto: Producto | null;
-    tipo_ajuste: 'ENTRADA' | 'SALIDA';
-    cantidad: number;
-    costo_unitario_soles: number;
-    motivo: string;
-  }>({
-    abierto: false,
-    producto: null,
-    tipo_ajuste: 'SALIDA',
-    cantidad: 1,
-    costo_unitario_soles: 0,
-    motivo: '',
-  });
+  }>({ abierto: false, producto: null });
 
   const [confirmModal, setConfirmModal] = useState<{
     abierto: boolean;
     id: number | null;
     nombre: string;
-  }>({ abierto: false, id: null, nombre: '' });
+    accion: 'DESACTIVAR' | 'REACTIVAR';
+  }>({ abierto: false, id: null, nombre: '', accion: 'DESACTIVAR' });
 
   const [notificacion, setNotificacion] = useState<string | null>(null);
   const [errorModalMsg, setErrorModalMsg] = useState<string | null>(null);
@@ -88,31 +106,90 @@ export const InventarioPage: React.FC = () => {
     setTimeout(() => setNotificacion(null), 3500);
   };
 
-  const cargarDatos = async () => {
+  const cargarProductosPaginados = async () => {
     setCargando(true);
     try {
-      const [prodsData, catsData] = await Promise.all([
-        filtroCritico
-          ? inventarioService.listarProductosCriticos()
-          : inventarioService.listarProductos(),
-        inventarioService.listarCategorias(),
-      ]);
-      setProductos(prodsData || []);
-      setCategorias(catsData || []);
+      if (filtroCritico) {
+        const prodsCriticos = await inventarioService.listarProductosCriticos();
+        setProductos((prodsCriticos as Producto[]) || []);
+        setTotalRegistros(prodsCriticos ? prodsCriticos.length : 0);
+      } else if (esAdmin) {
+        const offset = (paginaActual - 1) * limitePagina;
+        const resp = await inventarioService.listarProductosAdminPaginado(
+          busqueda.trim() || undefined,
+          undefined,
+          mostrarInactivos,
+          limitePagina,
+          offset
+        );
+        setProductos(resp.productos || []);
+        setTotalRegistros(resp.total_registros || 0);
+      } else {
+        // Rol CAJERO / MECANICO: usa catálogo público autorizado
+        const prodsPublicos = await inventarioService.listarProductosPublicos();
+        let filtrados = prodsPublicos || [];
+        if (busqueda.trim()) {
+          const q = busqueda.trim().toLowerCase();
+          filtrados = filtrados.filter(
+            (p) => p.nombre.toLowerCase().includes(q) || p.codigo.toLowerCase().includes(q)
+          );
+        }
+        setTotalRegistros(filtrados.length);
+        const offset = (paginaActual - 1) * limitePagina;
+        const paginados = filtrados.slice(offset, offset + limitePagina);
+        setProductos(paginados as Producto[]);
+      }
     } catch (err: unknown) {
       const msg =
         typeof err === 'string'
           ? err
-          : (err as { message?: string })?.message || 'Error al cargar inventario';
+          : (err as { message?: string })?.message || 'Error al cargar productos';
       setErrorModalMsg(msg);
     } finally {
       setCargando(false);
     }
   };
 
+  const cargarServicios = async () => {
+    setCargando(true);
+    try {
+      const data = esAdmin
+        ? await inventarioService.listarServiciosAdmin()
+        : await inventarioService.listarServiciosPublicos();
+      setServicios(data || []);
+    } catch (err: unknown) {
+      const msg =
+        typeof err === 'string'
+          ? err
+          : (err as { message?: string })?.message || 'Error al cargar servicios';
+      setErrorModalMsg(msg);
+    } finally {
+      setCargando(false);
+    }
+  };
+
+  const cargarCategorias = async () => {
+    try {
+      const cats = await inventarioService.listarCategorias();
+      setCategorias(cats || []);
+    } catch {
+      // Ignorar fallback
+    }
+  };
+
   useEffect(() => {
-    cargarDatos();
-  }, [filtroCritico]);
+    cargarCategorias();
+  }, []);
+
+  useEffect(() => {
+    if (tabActiva === 'PRODUCTOS') {
+      cargarProductosPaginados();
+    } else {
+      cargarServicios();
+    }
+  }, [tabActiva, paginaActual, filtroCritico, mostrarInactivos, busqueda, esAdmin]);
+
+  const totalPaginas = Math.max(1, Math.ceil(totalRegistros / limitePagina));
 
   const abrirModalCrear = () => {
     setModoModal('CREAR');
@@ -198,7 +275,7 @@ export const InventarioPage: React.FC = () => {
         mostrarToast('Producto actualizado correctamente');
       }
       setModalAbierto(false);
-      cargarDatos();
+      cargarProductosPaginados();
     } catch (err: unknown) {
       const msg =
         typeof err === 'string'
@@ -220,7 +297,7 @@ export const InventarioPage: React.FC = () => {
       );
       mostrarToast(`Despacho registrado para "${modalDespacho.producto.nombre}"`);
       setModalDespacho({ abierto: false, producto: null, cantidad: 1, motivo: '' });
-      cargarDatos();
+      cargarProductosPaginados();
     } catch (err: unknown) {
       const msg =
         typeof err === 'string'
@@ -232,62 +309,75 @@ export const InventarioPage: React.FC = () => {
     }
   };
 
-  const ejecutarAjuste = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!modalAjuste.producto) return;
+  const ejecutarAjusteConteo = async (payload: ConteoFisicoDTO) => {
     try {
-      const payload: AjustarStockDTO = {
-        id_producto: modalAjuste.producto.id_producto,
-        tipo_ajuste: modalAjuste.tipo_ajuste,
-        cantidad: Number(modalAjuste.cantidad),
-        costo_unitario_micro:
-          modalAjuste.tipo_ajuste === 'ENTRADA'
-            ? Math.round(Number(modalAjuste.costo_unitario_soles) * 1_000_000)
-            : null,
-        motivo: modalAjuste.motivo.trim(),
-      };
-      await inventarioService.ajustarStock(payload);
-      mostrarToast(`Ajuste registrado para "${modalAjuste.producto.nombre}"`);
-      setModalAjuste({
-        abierto: false,
-        producto: null,
-        tipo_ajuste: 'SALIDA',
-        cantidad: 1,
-        costo_unitario_soles: 0,
-        motivo: '',
-      });
-      cargarDatos();
+      await inventarioService.procesarConteoFisico(payload);
+      mostrarToast('Conteo físico reconciliado correctamente');
+      cargarProductosPaginados();
     } catch (err: unknown) {
       const msg =
         typeof err === 'string'
           ? err
-          : (err as { message?: string })?.message || 'Error al guardar el ajuste';
+          : (err as { message?: string })?.message || 'Error al aplicar el conteo físico';
       setErrorModalMsg(msg);
+      throw err;
     }
   };
 
-  const ejecutarEliminacion = async () => {
+  const ejecutarCambioEstado = async () => {
     if (!confirmModal.id) return;
     try {
-      await inventarioService.eliminarProducto(confirmModal.id);
-      setConfirmModal({ abierto: false, id: null, nombre: '' });
-      mostrarToast(`Producto "${confirmModal.nombre}" dado de baja correctamente`);
-      cargarDatos();
+      if (confirmModal.accion === 'DESACTIVAR') {
+        await inventarioService.eliminarProducto(confirmModal.id);
+        mostrarToast(`Producto "${confirmModal.nombre}" dado de baja correctamente`);
+      } else {
+        await inventarioService.reactivarProducto(confirmModal.id);
+        mostrarToast(`Producto "${confirmModal.nombre}" reactivado correctamente`);
+      }
+      setConfirmModal({ abierto: false, id: null, nombre: '', accion: 'DESACTIVAR' });
+      cargarProductosPaginados();
     } catch (err: unknown) {
-      setConfirmModal({ abierto: false, id: null, nombre: '' });
+      setConfirmModal({ abierto: false, id: null, nombre: '', accion: 'DESACTIVAR' });
       const msg =
         typeof err === 'string'
           ? err
-          : (err as { message?: string })?.message || 'Error al dar de baja el producto';
+          : (err as { message?: string })?.message || 'Error al cambiar estado del producto';
       setErrorModalMsg(msg);
     }
   };
 
-  const productosFiltrados = productos.filter(
-    (p) =>
-      p.nombre.toLowerCase().includes(busqueda.toLowerCase()) ||
-      p.codigo.toLowerCase().includes(busqueda.toLowerCase())
-  );
+  const handleGuardarServicio = async (payload: CrearServicioDTO | ActualizarServicioDTO) => {
+    try {
+      if ('id_servicio' in payload) {
+        await inventarioService.actualizarServicio(payload);
+        mostrarToast('Servicio actualizado correctamente');
+      } else {
+        await inventarioService.crearServicio(payload);
+        mostrarToast('Servicio creado correctamente');
+      }
+      cargarServicios();
+    } catch (err: unknown) {
+      const msg =
+        typeof err === 'string'
+          ? err
+          : (err as { message?: string })?.message || 'Error al guardar servicio';
+      setErrorModalMsg(msg);
+    }
+  };
+
+  const handleToggleEstadoServicio = async (s: ServicioDTO) => {
+    try {
+      await inventarioService.cambiarEstadoServicio(s.id_servicio, !s.activo);
+      mostrarToast(`Servicio "${s.nombre}" ${!s.activo ? 'activado' : 'desactivado'}`);
+      cargarServicios();
+    } catch (err: unknown) {
+      const msg =
+        typeof err === 'string'
+          ? err
+          : (err as { message?: string })?.message || 'Error al cambiar estado del servicio';
+      setErrorModalMsg(msg);
+    }
+  };
 
   return (
     <div
@@ -296,7 +386,7 @@ export const InventarioPage: React.FC = () => {
         padding: '32px',
         display: 'flex',
         flexDirection: 'column',
-        gap: '24px',
+        gap: '20px',
         height: '100%',
         boxSizing: 'border-box',
         overflow: 'hidden',
@@ -393,36 +483,321 @@ export const InventarioPage: React.FC = () => {
         onAbrirModalCompra={() => setModalCompraAbierto(true)}
       />
 
-      <InventarioFiltros
-        busqueda={busqueda}
-        setBusqueda={setBusqueda}
-        filtroCritico={filtroCritico}
-        setFiltroCritico={setFiltroCritico}
-        onRefresh={cargarDatos}
-      />
+      {/* Selector de Pestañas (Productos / Servicios / Historial Entradas) */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div
+          style={{
+            display: 'flex',
+            gap: '8px',
+            backgroundColor: '#1E293B',
+            padding: '4px',
+            borderRadius: '10px',
+          }}
+        >
+          <button
+            onClick={() => setTabActiva('PRODUCTOS')}
+            style={{
+              padding: '8px 16px',
+              backgroundColor: tabActiva === 'PRODUCTOS' ? '#2563EB' : 'transparent',
+              color: tabActiva === 'PRODUCTOS' ? '#FFFFFF' : '#94A3B8',
+              border: 'none',
+              borderRadius: '8px',
+              fontWeight: '700',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              fontSize: '13px',
+            }}
+          >
+            <Package size={16} /> Productos
+          </button>
+          <button
+            onClick={() => setTabActiva('SERVICIOS')}
+            style={{
+              padding: '8px 16px',
+              backgroundColor: tabActiva === 'SERVICIOS' ? '#2563EB' : 'transparent',
+              color: tabActiva === 'SERVICIOS' ? '#FFFFFF' : '#94A3B8',
+              border: 'none',
+              borderRadius: '8px',
+              fontWeight: '700',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              fontSize: '13px',
+            }}
+          >
+            <Wrench size={16} /> Servicios de Taller
+          </button>
+        </div>
 
-      <InventarioTabla
-        cargando={cargando}
-        productos={productosFiltrados}
-        esAdmin={esAdmin}
-        onVer={abrirModalVer}
-        onDespachar={(p) =>
-          setModalDespacho({ abierto: true, producto: p, cantidad: 1, motivo: '' })
-        }
-        onAjustar={(p) =>
-          setModalAjuste({
-            abierto: true,
-            producto: p,
-            tipo_ajuste: 'SALIDA',
-            cantidad: 1,
-            costo_unitario_soles: 0,
-            motivo: '',
-          })
-        }
-        onEditar={abrirModalEditar}
-        onEliminar={(id, nombre) => setConfirmModal({ abierto: true, id, nombre })}
-      />
+        {esAdmin && (
+          <button
+            onClick={() => setModalHistorialEntradas(true)}
+            style={{
+              padding: '8px 14px',
+              backgroundColor: 'rgba(56, 189, 248, 0.15)',
+              border: '1px solid rgba(56, 189, 248, 0.3)',
+              color: '#38BDF8',
+              borderRadius: '8px',
+              fontWeight: '600',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              fontSize: '13px',
+            }}
+          >
+            <History size={16} /> Ver Historial Entradas / Compras
+          </button>
+        )}
+      </div>
 
+      {tabActiva === 'PRODUCTOS' ? (
+        <>
+          {esAdmin && (
+            <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+              <label
+                style={{
+                  fontSize: '13px',
+                  color: '#CBD5E1',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={mostrarInactivos}
+                  onChange={(e) => {
+                    setMostrarInactivos(e.target.checked);
+                    setPaginaActual(1);
+                  }}
+                />
+                Mostrar Productos Inactivos / Dados de Baja
+              </label>
+            </div>
+          )}
+
+          <InventarioFiltros
+            busqueda={busqueda}
+            setBusqueda={(b) => {
+              setBusqueda(b);
+              setPaginaActual(1);
+            }}
+            filtroCritico={filtroCritico}
+            setFiltroCritico={(fc) => {
+              setFiltroCritico(fc);
+              setPaginaActual(1);
+            }}
+            onRefresh={cargarProductosPaginados}
+          />
+
+          <InventarioTabla
+            cargando={cargando}
+            productos={productos}
+            esAdmin={esAdmin}
+            paginaActual={paginaActual}
+            totalPaginas={totalPaginas}
+            totalRegistros={totalRegistros}
+            onCambiarPagina={(n) => setPaginaActual(n)}
+            onVer={abrirModalVer}
+            onDespachar={(p: Producto) =>
+              setModalDespacho({ abierto: true, producto: p, cantidad: 1, motivo: '' })
+            }
+            onAjustar={(p: Producto) => setModalAjuste({ abierto: true, producto: p })}
+            onVerKardex={(p: Producto) => setModalKardex({ abierto: true, producto: p })}
+            onEditar={abrirModalEditar}
+            onEliminar={(id: number, nombre: string, activo: boolean) =>
+              setConfirmModal({
+                abierto: true,
+                id,
+                nombre,
+                accion: activo ? 'DESACTIVAR' : 'REACTIVAR',
+              })
+            }
+          />
+        </>
+      ) : (
+        /* Tabla de Servicios */
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          {esAdmin && (
+            <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+              <button
+                onClick={() => {
+                  setServicioAEditar(null);
+                  setModalServicioAbierto(true);
+                }}
+                style={{
+                  padding: '8px 16px',
+                  backgroundColor: '#10B981',
+                  color: '#FFFFFF',
+                  border: 'none',
+                  borderRadius: '8px',
+                  fontWeight: '700',
+                  cursor: 'pointer',
+                }}
+              >
+                + Nuevo Servicio
+              </button>
+            </div>
+          )}
+
+          <div
+            style={{
+              flex: 1,
+              backgroundColor: 'rgba(15, 23, 42, 0.6)',
+              border: '1px solid #334155',
+              borderRadius: '16px',
+              overflowY: 'auto',
+            }}
+          >
+            <table
+              style={{
+                width: '100%',
+                borderCollapse: 'collapse',
+                textAlign: 'left',
+                fontSize: '14px',
+              }}
+            >
+              <thead>
+                <tr
+                  style={{
+                    borderBottom: '1px solid #334155',
+                    color: '#94A3B8',
+                    backgroundColor: '#1E293B',
+                  }}
+                >
+                  <th style={{ padding: '16px' }}>CÓDIGO</th>
+                  <th style={{ padding: '16px' }}>NOMBRE DEL SERVICIO</th>
+                  <th style={{ padding: '16px' }}>DESCRIPCIÓN</th>
+                  <th style={{ padding: '16px' }}>PRECIO VENTA</th>
+                  <th style={{ padding: '16px' }}>TIPO</th>
+                  <th style={{ padding: '16px' }}>ESTADO</th>
+                  {esAdmin && <th style={{ padding: '16px', textAlign: 'center' }}>ACCIONES</th>}
+                </tr>
+              </thead>
+              <tbody>
+                {cargando ? (
+                  <tr>
+                    <td
+                      colSpan={7}
+                      style={{ padding: '32px', textAlign: 'center', color: '#94A3B8' }}
+                    >
+                      Cargando servicios...
+                    </td>
+                  </tr>
+                ) : servicios.length === 0 ? (
+                  <tr>
+                    <td
+                      colSpan={7}
+                      style={{ padding: '32px', textAlign: 'center', color: '#94A3B8' }}
+                    >
+                      No hay servicios de mantenimiento registrados.
+                    </td>
+                  </tr>
+                ) : (
+                  servicios.map((s) => (
+                    <tr
+                      key={s.id_servicio}
+                      style={{
+                        borderBottom: '1px solid rgba(51, 65, 85, 0.4)',
+                        opacity: s.activo ? 1 : 0.6,
+                      }}
+                    >
+                      <td style={{ padding: '16px', color: '#38BDF8', fontFamily: 'monospace' }}>
+                        {s.codigo}
+                      </td>
+                      <td style={{ padding: '16px', fontWeight: '600', color: '#F8FAFC' }}>
+                        {s.nombre}
+                      </td>
+                      <td style={{ padding: '16px', color: '#94A3B8' }}>{s.descripcion || '-'}</td>
+                      <td style={{ padding: '16px', fontWeight: '700', color: '#34D399' }}>
+                        S/ {(s.precio_venta_cent / 100).toFixed(2)}
+                      </td>
+                      <td style={{ padding: '16px' }}>
+                        {s.es_cambio_aceite ? (
+                          <span
+                            style={{
+                              padding: '4px 8px',
+                              borderRadius: '6px',
+                              fontSize: '11px',
+                              fontWeight: '700',
+                              backgroundColor: 'rgba(251, 191, 36, 0.15)',
+                              color: '#FBBF24',
+                              border: '1px solid #FBBF24',
+                            }}
+                          >
+                            CAMBIO ACEITE
+                          </span>
+                        ) : (
+                          <span style={{ color: '#94A3B8' }}>GENERAL</span>
+                        )}
+                      </td>
+                      <td style={{ padding: '16px' }}>
+                        <span
+                          style={{
+                            padding: '4px 8px',
+                            borderRadius: '6px',
+                            fontSize: '11px',
+                            fontWeight: '700',
+                            backgroundColor: s.activo
+                              ? 'rgba(16, 185, 129, 0.15)'
+                              : 'rgba(239, 68, 68, 0.15)',
+                            color: s.activo ? '#10B981' : '#EF4444',
+                          }}
+                        >
+                          {s.activo ? 'ACTIVO' : 'INACTIVO'}
+                        </span>
+                      </td>
+                      {esAdmin && (
+                        <td style={{ padding: '16px', textAlign: 'center' }}>
+                          <div style={{ display: 'flex', justifyContent: 'center', gap: '8px' }}>
+                            <button
+                              onClick={() => {
+                                setServicioAEditar(s);
+                                setModalServicioAbierto(true);
+                              }}
+                              style={{
+                                padding: '6px 10px',
+                                backgroundColor: 'rgba(30, 41, 59, 0.8)',
+                                border: '1px solid #334155',
+                                borderRadius: '8px',
+                                cursor: 'pointer',
+                              }}
+                            >
+                              Editar
+                            </button>
+                            <button
+                              onClick={() => handleToggleEstadoServicio(s)}
+                              style={{
+                                padding: '6px 10px',
+                                backgroundColor: s.activo
+                                  ? 'rgba(239, 68, 68, 0.15)'
+                                  : 'rgba(16, 185, 129, 0.15)',
+                                border: `1px solid ${s.activo ? '#EF4444' : '#10B981'}`,
+                                color: s.activo ? '#EF4444' : '#10B981',
+                                borderRadius: '8px',
+                                cursor: 'pointer',
+                              }}
+                            >
+                              {s.activo ? 'Desactivar' : 'Activar'}
+                            </button>
+                          </div>
+                        </td>
+                      )}
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Modales Existentes */}
       <InventarioModal
         modalAbierto={modalAbierto}
         setModalAbierto={setModalAbierto}
@@ -450,27 +825,14 @@ export const InventarioPage: React.FC = () => {
       <ModalAjusteStock
         abierto={modalAjuste.abierto}
         producto={modalAjuste.producto}
-        tipoAjuste={modalAjuste.tipo_ajuste}
-        setTipoAjuste={(tipo) => setModalAjuste({ ...modalAjuste, tipo_ajuste: tipo })}
-        cantidad={modalAjuste.cantidad}
-        setCantidad={(cant) => setModalAjuste({ ...modalAjuste, cantidad: cant })}
-        costoUnitarioSoles={modalAjuste.costo_unitario_soles}
-        setCostoUnitarioSoles={(costo) =>
-          setModalAjuste({ ...modalAjuste, costo_unitario_soles: costo })
-        }
-        motivo={modalAjuste.motivo}
-        setMotivo={(mot) => setModalAjuste({ ...modalAjuste, motivo: mot })}
-        onClose={() =>
-          setModalAjuste({
-            abierto: false,
-            producto: null,
-            tipo_ajuste: 'SALIDA',
-            cantidad: 1,
-            costo_unitario_soles: 0,
-            motivo: '',
-          })
-        }
-        onSubmit={ejecutarAjuste}
+        onClose={() => setModalAjuste({ abierto: false, producto: null })}
+        onSubmit={ejecutarAjusteConteo}
+      />
+
+      <ModalKardex
+        abierto={modalKardex.abierto}
+        producto={modalKardex.producto}
+        onClose={() => setModalKardex({ abierto: false, producto: null })}
       />
 
       <ModalRegistroCompra
@@ -479,17 +841,45 @@ export const InventarioPage: React.FC = () => {
         onClose={() => setModalCompraAbierto(false)}
         onCompraExitosa={() => {
           mostrarToast('Compra e ingreso de stock registrados con éxito');
-          cargarDatos();
+          cargarProductosPaginados();
         }}
         onError={(msg) => setErrorModalMsg(msg)}
       />
 
+      <ModalServicio
+        abierto={modalServicioAbierto}
+        servicioAEditar={servicioAEditar}
+        onClose={() => {
+          setModalServicioAbierto(false);
+          setServicioAEditar(null);
+        }}
+        onGuardar={handleGuardarServicio}
+      />
+
+      <ModalHistorialEntradas
+        abierto={modalHistorialEntradas}
+        onClose={() => setModalHistorialEntradas(false)}
+        onError={(msg) => setErrorModalMsg(msg)}
+        onActualizado={() => {
+          mostrarToast('Entrada anulada correctamente');
+          cargarProductosPaginados();
+        }}
+      />
+
       <ConfirmModal
         abierto={confirmModal.abierto}
-        titulo="Dar de Baja Producto"
-        mensaje={`¿Estás seguro de que deseas dar de baja "${confirmModal.nombre}"? Esta acción desactivará el producto.`}
-        onConfirmar={ejecutarEliminacion}
-        onCancelar={() => setConfirmModal({ abierto: false, id: null, nombre: '' })}
+        titulo={
+          confirmModal.accion === 'DESACTIVAR' ? 'Dar de Baja Producto' : 'Reactivar Producto'
+        }
+        mensaje={
+          confirmModal.accion === 'DESACTIVAR'
+            ? `¿Estás seguro de que deseas desactivar "${confirmModal.nombre}"? Se conservará su historial de Kardex.`
+            : `¿Deseas volver a activar "${confirmModal.nombre}" en el catálogo principal?`
+        }
+        onConfirmar={ejecutarCambioEstado}
+        onCancelar={() =>
+          setConfirmModal({ abierto: false, id: null, nombre: '', accion: 'DESACTIVAR' })
+        }
       />
     </div>
   );

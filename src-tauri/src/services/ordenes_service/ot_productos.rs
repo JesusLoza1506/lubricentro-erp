@@ -3,6 +3,7 @@ use crate::dto::orden_trabajo_dto::{
     DevolverInsumoOtDto, OrdenTrabajoHistorialDto, RegistrarInsumoOtDto,
 };
 use crate::errors::AppError;
+use crate::services::inventario_service::calcular_promedio_ponderado_micro;
 use rusqlite::{params, Connection};
 use uuid::Uuid;
 
@@ -17,7 +18,7 @@ fn validar_precision_cantidad(cantidad: f64, unidad_medida: &str) -> Result<(), 
             )));
         }
     } else {
-        // Para ML / L, máximo 3 decimales (1 mL)
+        // Para ML / L, máximo 3 decimales
         let mult = cantidad * 1000.0;
         if (mult - mult.round()).abs() > 0.001 {
             return Err(AppError::Validation(
@@ -39,7 +40,6 @@ pub fn registrar_insumo_ot(
         .filter(|s| !s.trim().is_empty())
         .unwrap_or_else(|| Uuid::new_v4().to_string());
 
-    // PROTECCIÓN DE IDEMPOTENCIA: Verificar si la operación ya fue procesada anteriormente
     let ya_registrado: i32 = conn.query_row(
         "SELECT COUNT(*) FROM detalle_ot_productos WHERE id_operacion = ?1",
         [&id_operacion_req],
@@ -47,7 +47,6 @@ pub fn registrar_insumo_ot(
     )?;
 
     if ya_registrado > 0 {
-        // Retornar el estado actual sin volver a descontar inventario
         return obtener_ot_por_id(conn, req.id_ot, id_usuario, rol);
     }
 
@@ -65,7 +64,7 @@ pub fn registrar_insumo_ot(
         ));
     }
 
-    let (precio_cent, stock_actual, nombre, codigo, unidad_medida, valor_stock_micro, ultimo_costo_micro): (
+    let (precio_cent, stock_actual, nombre, codigo, unidad_medida, valor_stock_micro, _ultimo_costo_micro): (
         i64,
         i64,
         String,
@@ -97,24 +96,16 @@ pub fn registrar_insumo_ot(
         )));
     }
 
-    let costo_unitario: i64 = match ultimo_costo_micro {
-        Some(c) if c >= 1 => c,
-        _ => {
-            if stock_actual > 0 && valor_stock_micro > 0 {
-                if um_upper == "ML" {
-                    ((valor_stock_micro as f64 / stock_actual as f64) * 1000.0).round() as i64
-                } else {
-                    valor_stock_micro / stock_actual
-                }
-            } else {
-                50000000
-            }
-        }
-    }
-    .max(1);
+    // FIX: Redondeo de costo unitario mediante promedio ponderado entero con i128 (round-half-up)
+    let costo_unitario: i64 = if stock_actual > 0 && valor_stock_micro > 0 {
+        let calculado = calcular_promedio_ponderado_micro(valor_stock_micro, 0, stock_actual)?;
+        calculado.max(1)
+    } else {
+        1
+    };
 
-    let valor_consumido: i64 = if um_upper == "ML" {
-        ((cant_base as f64 / 1000.0) * (costo_unitario as f64)).round() as i64
+    let valor_consumido: i64 = if cant_base == stock_actual {
+        valor_stock_micro
     } else {
         costo_unitario * cant_base
     };
@@ -193,7 +184,6 @@ pub fn devolver_insumo_ot(
         .filter(|s| !s.trim().is_empty())
         .unwrap_or_else(|| Uuid::new_v4().to_string());
 
-    // PROTECCIÓN DE IDEMPOTENCIA: Verificar si la devolución ya fue aplicada previamente
     let ya_devuelto: i32 = conn.query_row(
         "SELECT COUNT(*) FROM movimientos_inventario WHERE id_operacion = ?1",
         [&id_operacion_req],
@@ -218,11 +208,11 @@ pub fn devolver_insumo_ot(
         ));
     }
 
-    let (id_producto, unidad_medida, cant_consumida, costo_unitario): (i64, String, i64, i64) = conn
+    let (id_producto, unidad_medida, cant_consumida, costo_unitario, valor_consumido_micro): (i64, String, i64, i64, i64) = conn
         .query_row(
-            "SELECT id_producto, unidad_medida, cantidad, costo_unitario_micro FROM detalle_ot_productos WHERE id_detalle = ?1 AND id_ot = ?2",
+            "SELECT id_producto, unidad_medida, cantidad, costo_unitario_micro, valor_consumido_micro FROM detalle_ot_productos WHERE id_detalle = ?1 AND id_ot = ?2",
             params![req.id_detalle_producto, req.id_ot],
-            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
+            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?, row.get(4)?)),
         )
         .map_err(|_| AppError::NotFound("No se encontró el registro de consumo de producto.".to_string()))?;
 
@@ -235,13 +225,15 @@ pub fn devolver_insumo_ot(
         req.cantidad_a_devolver.round() as i64
     };
 
-    let devuelto_previo: i64 = conn.query_row(
-        "SELECT COALESCE(SUM(diferencia), 0) FROM movimientos_inventario WHERE id_consumo_ot = ?1 AND tipo_movimiento = 'REPOSICION_OT'",
+    let (devuelto_previo_cant, devuelto_previo_val): (i64, i64) = conn.query_row(
+        "SELECT COALESCE(SUM(diferencia), 0), COALESCE(SUM(valor_delta_micro), 0) FROM movimientos_inventario WHERE id_consumo_ot = ?1 AND tipo_movimiento = 'REPOSICION_OT'",
         [req.id_detalle_producto],
-        |row| row.get(0),
+        |row| Ok((row.get(0)?, row.get(1)?)),
     )?;
 
-    let neto_actual = cant_consumida - devuelto_previo;
+    let neto_actual = cant_consumida - devuelto_previo_cant;
+    let valor_neto_pendiente = valor_consumido_micro - devuelto_previo_val;
+
     if cant_dev_base <= 0 || cant_dev_base > neto_actual {
         return Err(AppError::Validation(format!(
             "La cantidad a devolver debe ser mayor a 0 y no superar el neto disponible ({})",
@@ -249,17 +241,18 @@ pub fn devolver_insumo_ot(
         )));
     }
 
+    // SI ES DEVOLUCIÓN TOTAL DEL SALDO PENDIENTE, RECUPERA EXACTAMENTE EL RESIDUO DE VALOR
+    let valor_reposicion: i64 = if cant_dev_base == neto_actual {
+        valor_neto_pendiente
+    } else {
+        costo_unitario * cant_dev_base
+    };
+
     let (stock_actual, valor_stock_micro): (i64, i64) = conn.query_row(
         "SELECT stock_actual, valor_stock_micro FROM productos WHERE id_producto = ?1",
         [id_producto],
         |row| Ok((row.get(0)?, row.get(1)?)),
     )?;
-
-    let valor_reposicion: i64 = if um_upper == "ML" {
-        ((cant_dev_base as f64 / 1000.0) * (costo_unitario as f64)).round() as i64
-    } else {
-        costo_unitario * cant_dev_base
-    };
 
     let nuevo_stock = stock_actual + cant_dev_base;
     let nuevo_valor_stock = valor_stock_micro + valor_reposicion;

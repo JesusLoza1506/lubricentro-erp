@@ -1,37 +1,66 @@
-import React from 'react';
-import { Producto } from '../../../types/inventario';
+import React, { useState, useEffect } from 'react';
+import { Producto, ConteoFisicoDTO } from '../../../types/inventario';
 import { modalInputStyle } from '../inventarioStyles';
 
 interface ModalAjusteStockProps {
   abierto: boolean;
   producto: Producto | null;
-  tipoAjuste: 'ENTRADA' | 'SALIDA';
-  setTipoAjuste: (val: 'ENTRADA' | 'SALIDA') => void;
-  cantidad: number;
-  setCantidad: (val: number) => void;
-  costoUnitarioSoles: number;
-  setCostoUnitarioSoles: (val: number) => void;
-  motivo: string;
-  setMotivo: (val: string) => void;
   onClose: () => void;
-  onSubmit: (e: React.FormEvent) => void;
+  onSubmit: (payload: ConteoFisicoDTO) => Promise<void>;
 }
 
 export const ModalAjusteStock: React.FC<ModalAjusteStockProps> = ({
   abierto,
   producto,
-  tipoAjuste,
-  setTipoAjuste,
-  cantidad,
-  setCantidad,
-  costoUnitarioSoles,
-  setCostoUnitarioSoles,
-  motivo,
-  setMotivo,
   onClose,
   onSubmit,
 }) => {
+  const [stockFisico, setStockFisico] = useState<number>(0);
+  const [stockObservado, setStockObservado] = useState<number>(0);
+  const [costoSoles, setCostoSoles] = useState<number>(0);
+  const [motivo, setMotivo] = useState<string>('');
+  const [guardando, setGuardando] = useState<boolean>(false);
+
+  useEffect(() => {
+    if (producto) {
+      const stockUI =
+        producto.unidad_medida === 'ML' ? producto.stock_actual / 1000 : producto.stock_actual;
+      setStockFisico(stockUI);
+      setStockObservado(stockUI);
+      setMotivo('');
+      setCostoSoles(0);
+    }
+  }, [producto]);
+
   if (!abierto || !producto) return null;
+
+  const esML = producto.unidad_medida === 'ML';
+  const stockTeoricoUI = esML ? producto.stock_actual / 1000 : producto.stock_actual;
+  const diferenciaUI = stockFisico - stockTeoricoUI;
+  const requiereMotivo = diferenciaUI !== 0;
+
+  const handleFormSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (requiereMotivo && motivo.trim().length < 5) return;
+
+    try {
+      setGuardando(true);
+      const payload: ConteoFisicoDTO = {
+        id_producto: producto.id_producto,
+        stock_fisico_contado: stockFisico,
+        stock_observado: stockObservado,
+        costo_unitario_micro:
+          diferenciaUI > 0 && stockTeoricoUI === 0 ? Math.round(costoSoles * 1_000_000) : null,
+        motivo: motivo.trim(),
+      };
+      await onSubmit(payload);
+      onClose();
+    } catch {
+      // Error manejado en el componente superior
+    } finally {
+      setGuardando(false);
+    }
+  };
 
   return (
     <div
@@ -51,7 +80,7 @@ export const ModalAjusteStock: React.FC<ModalAjusteStockProps> = ({
     >
       <div
         style={{
-          width: '480px',
+          width: '500px',
           backgroundColor: '#0F172A',
           border: '1px solid #A855F7',
           borderRadius: '16px',
@@ -60,45 +89,75 @@ export const ModalAjusteStock: React.FC<ModalAjusteStockProps> = ({
         }}
       >
         <h3 style={{ fontSize: '18px', fontWeight: '800', color: '#F8FAFC', margin: '0 0 16px 0' }}>
-          Ajuste Manual de Stock (Admin)
+          Conteo Físico Reconciliado (Auditoría)
         </h3>
-        <p style={{ color: '#94A3B8', fontSize: '13px', marginBottom: '16px' }}>
-          Producto: <strong style={{ color: '#F8FAFC' }}>{producto.nombre}</strong> <br />
-          Stock Actual:{' '}
-          <strong style={{ color: '#A855F7' }}>
-            {producto.stock_actual} {producto.unidad_medida}
-          </strong>
-        </p>
-        <form onSubmit={onSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+
+        <div
+          style={{
+            backgroundColor: '#1E293B',
+            padding: '12px 16px',
+            borderRadius: '10px',
+            marginBottom: '16px',
+          }}
+        >
+          <p style={{ color: '#CBD5E1', fontSize: '13px', margin: '0 0 6px 0' }}>
+            Producto: <strong style={{ color: '#F8FAFC' }}>{producto.nombre}</strong> (
+            {producto.codigo})
+          </p>
+          <p style={{ color: '#94A3B8', fontSize: '13px', margin: 0 }}>
+            Stock Registrado en Sistema:{' '}
+            <strong style={{ color: '#38BDF8' }}>
+              {stockTeoricoUI} {esML ? 'Litros (L)' : 'UNIDADES'}
+            </strong>
+          </p>
+        </div>
+
+        <form
+          onSubmit={handleFormSubmit}
+          style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}
+        >
           <div>
             <label
               style={{ display: 'block', fontSize: '12px', color: '#94A3B8', marginBottom: '6px' }}
             >
-              Tipo de Ajuste *
+              Stock Real en Almacén / Taller ({esML ? 'Litros' : 'Unidades'}) *
             </label>
-            <select
+            <input
               required
-              value={tipoAjuste}
-              onChange={(e) => setTipoAjuste(e.target.value as 'ENTRADA' | 'SALIDA')}
-              style={{
-                ...modalInputStyle,
-                backgroundColor: '#1E293B',
-                color: '#F8FAFC',
-                cursor: 'pointer',
-              }}
-            >
-              <option value="SALIDA">SALIDA (Merma / Muestra / Corrección)</option>
-              <option value="ENTRADA">ENTRADA (Ajuste por sobrante físico)</option>
-            </select>
+              type="number"
+              step={esML ? '0.001' : '1'}
+              min="0"
+              value={stockFisico}
+              onChange={(e) => setStockFisico(parseFloat(e.target.value) || 0)}
+              style={modalInputStyle}
+            />
           </div>
 
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: tipoAjuste === 'ENTRADA' ? '1fr 1fr' : '1fr',
-              gap: '12px',
-            }}
-          >
+          {diferenciaUI !== 0 && (
+            <div
+              style={{
+                backgroundColor:
+                  diferenciaUI > 0 ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)',
+                border: `1px solid ${diferenciaUI > 0 ? '#10B981' : '#EF4444'}`,
+                padding: '12px',
+                borderRadius: '8px',
+              }}
+            >
+              <span
+                style={{
+                  fontSize: '13px',
+                  fontWeight: '700',
+                  color: diferenciaUI > 0 ? '#34D399' : '#F87171',
+                }}
+              >
+                Diferencia a Ajustar: {diferenciaUI > 0 ? `+${diferenciaUI}` : diferenciaUI}{' '}
+                {esML ? 'L' : 'UND'} (
+                {diferenciaUI > 0 ? 'Sobrante - Entrada' : 'Faltante - Salida'})
+              </span>
+            </div>
+          )}
+
+          {diferenciaUI > 0 && stockTeoricoUI === 0 && (
             <div>
               <label
                 style={{
@@ -108,56 +167,37 @@ export const ModalAjusteStock: React.FC<ModalAjusteStockProps> = ({
                   marginBottom: '6px',
                 }}
               >
-                Cantidad Delta ({producto.unidad_medida}) *
+                Costo Unitario en Soles (S/) *
               </label>
               <input
                 required
                 type="number"
-                min="1"
-                step="1"
-                value={cantidad}
-                onChange={(e) => setCantidad(parseInt(e.target.value, 10) || 0)}
+                step="0.01"
+                min="0.01"
+                value={costoSoles}
+                onChange={(e) => setCostoSoles(parseFloat(e.target.value) || 0)}
                 style={modalInputStyle}
               />
             </div>
-
-            {tipoAjuste === 'ENTRADA' && (
-              <div>
-                <label
-                  style={{
-                    display: 'block',
-                    fontSize: '12px',
-                    color: '#94A3B8',
-                    marginBottom: '6px',
-                  }}
-                >
-                  Costo Unitario (S/) *
-                </label>
-                <input
-                  required
-                  type="number"
-                  step="0.01"
-                  min="0.01"
-                  value={costoUnitarioSoles}
-                  onChange={(e) => setCostoUnitarioSoles(parseFloat(e.target.value) || 0)}
-                  style={modalInputStyle}
-                />
-              </div>
-            )}
-          </div>
+          )}
 
           <div>
             <label
               style={{ display: 'block', fontSize: '12px', color: '#94A3B8', marginBottom: '6px' }}
             >
-              Motivo Obligatorio (mínimo 5 caracteres) *
+              Motivo de la Reconciliación{' '}
+              {requiereMotivo ? '(mínimo 5 caracteres) *' : '(Opcional sin diferencias)'}
             </label>
             <input
-              required
-              minLength={5}
+              required={requiereMotivo}
+              minLength={requiereMotivo ? 5 : undefined}
               maxLength={250}
               type="text"
-              placeholder="Ej. Conteo físico de inventario de cierre de mes"
+              placeholder={
+                requiereMotivo
+                  ? 'Ej. Conteo físico mensual de almacén con inventario real'
+                  : 'Sin diferencias'
+              }
               value={motivo}
               onChange={(e) => setMotivo(e.target.value)}
               style={modalInputStyle}
@@ -170,6 +210,7 @@ export const ModalAjusteStock: React.FC<ModalAjusteStockProps> = ({
             <button
               type="button"
               onClick={onClose}
+              disabled={guardando}
               style={{
                 padding: '10px 16px',
                 backgroundColor: 'transparent',
@@ -183,6 +224,7 @@ export const ModalAjusteStock: React.FC<ModalAjusteStockProps> = ({
             </button>
             <button
               type="submit"
+              disabled={guardando || (requiereMotivo && motivo.trim().length < 5)}
               style={{
                 padding: '10px 20px',
                 backgroundColor: '#A855F7',
@@ -190,10 +232,11 @@ export const ModalAjusteStock: React.FC<ModalAjusteStockProps> = ({
                 border: 'none',
                 borderRadius: '8px',
                 fontWeight: '700',
-                cursor: 'pointer',
+                cursor: guardando ? 'wait' : 'pointer',
+                opacity: requiereMotivo && motivo.trim().length < 5 ? 0.6 : 1,
               }}
             >
-              Guardar Ajuste
+              {guardando ? 'Procesando...' : 'Aplicar Reconciliación'}
             </button>
           </div>
         </form>

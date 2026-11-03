@@ -301,12 +301,16 @@ export const InventarioModal: React.FC<InventarioModalProps> = ({
                     <input
                       required={prodForm.tiene_stock_inicial}
                       type="number"
-                      min="1"
-                      value={prodForm.cantidad_inicial || 0}
+                      step={prodForm.categoria === 'GRANEL' ? '0.001' : '1'}
+                      min="0.001"
+                      placeholder={
+                        prodForm.categoria === 'GRANEL' ? 'Litros (ej. 208)' : 'Unidades'
+                      }
+                      value={prodForm.cantidad_inicial || ''}
                       onChange={(e) =>
                         setProdForm({
                           ...prodForm,
-                          cantidad_inicial: parseInt(e.target.value, 10) || 0,
+                          cantidad_inicial: parseFloat(e.target.value) || 0,
                         })
                       }
                       style={modalInputStyle}
