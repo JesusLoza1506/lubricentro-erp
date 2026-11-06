@@ -2,7 +2,7 @@ use super::{idempotencia::IdempotenciaService, InventarioService};
 use crate::dto::producto_dto::{AjustarStockDto, ConteoFisicoDto};
 use crate::errors::AppError;
 use crate::services::auditoria_service::AuditoriaService;
-use rusqlite::{params, Connection};
+use rusqlite::{params, Connection, Transaction};
 use serde_json::Value;
 
 impl InventarioService {
@@ -12,33 +12,8 @@ impl InventarioService {
         id_operacion: Option<&str>,
         id_usuario: i64,
     ) -> Result<Value, AppError> {
-        let motivo_trim = req.motivo.trim();
-        if motivo_trim.len() < 5 || motivo_trim.len() > 250 {
-            return Err(AppError::Validation(
-                "El motivo del ajuste debe contener entre 5 y 250 caracteres.".to_string(),
-            ));
-        }
-
-        if req.cantidad <= 0 {
-            return Err(AppError::Validation(
-                "La cantidad de ajuste debe ser mayor a cero.".to_string(),
-            ));
-        }
-
-        let tipo_mov = match req.tipo_ajuste.trim().to_uppercase().as_str() {
-            "ENTRADA" => "AJUSTE_ENTRADA",
-            "SALIDA" => "AJUSTE_SALIDA",
-            _ => {
-                return Err(AppError::Validation(
-                    "Tipo de ajuste inválido. Use ENTRADA o SALIDA.".to_string(),
-                ))
-            }
-        };
-
-        let tx = conn.transaction()?;
-
-        // Idempotencia Atómica: Si ya fue procesado, retorna inmediatamente el JSON previo
-        if let Some(resultado_previo) = IdempotenciaService::evaluar_y_registrar(
+        let tx = conn.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)?;
+        if let Some(previo) = IdempotenciaService::evaluar_y_registrar(
             &tx,
             id_operacion,
             "AJUSTAR_STOCK",
@@ -46,9 +21,43 @@ impl InventarioService {
             id_usuario,
         )? {
             tx.commit()?;
-            return Ok(resultado_previo);
+            return Ok(previo);
         }
+        let resultado = Self::aplicar_ajuste(&tx, &req, id_usuario, None)?;
+        IdempotenciaService::finalizar_solicitud(
+            &tx,
+            id_operacion,
+            "AJUSTAR_STOCK",
+            &req,
+            id_usuario,
+            &resultado,
+        )?;
+        tx.commit()?;
+        Ok(resultado)
+    }
 
+    fn aplicar_ajuste(
+        tx: &Transaction<'_>,
+        req: &AjustarStockDto,
+        id_usuario: i64,
+        aporte_conteo: Option<i64>,
+    ) -> Result<Value, AppError> {
+        let motivo_trim = req.motivo.trim();
+        if !(5..=250).contains(&motivo_trim.chars().count()) {
+            return Err(AppError::Validation(
+                "El motivo debe contener entre 5 y 250 caracteres.".into(),
+            ));
+        }
+        if req.cantidad <= 0 {
+            return Err(AppError::Validation(
+                "La cantidad debe ser mayor a cero.".into(),
+            ));
+        }
+        let tipo_mov = match req.tipo_ajuste.trim().to_uppercase().as_str() {
+            "ENTRADA" => "AJUSTE_ENTRADA",
+            "SALIDA" => "AJUSTE_SALIDA",
+            _ => return Err(AppError::Validation("Tipo de ajuste inválido.".into())),
+        };
         let (stock_ant, val_ant, un_med, ultimo_costo): (i64, i64, String, Option<i64>) = tx
             .query_row(
                 "SELECT stock_actual, valor_stock_micro, unidad_medida, ultimo_costo_micro FROM productos WHERE id_producto = ?1 AND activo = 1",
@@ -58,6 +67,7 @@ impl InventarioService {
             .map_err(|_| AppError::NotFound("Producto no encontrado o inactivo.".to_string()))?;
 
         let un_upper = un_med.to_uppercase();
+        super::validaciones::cantidad_base(req.cantidad, &un_upper)?;
 
         let (diferencia, val_delta_micro, costo_unit_micro) = if tipo_mov == "AJUSTE_ENTRADA" {
             let costo_ingresado = req.costo_unitario_micro.ok_or_else(|| {
@@ -73,21 +83,24 @@ impl InventarioService {
                 ));
             }
 
-            let costo_validado = (costo_ingresado / 10_000) * 10_000;
+            let costo_validado = if aporte_conteo.is_some() {
+                costo_ingresado
+            } else {
+                super::validaciones::costo_capturado(costo_ingresado)?
+            };
             if costo_validado <= 0 {
                 return Err(AppError::Validation(
                     "El costo unitario ingresado redondeado debe ser mayor a cero.".to_string(),
                 ));
             }
 
-            let (total_delta, c_kardex) = if un_upper == "ML" {
-                let total = ((req.cantidad as i128 * costo_validado as i128 + 500) / 1000) as i64;
-                let c_k = (total / req.cantidad.max(1)).max(1);
-                (total, c_k)
+            let total_delta = if let Some(valor) = aporte_conteo {
+                super::validaciones::valor_stock(valor as i128)?
             } else {
-                let total = req.cantidad * costo_validado;
-                (total, costo_validado)
+                super::validaciones::aporte_micro(req.cantidad, costo_validado, &un_upper)?
             };
+            let c_kardex = ((total_delta as i128 + req.cantidad as i128 / 2) / req.cantidad as i128)
+                .max(1) as i64;
 
             (req.cantidad, total_delta, c_kardex)
         } else {
@@ -107,12 +120,11 @@ impl InventarioService {
                 };
                 (-val_ant, costo_aprox)
             } else {
-                let costo_prom = (val_ant / stock_ant.max(1)).max(1);
-                let delta = if un_upper == "ML" {
-                    ((req.cantidad as i128 * costo_prom as i128 + 500) / 1000) as i64
-                } else {
-                    req.cantidad * costo_prom
-                };
+                let costo_prom =
+                    ((val_ant as i128 + stock_ant as i128 / 2) / stock_ant as i128).max(1) as i64;
+                // valor/stock ya está expresado por UND o por ML. No dividir otra vez entre 1000.
+                let delta = ((req.cantidad as i128 * val_ant as i128 + stock_ant as i128 / 2)
+                    / stock_ant as i128) as i64;
                 (-delta, costo_prom)
             };
 
@@ -120,7 +132,8 @@ impl InventarioService {
         };
 
         let stock_res = stock_ant + diferencia;
-        let val_res = val_ant + val_delta_micro;
+        super::validaciones::cantidad_base(stock_res, &un_upper)?;
+        let val_res = super::validaciones::valor_stock(val_ant as i128 + val_delta_micro as i128)?;
 
         tx.execute(
             "INSERT INTO movimientos_inventario (
@@ -175,7 +188,7 @@ impl InventarioService {
         .to_string();
 
         AuditoriaService::registrar_transaccion_v5(
-            &tx,
+            tx,
             Some(id_usuario),
             "USUARIO",
             None,
@@ -199,9 +212,6 @@ impl InventarioService {
             "valor_resultante_micro": val_res
         });
 
-        IdempotenciaService::finalizar_solicitud(&tx, id_operacion, &response_payload)?;
-
-        tx.commit()?;
         Ok(response_payload)
     }
 
@@ -211,122 +221,83 @@ impl InventarioService {
         id_operacion: Option<&str>,
         id_usuario: i64,
     ) -> Result<Value, AppError> {
-        let motivo_trim = req.motivo.trim().to_string();
-        if motivo_trim.len() < 5 || motivo_trim.len() > 250 {
-            return Err(AppError::Validation(
-                "El motivo del conteo físico debe contener entre 5 y 250 caracteres.".to_string(),
-            ));
+        // El comprobante de solicitud pertenece al conteo ORIGINAL, nunca al ajuste derivado.
+        let tx = conn.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)?;
+        if let Some(previo) = IdempotenciaService::evaluar_y_registrar(
+            &tx,
+            id_operacion,
+            "CONTEO_FISICO",
+            &req,
+            id_usuario,
+        )? {
+            tx.commit()?;
+            return Ok(previo);
         }
-
-        if req.stock_fisico_contado < 0.0 {
-            return Err(AppError::Validation(
-                "El stock físico contado no puede ser negativo.".to_string(),
-            ));
-        }
-
-        let (stock_ant, val_ant, un_med, ultimo_costo): (i64, i64, String, Option<i64>) = conn
-            .query_row(
-                "SELECT stock_actual, valor_stock_micro, unidad_medida, ultimo_costo_micro FROM productos WHERE id_producto = ?1 AND activo = 1",
-                [req.id_producto],
-                |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?)),
-            )
-            .map_err(|_| AppError::NotFound("Producto no encontrado o inactivo.".to_string()))?;
-
-        let un_upper = un_med.to_uppercase();
-
-        if un_upper == "UND" {
-            if (req.stock_fisico_contado - req.stock_fisico_contado.round()).abs() > 0.0001 {
-                return Err(AppError::Validation(
-                    "No se permiten números decimales en el conteo de productos medidos en unidades (UND)."
-                        .to_string(),
-                ));
-            }
-        } else if un_upper == "ML" {
-            let ml_exacto = req.stock_fisico_contado * 1000.0;
-            if (ml_exacto - ml_exacto.round()).abs() > 0.0001 {
-                return Err(AppError::Validation(
-                    "Para productos a GRANEL se permite un máximo de 3 decimales en litros (ej. 4.500 L)."
-                        .to_string(),
-                ));
+        let (stock, valor, unidad, ultimo): (i64, i64, String, Option<i64>) = tx.query_row(
+            "SELECT stock_actual, valor_stock_micro, unidad_medida, ultimo_costo_micro FROM productos WHERE id_producto=?1 AND activo=1",
+            [req.id_producto], |r| Ok((r.get(0)?,r.get(1)?,r.get(2)?,r.get(3)?)))
+            .map_err(|e| if matches!(e, rusqlite::Error::QueryReturnedNoRows) {
+                AppError::NotFound("Producto no encontrado o inactivo.".into())
+            } else { e.into() })?;
+        let contado = super::validaciones::cantidad_comercial(req.stock_fisico_contado, &unidad)?;
+        if let Some(observado) = req.stock_observado {
+            if super::validaciones::cantidad_comercial(observado, &unidad)? != stock {
+                return Err(AppError::Validation("El stock del producto fue modificado por otro usuario durante el conteo. Recargue los datos antes de continuar.".into()));
             }
         }
-
-        if let Some(obs) = req.stock_observado {
-            let stock_observado_base = if un_upper == "ML" {
-                (obs * 1000.0).round() as i64
-            } else {
-                obs.round() as i64
-            };
-
-            if stock_ant != stock_observado_base {
-                return Err(AppError::Validation(
-                    "El stock del producto fue modificado por otro usuario mientras realizaba el conteo. Por favor, recargue los datos e intente nuevamente."
-                        .to_string(),
-                ));
-            }
-        }
-
-        let stock_fisico_base = if un_upper == "ML" {
-            (req.stock_fisico_contado * 1000.0).round() as i64
+        let diferencia = contado - stock;
+        let resultado = if diferencia == 0 {
+            serde_json::json!({"status":"OK", "sin_diferencias":true,
+                "message":"Conteo verificado: sin diferencias de stock.",
+                "id_producto":req.id_producto, "stock_resultante":stock,
+                "valor_resultante_micro":valor})
         } else {
-            req.stock_fisico_contado.round() as i64
-        };
-
-        let diferencia = stock_fisico_base - stock_ant;
-        if diferencia == 0 {
-            return Ok(serde_json::json!({
-                "status": "OK",
-                "message": "Sin diferencias de stock registradas",
-                "id_producto": req.id_producto,
-                "stock_resultante": stock_ant
-            }));
-        }
-
-        if diferencia > 0 {
-            let costo = if stock_ant > 0 {
-                val_ant / stock_ant
+            let aporte = if diferencia > 0 {
+                let total = if stock > 0 {
+                    ((diferencia as i128 * valor as i128 + stock as i128 / 2) / stock as i128)
+                        as i64
+                } else if let Some(capturado) = req.costo_unitario_micro {
+                    let costo = super::validaciones::costo_capturado(capturado)?;
+                    if unidad == "ML" {
+                        ((diferencia as i128 * costo as i128 + 500) / 1000) as i64
+                    } else {
+                        diferencia
+                            .checked_mul(costo)
+                            .ok_or_else(|| AppError::Validation("Valor fuera de rango.".into()))?
+                    }
+                } else {
+                    let costo = ultimo.filter(|v| *v > 0).ok_or_else(||
+                        AppError::Validation("Ingrese el costo por unidad o litro para el sobrante sin costo previo.".into()))?;
+                    diferencia
+                        .checked_mul(costo)
+                        .ok_or_else(|| AppError::Validation("Valor fuera de rango.".into()))?
+                };
+                Some(total)
             } else {
-                let cm = req.costo_unitario_micro.or(ultimo_costo).ok_or_else(|| {
-                    AppError::Validation(
-                        "Costo unitario requerido para registrar un sobrante inicial.".to_string(),
-                    )
-                })?;
-                let cv = (cm / 10_000) * 10_000;
-
-                if cv <= 0 {
-                    return Err(AppError::Validation(
-                        "El costo unitario ingresado para el sobrante debe ser mayor a cero."
-                            .to_string(),
-                    ));
-                }
-                cv
+                None
             };
-
-            Self::ajustar_stock(
-                conn,
-                AjustarStockDto {
+            Self::aplicar_ajuste(
+                &tx,
+                &AjustarStockDto {
                     id_producto: req.id_producto,
-                    tipo_ajuste: "ENTRADA".to_string(),
-                    cantidad: diferencia,
-                    costo_unitario_micro: Some(costo),
-                    motivo: motivo_trim,
-                },
-                id_operacion,
-                id_usuario,
-            )
-        } else {
-            Self::ajustar_stock(
-                conn,
-                AjustarStockDto {
-                    id_producto: req.id_producto,
-                    tipo_ajuste: "SALIDA".to_string(),
+                    tipo_ajuste: if diferencia > 0 { "ENTRADA" } else { "SALIDA" }.into(),
                     cantidad: diferencia.abs(),
-                    costo_unitario_micro: None,
-                    motivo: motivo_trim,
+                    costo_unitario_micro: aporte.map(|_| 1),
+                    motivo: req.motivo.clone(),
                 },
-                id_operacion,
                 id_usuario,
-            )
-        }
+                aporte,
+            )?
+        };
+        IdempotenciaService::finalizar_solicitud(
+            &tx,
+            id_operacion,
+            "CONTEO_FISICO",
+            &req,
+            id_usuario,
+            &resultado,
+        )?;
+        tx.commit()?;
+        Ok(resultado)
     }
 }

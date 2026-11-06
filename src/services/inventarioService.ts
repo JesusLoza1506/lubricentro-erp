@@ -1,8 +1,11 @@
+import { ejecutarOperacionInventario } from './operacionInventario';
 import { invoke } from '@tauri-apps/api/core';
 import {
   ProductoAdminDTO,
   ProductoPublicoDTO,
   ProductosPaginadosDTO,
+  ProductosPublicosPaginadosDTO,
+  OrigenKardexDTO,
   CrearProductoDTO,
   EditarProductoDTO,
   AjustarStockDTO,
@@ -20,12 +23,23 @@ import {
   ActualizarServicioDTO,
 } from '../types/inventario';
 
+export interface ResultadoOperacionStock {
+  status: string;
+  message?: string;
+  sin_diferencias?: boolean;
+  id_ingreso?: number;
+  stock_resultante?: number;
+}
+
 export interface ResumenSaldosKardexDTO {
   saldo_inicial: number;
   saldo_final: number;
+  saldo_actual: number;
 }
 
 export const inventarioService = {
+  proponerCodigo: (tipo: 'PRODUCTO' | 'SERVICIO'): Promise<string> =>
+    invoke('proponer_codigo_inventario_cmd', { tipo }),
   listarProductos: async (
     incluirInactivos: boolean = false
   ): Promise<(ProductoAdminDTO | ProductoPublicoDTO)[]> => {
@@ -39,7 +53,10 @@ export const inventarioService = {
     categoria?: string,
     incluirInactivos?: boolean,
     limite: number = 20,
-    offset: number = 0
+    offset: number = 0,
+    soloCriticos: boolean = false,
+    stock?: string,
+    estado?: string
   ): Promise<ProductosPaginadosDTO> => {
     return await invoke<ProductosPaginadosDTO>('listar_productos_admin_paginado_cmd', {
       busqueda,
@@ -47,6 +64,9 @@ export const inventarioService = {
       incluirInactivos,
       limite,
       offset,
+      soloCriticos,
+      stock,
+      estado,
     });
   },
 
@@ -58,13 +78,19 @@ export const inventarioService = {
     busqueda?: string,
     categoria?: string,
     limite: number = 20,
-    offset: number = 0
-  ): Promise<ProductosPaginadosDTO> => {
-    return await invoke<ProductosPaginadosDTO>('listar_productos_publicos_paginado_cmd', {
+    offset: number = 0,
+    soloCriticos: boolean = false,
+    stock?: string,
+    estado?: string
+  ): Promise<ProductosPublicosPaginadosDTO> => {
+    return await invoke<ProductosPublicosPaginadosDTO>('listar_productos_publicos_paginado_cmd', {
       busqueda,
       categoria,
       limite,
       offset,
+      soloCriticos,
+      stock,
+      estado,
     });
   },
 
@@ -80,17 +106,11 @@ export const inventarioService = {
     return await invoke('actualizar_producto_cmd', { payload });
   },
 
-  eliminarProducto: async (
-    idProducto: number,
-    motivo: string = 'Desactivación administrativa desde interfaz'
-  ): Promise<void> => {
+  eliminarProducto: async (idProducto: number, motivo: string): Promise<void> => {
     return await invoke('eliminar_producto_cmd', { idProducto, motivo });
   },
 
-  reactivarProducto: async (
-    idProducto: number,
-    motivo: string = 'Reactivación administrativa desde interfaz'
-  ): Promise<void> => {
+  reactivarProducto: async (idProducto: number, motivo: string): Promise<void> => {
     return await invoke('reactivar_producto_cmd', { idProducto, motivo });
   },
 
@@ -102,12 +122,30 @@ export const inventarioService = {
     return await invoke('despachar_producto_granel_cmd', { idProducto, cantidad, motivo });
   },
 
-  ajustarStock: async (payload: AjustarStockDTO): Promise<void> => {
-    return await invoke('ajustar_stock_cmd', { payload });
+  ajustarStock: async (
+    payload: AjustarStockDTO,
+    idOperacion?: string
+  ): Promise<ResultadoOperacionStock> => {
+    return ejecutarOperacionInventario<ResultadoOperacionStock>(
+      'ajustar_stock_cmd',
+      payload,
+      idOperacion
+    );
   },
 
-  procesarConteoFisico: async (payload: ConteoFisicoDTO): Promise<void> => {
-    return await invoke('procesar_conteo_fisico_cmd', { payload });
+  procesarConteoFisico: async (
+    payload: ConteoFisicoDTO,
+    idOperacion?: string
+  ): Promise<ResultadoOperacionStock> => {
+    return ejecutarOperacionInventario<ResultadoOperacionStock>(
+      'procesar_conteo_fisico_cmd',
+      payload,
+      idOperacion
+    );
+  },
+
+  obtenerOrigenKardex: async (idMovimiento: number): Promise<OrigenKardexDTO> => {
+    return await invoke<OrigenKardexDTO>('obtener_origen_kardex_cmd', { idMovimiento });
   },
 
   listarKardexProducto: async (
@@ -142,26 +180,44 @@ export const inventarioService = {
     });
   },
 
-  registrarIngresoCompra: async (payload: RegistrarIngresoDTO): Promise<number> => {
-    return await invoke<number>('registrar_ingreso_compra_cmd', { payload });
+  registrarIngresoCompra: async (
+    payload: RegistrarIngresoDTO,
+    idOperacion?: string
+  ): Promise<ResultadoOperacionStock> => {
+    return ejecutarOperacionInventario<ResultadoOperacionStock>(
+      'registrar_ingreso_compra_cmd',
+      payload,
+      idOperacion
+    );
   },
 
   listarIngresosStock: async (
     limite: number = 20,
     offset: number = 0,
     estado?: string,
-    origen?: string
+    origen?: string,
+    fechaInicio?: string,
+    fechaFin?: string
   ): Promise<IngresoStockResponseDTO[]> => {
     return await invoke<IngresoStockResponseDTO[]>('listar_ingresos_stock_cmd', {
       limite,
       offset,
       estado,
       origen,
+      fechaInicio,
+      fechaFin,
     });
   },
 
-  anularIngresoCompra: async (payload: AnularIngresoDTO): Promise<void> => {
-    return await invoke('anular_ingreso_compra_cmd', { payload });
+  anularIngresoCompra: async (
+    payload: AnularIngresoDTO,
+    idOperacion?: string
+  ): Promise<ResultadoOperacionStock> => {
+    return ejecutarOperacionInventario<ResultadoOperacionStock>(
+      'anular_ingreso_compra_cmd',
+      payload,
+      idOperacion
+    );
   },
 
   listarCategorias: async (): Promise<Categoria[]> => {

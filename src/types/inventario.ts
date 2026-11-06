@@ -29,6 +29,22 @@ export interface ProductosPaginadosDTO {
   total_registros: number;
 }
 
+export interface ProductosPublicosPaginadosDTO {
+  productos: ProductoPublicoDTO[];
+  total_registros: number;
+}
+
+export interface OrigenKardexDTO {
+  tipo: string;
+  codigo: string;
+  fecha: string;
+  estado: string;
+  documento: string | null;
+  resumen: string | null;
+  lineas: { nombre: string; unidad_medida: string; cantidad: number; valor_micro: number | null }[];
+  comprobantes: { id_comprobante: number; numero: string; tipo_comprobante: string; estado_envio: string; total_cent: number }[];
+}
+
 export interface CrearProductoDTO {
   codigo: string;
   nombre: string;
@@ -81,6 +97,11 @@ export interface MovimientoKardexDTO {
   motivo?: string | null;
   fecha_movimiento: string;
   usuario_nombre?: string | null;
+  id_ingreso: number | null;
+  id_ot: number | null;
+  id_venta: number | null;
+  id_devolucion: number | null;
+  codigo_origen: string | null;
 }
 
 export interface ServicioDTO {

@@ -1,4 +1,4 @@
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import '@testing-library/jest-dom';
 import { InventarioPage } from '../InventarioPage';
@@ -66,8 +66,9 @@ describe('InventarioPage - Pruebas de Integración Frontend FASE 7', () => {
     });
 
     (inventarioService.listarProductosAdminPaginado as ReturnType<typeof vi.fn>).mockImplementation(
-      async (busqueda) => {
+      async (busqueda, _categoria, _inactivos, _limite, _offset, criticos) => {
         let resultado = [...mockProductos];
+        if (criticos) resultado = resultado.filter((p) => p.es_critico);
         if (busqueda) {
           resultado = resultado.filter(
             (p) =>
@@ -123,10 +124,12 @@ describe('InventarioPage - Pruebas de Integración Frontend FASE 7', () => {
   it('1. Renderiza correctamente la tabla de productos e indicadores de stock', async () => {
     render(<InventarioPage />);
 
-    expect(await screen.findByText(/Gestión de Inventario y Stock/i)).toBeInTheDocument();
+    expect(await screen.findByText(/^Inventario y Stock$/i)).toBeInTheDocument();
     expect(await screen.findByText('Aceite Sintético 5W30 1L')).toBeInTheDocument();
     expect(screen.getByText('Aceite Granel 10W40')).toBeInTheDocument();
-    expect(screen.getByText('CRÍTICO')).toBeInTheDocument();
+    expect(
+      within(screen.getByRole('region', { name: 'Catálogo de productos' })).getByText('Crítico')
+    ).toBeInTheDocument();
   });
 
   it('2. Permite filtrar productos por búsqueda de texto', async () => {
@@ -152,19 +155,17 @@ describe('InventarioPage - Pruebas de Integración Frontend FASE 7', () => {
     const modalTitle = await screen.findByRole('heading', { name: /Nuevo Producto/i });
     expect(modalTitle).toBeInTheDocument();
 
-    const modalContainer = modalTitle.closest('form') || modalTitle.closest('div')?.parentElement;
-    expect(modalContainer).toBeTruthy();
+    const modal = screen.getByRole('dialog', { name: 'Nuevo Producto' });
+    fireEvent.change(within(modal).getByRole('textbox', { name: 'Código *' }), {
+      target: { value: 'FILT-001' },
+    });
+    fireEvent.change(within(modal).getByRole('textbox', { name: 'Nombre del producto *' }), {
+      target: { value: 'Filtro Aceite PH6607' },
+    });
 
-    const inputs = modalContainer
-      ? Array.from(modalContainer.querySelectorAll<HTMLInputElement>('input'))
-      : (screen.getAllByRole('textbox') as HTMLInputElement[]);
-
-    const codigoInput = inputs.find((i) => i.getAttribute('name') === 'codigo') || inputs[0];
-    const nombreInput = inputs.find((i) => i.getAttribute('name') === 'nombre') || inputs[1];
-
-    if (codigoInput) fireEvent.change(codigoInput, { target: { value: 'FILT-001' } });
-    if (nombreInput) fireEvent.change(nombreInput, { target: { value: 'Filtro Aceite PH6607' } });
-
+    fireEvent.change(screen.getByRole('spinbutton', { name: 'Precio de venta' }), {
+      target: { value: '25.00' },
+    });
     const formElement = modalTitle.closest('form');
     if (formElement) {
       fireEvent.submit(formElement);
@@ -190,11 +191,13 @@ describe('InventarioPage - Pruebas de Integración Frontend FASE 7', () => {
 
     render(<InventarioPage />);
 
+    await screen.findByText('Aceite Sintético 5W30 1L');
+    fireEvent.click(screen.getByRole('button', { name: 'Más acciones: Aceite Sintético 5W30 1L' }));
     const btnAjusteList = await screen.findAllByTitle('Conteo Físico Reconciliado');
     fireEvent.click(btnAjusteList[0]);
 
     expect(
-      await screen.findByText(/Conteo Físico Reconciliado \(Auditoría\)/i)
+      await screen.findByText(/Conteo físico de stock/i)
     ).toBeInTheDocument();
 
     const btnAplicar = screen.getByRole('button', { name: /Aplicar Reconciliación/i });
@@ -202,7 +205,9 @@ describe('InventarioPage - Pruebas de Integración Frontend FASE 7', () => {
 
     await waitFor(() => {
       expect(
-        screen.getByText(/El stock del producto fue modificado por otro usuario/i)
+        within(screen.getByRole('dialog', { name: 'Conteo físico' })).getByText(
+          /El stock del producto fue modificado por otro usuario/i
+        )
       ).toBeInTheDocument();
     });
   });
@@ -212,16 +217,21 @@ describe('InventarioPage - Pruebas de Integración Frontend FASE 7', () => {
 
     render(<InventarioPage />);
 
+    await screen.findByText('Aceite Sintético 5W30 1L');
+    fireEvent.click(screen.getByRole('button', { name: 'Más acciones: Aceite Sintético 5W30 1L' }));
     const btnBajaList = await screen.findAllByTitle('Dar de Baja Producto');
     fireEvent.click(btnBajaList[0]);
 
     expect(await screen.findByText(/Dar de Baja Producto/i)).toBeInTheDocument();
 
+    fireEvent.change(screen.getByLabelText('Motivo administrativo'), {
+      target: { value: 'Producto discontinuado' },
+    });
     const btnConfirmar = screen.getByRole('button', { name: /Confirmar/i });
     fireEvent.click(btnConfirmar);
 
     await waitFor(() => {
-      expect(inventarioService.eliminarProducto).toHaveBeenCalledWith(1);
+      expect(inventarioService.eliminarProducto).toHaveBeenCalledWith(1, 'Producto discontinuado');
     });
   });
 });

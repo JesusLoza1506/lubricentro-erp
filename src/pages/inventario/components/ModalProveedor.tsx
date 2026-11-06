@@ -1,7 +1,6 @@
-import React, { useState, useEffect } from 'react';
-import { AlertCircle } from 'lucide-react';
+import { useNotificarInventario } from '../AvisosInventario';
+import React, { useState, useEffect, useRef } from 'react';
 import { ProveedorDTO, CrearProveedorDTO, ActualizarProveedorDTO } from '../../../types/inventario';
-import { modalInputStyle } from '../inventarioStyles';
 
 interface ModalProveedorProps {
   abierto: boolean;
@@ -18,6 +17,7 @@ export const ModalProveedor: React.FC<ModalProveedorProps> = ({
   onGuardar,
   onEditar,
 }) => {
+  const notificar = useNotificarInventario();
   const [form, setForm] = useState<CrearProveedorDTO>({
     tipo_documento: 'RUC',
     numero_documento: '',
@@ -27,6 +27,7 @@ export const ModalProveedor: React.FC<ModalProveedorProps> = ({
     direccion: '',
     contacto_asesor: '',
   });
+  const envioEnCurso = useRef(false);
   const [guardando, setGuardando] = useState(false);
   const [errorModal, setErrorModal] = useState<string | null>(null);
 
@@ -59,9 +60,13 @@ export const ModalProveedor: React.FC<ModalProveedorProps> = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (envioEnCurso.current) return;
+    envioEnCurso.current = true;
     setErrorModal(null);
     try {
       setGuardando(true);
+      if (proveedorAEditar && !onEditar)
+        throw new Error('No se puede editar el proveedor en esta pantalla.');
       if (proveedorAEditar && onEditar) {
         await onEditar({
           ...form,
@@ -93,242 +98,120 @@ export const ModalProveedor: React.FC<ModalProveedorProps> = ({
           ? err
           : (err as { message?: string })?.message || 'Error al guardar el proveedor.';
       setErrorModal(msg);
+      notificar(msg, 'ERROR');
     } finally {
+      envioEnCurso.current = false;
       setGuardando(false);
     }
   };
 
   return (
     <div
+      className="inv-overlay"
       style={{
         position: 'fixed',
-        top: 0,
-        left: 0,
-        width: '100vw',
-        height: '100vh',
-        backgroundColor: 'rgba(0,0,0,0.8)',
-        backdropFilter: 'blur(4px)',
+        inset: 0,
         display: 'flex',
-        justifyContent: 'center',
         alignItems: 'center',
-        zIndex: 1200,
+        justifyContent: 'center',
+        zIndex: 1400,
       }}
     >
-      <div
-        style={{
-          width: '460px',
-          backgroundColor: '#0F172A',
-          border: '1px solid #334155',
-          borderRadius: '16px',
-          padding: '24px',
-          boxShadow: '0 20px 40px rgba(0,0,0,0.5)',
-        }}
-      >
-        <h3 style={{ fontSize: '18px', fontWeight: '800', color: '#F8FAFC', margin: '0 0 16px 0' }}>
-          {proveedorAEditar ? 'Editar Proveedor' : 'Nuevo Proveedor'}
-        </h3>
-
-        {errorModal && (
-          <div
-            style={{
-              backgroundColor: 'rgba(239, 68, 68, 0.15)',
-              border: '1px solid #EF4444',
-              color: '#F87171',
-              padding: '10px 14px',
-              borderRadius: '8px',
-              marginBottom: '14px',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              fontSize: '12px',
-            }}
-          >
-            <AlertCircle size={16} />
-            <span>{errorModal}</span>
+      <div className="inv-dialog" role="dialog" aria-modal="true" aria-label="Proveedor">
+        <header className="inv-dialog-header">
+          <div>
+            <h3>{proveedorAEditar ? 'Editar Proveedor' : 'Nuevo Proveedor'}</h3>
+            <p>Datos de identificación y contacto para las compras.</p>
           </div>
-        )}
-
-        <form
-          onSubmit={handleSubmit}
-          style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}
-        >
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '10px' }}>
-            <div>
-              <label
-                style={{
-                  display: 'block',
-                  fontSize: '11px',
-                  color: '#94A3B8',
-                  marginBottom: '4px',
-                }}
-              >
-                Tipo Doc.
+        </header>
+        <form className="inv-form" onSubmit={handleSubmit}>
+          <fieldset disabled={guardando} className="inv-form-section">
+            <legend className="inv-section-label">Identificación</legend>
+            <div className="inv-form-grid is-identification">
+              <label className="inv-field">
+                Tipo documento
+                <select
+                  value={form.tipo_documento}
+                  onChange={(e) => setForm({ ...form, tipo_documento: e.target.value })}
+                >
+                  <option value="RUC">RUC</option>
+                  <option value="DNI">DNI</option>
+                  <option value="CE">CE (Carné Extr.)</option>
+                </select>
               </label>
-              <select
-                value={form.tipo_documento}
-                onChange={(e) => setForm({ ...form, tipo_documento: e.target.value })}
-                style={{ ...modalInputStyle, backgroundColor: '#1E293B', color: '#F8FAFC' }}
-              >
-                <option value="RUC">RUC</option>
-                <option value="DNI">DNI</option>
-                <option value="CE">CE (Carné Extr.)</option>
-              </select>
+              <label className="inv-field">
+                Número documento *
+                <input
+                  required
+                  placeholder="20100070970"
+                  value={form.numero_documento}
+                  onChange={(e) => setForm({ ...form, numero_documento: e.target.value })}
+                />
+              </label>
             </div>
-            <div>
-              <label
-                style={{
-                  display: 'block',
-                  fontSize: '11px',
-                  color: '#94A3B8',
-                  marginBottom: '4px',
-                }}
-              >
-                N° Documento *
-              </label>
+            <label className="inv-field">
+              Nombre o razón social *
               <input
                 required
-                type="text"
-                placeholder="20100070970"
-                value={form.numero_documento}
-                onChange={(e) => setForm({ ...form, numero_documento: e.target.value })}
-                style={modalInputStyle}
+                placeholder="Distribuidora de Lubricantes SAC"
+                value={form.nombre_razon_social}
+                onChange={(e) => setForm({ ...form, nombre_razon_social: e.target.value })}
               />
-            </div>
-          </div>
-
-          <div>
-            <label
-              style={{ display: 'block', fontSize: '11px', color: '#94A3B8', marginBottom: '4px' }}
-            >
-              Razón Social / Nombre *
             </label>
-            <input
-              required
-              type="text"
-              placeholder="Distribuidora de Lubricantes SAC"
-              value={form.nombre_razon_social}
-              onChange={(e) => setForm({ ...form, nombre_razon_social: e.target.value })}
-              style={modalInputStyle}
-            />
-          </div>
-
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-            <div>
-              <label
-                style={{
-                  display: 'block',
-                  fontSize: '11px',
-                  color: '#94A3B8',
-                  marginBottom: '4px',
-                }}
-              >
+          </fieldset>
+          <fieldset disabled={guardando} className="inv-form-section">
+            <legend className="inv-section-label">Contacto · opcional</legend>
+            <div className="inv-form-grid">
+              <label className="inv-field">
                 Teléfono
+                <input
+                  value={form.telefono || ''}
+                  onChange={(e) => setForm({ ...form, telefono: e.target.value })}
+                />
               </label>
-              <input
-                type="text"
-                value={form.telefono || ''}
-                onChange={(e) => setForm({ ...form, telefono: e.target.value })}
-                style={modalInputStyle}
-              />
+              <label className="inv-field">
+                Persona de contacto
+                <input
+                  value={form.contacto_asesor || ''}
+                  onChange={(e) => setForm({ ...form, contacto_asesor: e.target.value })}
+                />
+              </label>
             </div>
-            <div>
-              <label
-                style={{
-                  display: 'block',
-                  fontSize: '11px',
-                  color: '#94A3B8',
-                  marginBottom: '4px',
-                }}
-              >
-                Asesor de Venta
-              </label>
-              <input
-                type="text"
-                value={form.contacto_asesor || ''}
-                onChange={(e) => setForm({ ...form, contacto_asesor: e.target.value })}
-                style={modalInputStyle}
-              />
-            </div>
-          </div>
-
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-            <div>
-              <label
-                style={{
-                  display: 'block',
-                  fontSize: '11px',
-                  color: '#94A3B8',
-                  marginBottom: '4px',
-                }}
-              >
-                Correo Electrónico
-              </label>
+            <label className="inv-field">
+              Correo electrónico
               <input
                 type="email"
                 placeholder="contacto@proveedor.com"
                 value={form.correo || ''}
                 onChange={(e) => setForm({ ...form, correo: e.target.value })}
-                style={modalInputStyle}
               />
-            </div>
-            <div>
-              <label
-                style={{
-                  display: 'block',
-                  fontSize: '11px',
-                  color: '#94A3B8',
-                  marginBottom: '4px',
-                }}
-              >
-                Dirección Fiscal
-              </label>
+            </label>
+            <label className="inv-field">
+              Dirección
               <input
-                type="text"
                 placeholder="Av. Industrial 123"
                 value={form.direccion || ''}
                 onChange={(e) => setForm({ ...form, direccion: e.target.value })}
-                style={modalInputStyle}
               />
-            </div>
-          </div>
-
-          <div
-            style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '12px' }}
-          >
-            <button
-              type="button"
-              onClick={onClose}
-              style={{
-                padding: '8px 14px',
-                backgroundColor: 'transparent',
-                border: '1px solid #334155',
-                color: '#CBD5E1',
-                borderRadius: '8px',
-                cursor: 'pointer',
-              }}
-            >
+            </label>
+          </fieldset>
+          {errorModal && (
+            <p role="alert" className="inv-form-error">
+              {errorModal}
+            </p>
+          )}
+          <footer className="inv-form-footer">
+            <button type="button" className="inv-button" disabled={guardando} onClick={onClose}>
               Cancelar
             </button>
-            <button
-              type="submit"
-              disabled={guardando}
-              style={{
-                padding: '8px 18px',
-                backgroundColor: '#2563EB',
-                color: '#FFFFFF',
-                border: 'none',
-                borderRadius: '8px',
-                fontWeight: '700',
-                cursor: 'pointer',
-              }}
-            >
+            <button type="submit" className="inv-button inv-primary" disabled={guardando}>
               {guardando
                 ? 'Guardando...'
                 : proveedorAEditar
                   ? 'Guardar Cambios'
                   : 'Crear Proveedor'}
             </button>
-          </div>
+          </footer>
         </form>
       </div>
     </div>

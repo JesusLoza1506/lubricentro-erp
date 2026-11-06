@@ -30,7 +30,7 @@ impl InventarioService {
         let now_lima = obtener_fecha_lima();
 
         let num_doc = if tipo_doc == "SIN_DOCUMENTO" {
-            format!("SD-{}", now_lima.format("%Y%m%d-%H%M%S"))
+            format!("SD-{}", uuid::Uuid::new_v4().simple())
         } else {
             req.numero_documento
                 .as_deref()
@@ -38,22 +38,6 @@ impl InventarioService {
                 .ok_or_else(|| AppError::Validation("Número de documento requerido.".to_string()))?
                 .to_string()
         };
-
-        // Verificación de duplicado en negocio por documento
-        if tipo_doc != "SIN_DOCUMENTO" {
-            let existe_compra: i64 = conn.query_row(
-                "SELECT COUNT(*) FROM ingresos_stock WHERE id_proveedor = ?1 AND tipo_documento = ?2 AND numero_documento = ?3 AND estado != 'ANULADO'",
-                params![id_prov, tipo_doc, num_doc.trim()],
-                |r| r.get(0),
-            ).unwrap_or(0);
-
-            if existe_compra > 0 {
-                return Err(AppError::Validation(format!(
-                    "Ya existe un ingreso registrado con el documento {} - {} para este proveedor.",
-                    tipo_doc, num_doc
-                )));
-            }
-        }
 
         let fec_doc = if tipo_doc == "SIN_DOCUMENTO" {
             now_lima.format("%Y-%m-%d").to_string()
@@ -78,6 +62,22 @@ impl InventarioService {
         )? {
             tx.commit()?;
             return Ok(resultado_previo);
+        }
+
+        // Verificación de duplicado en negocio por documento
+        if tipo_doc != "SIN_DOCUMENTO" {
+            let existe_compra: i64 = tx.query_row(
+                "SELECT COUNT(*) FROM ingresos_stock WHERE id_proveedor = ?1 AND tipo_documento = ?2 AND numero_documento = ?3",
+                params![id_prov, tipo_doc, num_doc.trim()],
+                |r| r.get(0),
+            )?;
+
+            if existe_compra > 0 {
+                return Err(AppError::Validation(format!(
+                    "Ya existe un ingreso registrado con el documento {} - {} para este proveedor.",
+                    tipo_doc, num_doc
+                )));
+            }
         }
 
         let prov_snapshot: String = tx.query_row(
@@ -112,7 +112,10 @@ impl InventarioService {
                 |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?, r.get(4)?)),
             ).map_err(|_| AppError::NotFound(format!("Producto ID {} no encontrado.", d.id_producto)))?;
 
-            let costo_efectivo_micro = (d.costo_efectivo_micro / 10_000) * 10_000;
+            super::validaciones::cantidad_base(d.cantidad, &un_prod)?;
+            super::validaciones::cantidad_base(stock_ant + d.cantidad, &un_prod)?;
+            let costo_efectivo_micro =
+                super::validaciones::costo_capturado(d.costo_efectivo_micro)?;
             if costo_efectivo_micro <= 0 {
                 return Err(AppError::Validation(format!(
                     "El costo unitario redondeado del producto ID {} no es válido.",
@@ -120,17 +123,16 @@ impl InventarioService {
                 )));
             }
 
-            let (aporte_micro, costo_unitario_kardex) = if un_prod.to_uppercase() == "ML" {
-                let total =
-                    ((d.cantidad as i128 * costo_efectivo_micro as i128 + 500) / 1000) as i64;
-                let costo_k = (total / d.cantidad.max(1)).max(1);
-                (total, costo_k)
+            let aporte_micro =
+                super::validaciones::aporte_micro(d.cantidad, costo_efectivo_micro, &un_prod)?;
+            super::validaciones::valor_stock(val_ant_micro as i128 + aporte_micro as i128)?;
+            let costo_unitario_kardex = if un_prod == "ML" {
+                (aporte_micro / d.cantidad).max(1)
             } else {
-                let total = d.cantidad * costo_efectivo_micro;
-                (total, costo_efectivo_micro)
+                costo_efectivo_micro
             };
-
-            total_costo_micro += aporte_micro;
+            total_costo_micro =
+                super::validaciones::valor_stock(total_costo_micro as i128 + aporte_micro as i128)?;
             detalles_calculados.push((
                 d.id_producto,
                 cod_prod,
@@ -233,7 +235,14 @@ impl InventarioService {
         });
 
         // Finalizar Idempotencia en la transacción
-        IdempotenciaService::finalizar_solicitud(&tx, id_operacion, &response_payload)?;
+        IdempotenciaService::finalizar_solicitud(
+            &tx,
+            id_operacion,
+            "REGISTRAR_COMPRA",
+            &req,
+            id_usuario,
+            &response_payload,
+        )?;
 
         tx.commit()?;
         Ok(response_payload)
@@ -246,6 +255,44 @@ impl InventarioService {
         estado: Option<String>,
         origen: Option<String>,
     ) -> Result<Vec<IngresoStockResponseDto>, AppError> {
+        Self::listar_ingresos_stock_filtrado(conn, limite, offset, estado, origen, None, None)
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub fn listar_ingresos_stock_filtrado(
+        conn: &Connection,
+        limite: i64,
+        offset: i64,
+        estado: Option<String>,
+        origen: Option<String>,
+        fecha_inicio: Option<String>,
+        fecha_fin: Option<String>,
+    ) -> Result<Vec<IngresoStockResponseDto>, AppError> {
+        if !(1..=100).contains(&limite) || offset < 0 {
+            return Err(AppError::Validation("Paginación inválida.".into()));
+        }
+        let fechas = match (fecha_inicio, fecha_fin) {
+            (None, None) => None,
+            (Some(inicio), Some(fin)) => {
+                let parsear = |s: &str| {
+                    chrono::NaiveDate::parse_from_str(s, "%Y-%m-%d")
+                        .map_err(|_| AppError::Validation("Fecha inválida.".into()))
+                };
+                let desde = parsear(&inicio)?;
+                let hasta = parsear(&fin)?;
+                if desde > hasta || (hasta - desde).num_days() > 366 {
+                    return Err(AppError::Validation(
+                        "El rango debe estar ordenado y no superar 366 días.".into(),
+                    ));
+                }
+                Some((inicio, fin))
+            }
+            _ => {
+                return Err(AppError::Validation(
+                    "Complete ambas fechas del rango.".into(),
+                ))
+            }
+        };
         let mut sql = String::from(
             "SELECT i.id_ingreso, i.id_operacion, i.codigo, i.origen, i.id_proveedor, 
                     p.nombre_razon_social, i.tipo_documento, i.numero_documento, i.fecha_documento, 
@@ -274,6 +321,12 @@ impl InventarioService {
             }
         }
 
+        if let Some((inicio, fin)) = fechas {
+            params_vec.push(Box::new(format!("{inicio} 00:00:00")));
+            sql.push_str(&format!(" AND i.fecha_registro >= ?{}", params_vec.len()));
+            params_vec.push(Box::new(format!("{fin} 23:59:59")));
+            sql.push_str(&format!(" AND i.fecha_registro <= ?{}", params_vec.len()));
+        }
         params_vec.push(Box::new(limite));
         let limit_idx = params_vec.len();
         params_vec.push(Box::new(offset));
@@ -384,20 +437,6 @@ impl InventarioService {
             ));
         }
 
-        let (estado_actual, origen_ing, cod_ingreso, total_costo): (String, String, String, i64) = conn
-            .query_row(
-                "SELECT estado, origen, codigo, total_costo_micro FROM ingresos_stock WHERE id_ingreso = ?1",
-                [req.id_ingreso],
-                |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?)),
-            )
-            .map_err(|_| AppError::NotFound("Ingreso no encontrado.".to_string()))?;
-
-        if estado_actual != "REGISTRADO" {
-            return Err(AppError::Validation(
-                "Solo se pueden anular ingresos en estado REGISTRADO.".to_string(),
-            ));
-        }
-
         let tx = conn.transaction()?;
 
         // Idempotencia Atómica
@@ -410,6 +449,20 @@ impl InventarioService {
         )? {
             tx.commit()?;
             return Ok(resultado_previo);
+        }
+
+        let (estado_actual, origen_ing, cod_ingreso, total_costo): (String, String, String, i64) = tx
+            .query_row(
+                "SELECT estado, origen, codigo, total_costo_micro FROM ingresos_stock WHERE id_ingreso = ?1",
+                [req.id_ingreso],
+                |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?)),
+            )
+            .map_err(|_| AppError::NotFound("Ingreso no encontrado.".to_string()))?;
+
+        if estado_actual != "REGISTRADO" {
+            return Err(AppError::Validation(
+                "Solo se pueden anular ingresos en estado REGISTRADO.".to_string(),
+            ));
         }
 
         let detalles: Vec<(i64, i64, String, i64, i64, i64)> = {
@@ -546,7 +599,14 @@ impl InventarioService {
             "id_ingreso": req.id_ingreso
         });
 
-        IdempotenciaService::finalizar_solicitud(&tx, id_operacion, &response_payload)?;
+        IdempotenciaService::finalizar_solicitud(
+            &tx,
+            id_operacion,
+            "ANULAR_COMPRA",
+            &req,
+            id_usuario,
+            &response_payload,
+        )?;
 
         tx.commit()?;
         Ok(response_payload)

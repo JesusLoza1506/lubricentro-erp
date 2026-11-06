@@ -1,7 +1,8 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { X, ArrowLeft, ArrowRight, AlertCircle, Filter } from 'lucide-react';
 import { Producto, MovimientoKardexDTO } from '../../../types/inventario';
-import { invoke } from '@tauri-apps/api/core';
+import { inventarioService } from '../../../services/inventarioService';
+import { ModalOrigenKardex, dineroMicro } from './ModalOrigenKardex';
 
 interface ModalKardexProps {
   abierto: boolean;
@@ -34,9 +35,14 @@ export const ModalKardex: React.FC<ModalKardexProps> = ({ abierto, producto, onC
   });
 
   const limite = 20;
+  const consulta = useRef(0);
+  const aplicados = useRef({ inicio: '', fin: '', tipo: 'TODOS' });
+  const [origenSeleccionado, setOrigenSeleccionado] = useState<number | null>(null);
 
   useEffect(() => {
     if (abierto && producto) {
+      setOrigenSeleccionado(null);
+      setMovimientos([]);
       setPagina(0);
       setFechaInicio('');
       setFechaFin('');
@@ -44,42 +50,47 @@ export const ModalKardex: React.FC<ModalKardexProps> = ({ abierto, producto, onC
       setErrorMsg(null);
       cargarKardex(0, '', '', 'TODOS');
     }
+    return () => {
+      consulta.current += 1;
+    };
   }, [abierto, producto]);
 
   const cargarKardex = async (numPagina: number, fInicio: string, fFin: string, tMov: string) => {
     if (!producto) return;
+    const actual = ++consulta.current;
     setCargando(true);
     setErrorMsg(null);
     try {
-      // 1. Carga movimientos filtrados y paginados vía comando Tauri
-      const data: MovimientoKardexDTO[] = await invoke('listar_kardex_producto_cmd', {
-        idProducto: producto.id_producto,
-        limite,
-        offset: numPagina * limite,
-        fechaInicio: fInicio || null,
-        fechaFin: fFin || null,
-        tipoMovimiento: tMov === 'TODOS' ? null : tMov,
-      });
-
-      // 2. Carga resumen de saldos del período vía comando Tauri
-      const resSaldos: ResumenSaldos = await invoke('obtener_resumen_saldos_kardex_cmd', {
-        idProducto: producto.id_producto,
-        fechaInicio: fInicio || null,
-        fechaFin: fFin || null,
-        tipoMovimiento: tMov === 'TODOS' ? null : tMov,
-      });
-
+      const [data, resSaldos] = await Promise.all([
+        inventarioService.listarKardexProducto(
+          producto.id_producto,
+          limite,
+          numPagina * limite,
+          fInicio || undefined,
+          fFin || undefined,
+          tMov === 'TODOS' ? undefined : tMov
+        ),
+        inventarioService.obtenerResumenSaldosKardex(
+          producto.id_producto,
+          fInicio || undefined,
+          fFin || undefined,
+          tMov === 'TODOS' ? undefined : tMov
+        ),
+      ]);
+      if (actual !== consulta.current) return;
+      aplicados.current = { inicio: fInicio, fin: fFin, tipo: tMov };
       setMovimientos(data || []);
       setSaldos(resSaldos);
       setPagina(numPagina);
     } catch (err: unknown) {
+      if (actual !== consulta.current) return;
       const msg =
         typeof err === 'string'
           ? err
           : (err as { message?: string })?.message || 'Error al obtener datos del Kárdex';
       setErrorMsg(msg);
     } finally {
-      setCargando(false);
+      if (actual === consulta.current) setCargando(false);
     }
   };
 
@@ -93,10 +104,11 @@ export const ModalKardex: React.FC<ModalKardexProps> = ({ abierto, producto, onC
 
   const esML = producto.unidad_medida === 'ML';
   const unidadTexto = esML ? 'L' : 'UND';
-  const formatearCant = (val: number) => (esML ? (val / 1000).toFixed(2) : val.toString());
+  const formatearCant = (val: number) => (esML ? (val / 1000).toFixed(3) : val.toString());
 
   return (
     <div
+      className="inv-overlay"
       style={{
         position: 'fixed',
         top: 0,
@@ -112,8 +124,13 @@ export const ModalKardex: React.FC<ModalKardexProps> = ({ abierto, producto, onC
       }}
     >
       <div
+        className="inv-dialog inv-dialog-wide"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Kardex"
         style={{
-          width: '950px',
+          width: 'min(1400px, 96vw)',
+          boxSizing: 'border-box',
           backgroundColor: '#0F172A',
           border: '1px solid #334155',
           borderRadius: '16px',
@@ -135,11 +152,12 @@ export const ModalKardex: React.FC<ModalKardexProps> = ({ abierto, producto, onC
         >
           <div>
             <h3 style={{ fontSize: '18px', fontWeight: '800', color: '#F8FAFC', margin: 0 }}>
-              Historial de KÁRDEX - {producto.nombre}
+              Kardex · {producto.nombre}
             </h3>
             <span style={{ fontSize: '12px', color: '#94A3B8' }}>Código: {producto.codigo}</span>
           </div>
           <button
+            aria-label="Cerrar Kardex"
             onClick={onClose}
             style={{ background: 'none', border: 'none', color: '#94A3B8', cursor: 'pointer' }}
           >
@@ -208,11 +226,14 @@ export const ModalKardex: React.FC<ModalKardexProps> = ({ abierto, producto, onC
               <option value="AJUSTE_ENTRADA">AJUSTE ENTRADA</option>
               <option value="AJUSTE_SALIDA">AJUSTE SALIDA</option>
               <option value="ANULACION_INGRESO">ANULACIÓN INGRESO</option>
+              <option value="VENTA_DIRECTA">VENTA DIRECTA</option>
+              <option value="DEVOLUCION_VENTA">DEVOLUCIÓN DE VENTA</option>
             </select>
           </div>
 
           <button
             type="submit"
+            disabled={cargando}
             style={{
               padding: '8px 16px',
               backgroundColor: '#38BDF8',
@@ -231,6 +252,11 @@ export const ModalKardex: React.FC<ModalKardexProps> = ({ abierto, producto, onC
           </button>
         </form>
 
+        <p style={{ color: '#94A3B8', fontSize: 12 }}>
+          Saldos reales del período, considerando todos los movimientos. El filtro de tipo solo
+          limita las filas mostradas. Importes históricos en S/ con seis decimales; costo unitario
+          en UND o ML.
+        </p>
         {/* Panel de Saldos Inicial, Final y Stock Actual */}
         <div
           style={{
@@ -267,6 +293,7 @@ export const ModalKardex: React.FC<ModalKardexProps> = ({ abierto, producto, onC
         {/* Alerta de Error */}
         {errorMsg && (
           <div
+            role="alert"
             style={{
               backgroundColor: 'rgba(239, 68, 68, 0.15)',
               border: '1px solid #EF4444',
@@ -287,11 +314,12 @@ export const ModalKardex: React.FC<ModalKardexProps> = ({ abierto, producto, onC
 
         {/* Tabla Kárdex */}
         <div
-          style={{ flex: 1, overflowY: 'auto', border: '1px solid #334155', borderRadius: '8px' }}
+          style={{ flex: 1, overflow: 'auto', border: '1px solid #334155', borderRadius: '8px' }}
         >
           <table
             style={{
               width: '100%',
+              minWidth: 1150,
               borderCollapse: 'collapse',
               fontSize: '12px',
               color: '#F8FAFC',
@@ -304,6 +332,10 @@ export const ModalKardex: React.FC<ModalKardexProps> = ({ abierto, producto, onC
                 <th style={{ padding: '10px' }}>Stock Ant.</th>
                 <th style={{ padding: '10px' }}>Delta</th>
                 <th style={{ padding: '10px' }}>Stock Resultante</th>
+                <th style={{ padding: '10px' }}>Costo / {esML ? 'ML' : 'UND'}</th>
+                <th style={{ padding: '10px' }}>Valor anterior</th>
+                <th style={{ padding: '10px' }}>Variación de valor</th>
+                <th style={{ padding: '10px' }}>Valor resultante</th>
                 <th style={{ padding: '10px' }}>Origen / Motivo / Usuario</th>
               </tr>
             </thead>
@@ -311,7 +343,7 @@ export const ModalKardex: React.FC<ModalKardexProps> = ({ abierto, producto, onC
               {cargando ? (
                 <tr>
                   <td
-                    colSpan={6}
+                    colSpan={10}
                     style={{ textAlign: 'center', padding: '20px', color: '#CBD5E1' }}
                   >
                     Cargando movimientos de Kardex...
@@ -320,7 +352,7 @@ export const ModalKardex: React.FC<ModalKardexProps> = ({ abierto, producto, onC
               ) : movimientos.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={6}
+                    colSpan={10}
                     style={{ textAlign: 'center', padding: '20px', color: '#94A3B8' }}
                   >
                     Sin movimientos registrados en este período / filtro
@@ -348,8 +380,39 @@ export const ModalKardex: React.FC<ModalKardexProps> = ({ abierto, producto, onC
                     <td style={{ padding: '10px', fontWeight: '700' }}>
                       {formatearCant(m.stock_resultante)}
                     </td>
+                    <td style={{ padding: '10px', whiteSpace: 'nowrap' }}>
+                      {dineroMicro(m.costo_unitario_micro)}
+                    </td>
+                    <td style={{ padding: '10px', whiteSpace: 'nowrap' }}>
+                      {dineroMicro(m.valor_anterior_micro)}
+                    </td>
+                    <td style={{ padding: '10px', whiteSpace: 'nowrap' }}>
+                      {dineroMicro(m.valor_delta_micro)}
+                    </td>
+                    <td style={{ padding: '10px', whiteSpace: 'nowrap' }}>
+                      {dineroMicro(m.valor_resultante_micro)}
+                    </td>
                     <td style={{ padding: '10px', color: '#CBD5E1' }}>
-                      {m.motivo || 'N/A'} <br />
+                      {(m.id_ingreso || m.id_ot || m.id_venta || m.id_devolucion) && (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => setOrigenSeleccionado(m.id_movimiento)}
+                            style={{
+                              color: '#38BDF8',
+                              background: 'transparent',
+                              border: 0,
+                              padding: '0 0 6px',
+                              cursor: 'pointer',
+                              textAlign: 'left',
+                            }}
+                          >
+                            Ver {m.codigo_origen || 'origen'}
+                          </button>
+                          <br />
+                        </>
+                      )}
+                      {m.motivo || 'Sin observación adicional'} <br />
                       <small style={{ color: '#64748B' }}>
                         Por: {m.usuario_nombre || 'Sistema'}
                       </small>
@@ -372,7 +435,14 @@ export const ModalKardex: React.FC<ModalKardexProps> = ({ abierto, producto, onC
         >
           <button
             disabled={pagina === 0 || cargando}
-            onClick={() => cargarKardex(pagina - 1, fechaInicio, fechaFin, tipoMovimiento)}
+            onClick={() =>
+              cargarKardex(
+                pagina - 1,
+                aplicados.current.inicio,
+                aplicados.current.fin,
+                aplicados.current.tipo
+              )
+            }
             style={{
               padding: '8px 12px',
               backgroundColor: '#1E293B',
@@ -391,7 +461,14 @@ export const ModalKardex: React.FC<ModalKardexProps> = ({ abierto, producto, onC
           <span style={{ fontSize: '13px', color: '#94A3B8' }}>Página {pagina + 1}</span>
           <button
             disabled={movimientos.length < limite || cargando}
-            onClick={() => cargarKardex(pagina + 1, fechaInicio, fechaFin, tipoMovimiento)}
+            onClick={() =>
+              cargarKardex(
+                pagina + 1,
+                aplicados.current.inicio,
+                aplicados.current.fin,
+                aplicados.current.tipo
+              )
+            }
             style={{
               padding: '8px 12px',
               backgroundColor: '#1E293B',
@@ -409,6 +486,12 @@ export const ModalKardex: React.FC<ModalKardexProps> = ({ abierto, producto, onC
           </button>
         </div>
       </div>
+      {origenSeleccionado !== null && (
+        <ModalOrigenKardex
+          idMovimiento={origenSeleccionado}
+          onClose={() => setOrigenSeleccionado(null)}
+        />
+      )}
     </div>
   );
 };

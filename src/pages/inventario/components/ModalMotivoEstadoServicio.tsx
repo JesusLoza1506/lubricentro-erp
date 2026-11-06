@@ -3,6 +3,7 @@ import { ServicioDTO } from '../../../types/inventario';
 import { modalInputStyle } from '../inventarioStyles';
 
 interface ModalMotivoEstadoServicioProps {
+  error?: string;
   abierto: boolean;
   servicio: ServicioDTO | null;
   motivo: string;
@@ -13,6 +14,7 @@ interface ModalMotivoEstadoServicioProps {
 
 export const ModalMotivoEstadoServicio: React.FC<ModalMotivoEstadoServicioProps> = ({
   abierto,
+  error,
   servicio,
   motivo,
   setMotivo,
@@ -42,6 +44,7 @@ export const ModalMotivoEstadoServicio: React.FC<ModalMotivoEstadoServicioProps>
 
   return (
     <div
+      className="inv-overlay"
       style={{
         position: 'fixed',
         top: 0,
@@ -57,6 +60,10 @@ export const ModalMotivoEstadoServicio: React.FC<ModalMotivoEstadoServicioProps>
       }}
     >
       <div
+        className="inv-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Estado del servicio"
         style={{
           width: '440px',
           backgroundColor: '#0F172A',
@@ -79,6 +86,11 @@ export const ModalMotivoEstadoServicio: React.FC<ModalMotivoEstadoServicioProps>
         <p style={{ fontSize: '13px', color: '#94A3B8', marginBottom: '16px' }}>
           Servicio: <strong>{servicio.nombre}</strong>
         </p>
+        {error && (
+          <p role="alert" className="inv-form-error">
+            {error}
+          </p>
+        )}
         <form onSubmit={handleSubmit}>
           <label
             style={{

@@ -1,70 +1,58 @@
-import React from 'react';
-import { Plus, ShoppingCart } from 'lucide-react';
-
+import { Plus, ShoppingCart, Package } from 'lucide-react';
 interface InventarioHeaderProps {
   esAdmin: boolean;
   onAbrirModalCrear: () => void;
   onAbrirModalCompra?: () => void;
+  seccion?: 'PRODUCTOS' | 'SERVICIOS' | 'ENTRADAS';
+  onNuevoServicio?: () => void;
 }
-
-export const InventarioHeader: React.FC<InventarioHeaderProps> = ({
+export function InventarioHeader({
   esAdmin,
   onAbrirModalCrear,
   onAbrirModalCompra,
-}) => {
+  seccion = 'PRODUCTOS',
+  onNuevoServicio,
+}: InventarioHeaderProps) {
   return (
-    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-      <div>
-        <h2 style={{ fontSize: '24px', fontWeight: '800', color: '#F8FAFC', margin: 0 }}>
-          Gestión de Inventario y Stock
-        </h2>
-        <p style={{ color: '#94A3B8', fontSize: '14px', margin: '4px 0 0 0' }}>
-          Control de productos, stock crítico y despachos a taller.
-        </p>
+    <header className="inv-header">
+      <div className="inv-heading">
+        <span className="inv-heading-icon">
+          <Package size={23} />
+        </span>
+        <div>
+          <span className="inv-eyebrow">ALMACÉN Y CATÁLOGOS</span>
+          <h2>Inventario y Stock</h2>
+          <p>Lo que tienes, lo que ingresa y lo que necesita atención.</p>
+        </div>
       </div>
-
       {esAdmin && (
-        <div style={{ display: 'flex', gap: '12px' }}>
-          {onAbrirModalCompra && (
-            <button
-              onClick={onAbrirModalCompra}
-              style={{
-                padding: '10px 18px',
-                backgroundColor: 'rgba(16, 185, 129, 0.15)',
-                border: '1px solid #10B981',
-                color: '#34D399',
-                borderRadius: '10px',
-                fontWeight: '700',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-              }}
-            >
-              <ShoppingCart size={18} />
+        <div className="inv-header-actions">
+          {seccion === 'PRODUCTOS' && (
+            <>
+              <button className="inv-button" onClick={onAbrirModalCompra}>
+                <ShoppingCart size={16} />
+                Registrar Compra
+              </button>
+              <button className="inv-button inv-primary" onClick={onAbrirModalCrear}>
+                <Plus size={17} />
+                Nuevo Producto
+              </button>
+            </>
+          )}
+          {seccion === 'SERVICIOS' && (
+            <button className="inv-button inv-primary" onClick={onNuevoServicio}>
+              <Plus size={17} />
+              Nuevo Servicio
+            </button>
+          )}
+          {seccion === 'ENTRADAS' && (
+            <button className="inv-button inv-primary" onClick={onAbrirModalCompra}>
+              <Plus size={17} />
               Registrar Compra
             </button>
           )}
-          <button
-            onClick={onAbrirModalCrear}
-            style={{
-              padding: '10px 18px',
-              backgroundColor: '#2563EB',
-              border: 'none',
-              color: '#FFFFFF',
-              borderRadius: '10px',
-              fontWeight: '700',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-            }}
-          >
-            <Plus size={18} />
-            Nuevo Producto
-          </button>
         </div>
       )}
-    </div>
+    </header>
   );
-};
+}

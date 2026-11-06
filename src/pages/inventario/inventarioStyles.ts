@@ -20,3 +20,14 @@ export const getBadgeStyles = (esCritico: boolean): React.CSSProperties => ({
   backgroundColor: esCritico ? 'rgba(239, 68, 68, 0.2)' : 'rgba(52, 211, 153, 0.15)',
   color: esCritico ? '#FCA5A5' : '#34D399',
 });
+
+export const botonSecundarioStyle: React.CSSProperties = {
+  padding: '9px 12px',
+  background: '#1E293B',
+  color: '#CBD5E1',
+  border: '1px solid #475569',
+  borderRadius: '8px',
+  cursor: 'pointer',
+  fontWeight: 600,
+  whiteSpace: 'nowrap',
+};

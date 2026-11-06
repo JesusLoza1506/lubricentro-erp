@@ -16,7 +16,7 @@
 ![Plataforma](https://img.shields.io/badge/Plataforma-Windows_11-2563EB?style=flat-square)
 ![Módulos](https://img.shields.io/badge/Alcance-10_m%C3%B3dulos-0F766E?style=flat-square)
 
-[Progreso](#estado) · [Login](#modulo-login-y-sesion) · [Ficha vehicular](#modulo-ficha-vehicular-e-historial) · [Taller](#modulo-ordenes-de-trabajo-taller) · [Instalación](#instalacion) · [Documentación](#documentacion)
+[Progreso](#estado) · [Login](#modulo-login-y-sesion) · [Ficha vehicular](#modulo-ficha-vehicular-e-historial) · [Taller](#modulo-ordenes-de-trabajo-taller) · [Inventario](#modulo-inventario-y-stock) · [Instalación](#instalacion) · [Documentación](#documentacion)
 
 </div>
 
@@ -43,15 +43,17 @@
 
 ## 2. Estado del proyecto
 
-Desarrollo secuencial, módulo por módulo, conforme al alcance funcional v7. La última revisión sitúa **Login y Sesión en 95/100**, **Ficha Vehicular e Historial en 93/100** y **Órdenes de Trabajo Taller en 92/100**. Los tres módulos se encuentran en **ajustes finales**, con pendientes de cierre y validación. **La implementación continúa con Inventario y Stock**, cuya evaluación actual es **40/100**; se revisará y mejorará de forma progresiva con el objetivo de alcanzar una calificación de **90/100 o superior**. Inicio Dashboard se desarrollará al final para integrar datos de los demás módulos.
+Desarrollo secuencial, módulo por módulo, conforme al alcance funcional v7. **Login y Sesión (95/100)**, **Ficha Vehicular e Historial (93/100)**, **Órdenes de Trabajo Taller (93/100)** e **Inventario y Stock (95/100)** se encuentran en **ajustes finales**. Sus funciones principales ya están implementadas; los pendientes de cierre y la validación en escritorio se detallan en cada módulo.
+
+**La siguiente etapa será la implementación de Punto de Venta POS**, integrando ventas directas, cobro de órdenes y comprobantes sin duplicar los consumos del taller. Inicio Dashboard se desarrollará al final para reunir datos de los demás módulos.
 
 | Orden | Módulo | Estado | Evaluación |
 | --- | --- | --- | --- |
 | 01 | [Login y Sesión](#modulo-login-y-sesion) | 🟢 Ajustes finales | 95/100 |
 | 02 | [Ficha Vehicular e Historial](#modulo-ficha-vehicular-e-historial) | 🟢 Ajustes finales | 93/100 |
-| 03 | [Órdenes de Trabajo Taller](#modulo-ordenes-de-trabajo-taller) | 🟢 Ajustes finales | 92/100 |
-| 04 | Inventario y Stock | 🟡 En curso · implementación y mejoras | 40/100 |
-| 05 | Punto de Venta POS | ⚪ Pendiente | — |
+| 03 | [Órdenes de Trabajo Taller](#modulo-ordenes-de-trabajo-taller) | 🟢 Ajustes finales | 93/100 |
+| 04 | [Inventario y Stock](#modulo-inventario-y-stock) | 🟢 Ajustes finales | 95/100 |
+| 05 | Punto de Venta POS | ⚪ Pendiente · próximo módulo | — |
 | 06 | Caja Chica | ⚪ Pendiente | — |
 | 07 | Backup y Copias | ⚪ Pendiente | — |
 | 08 | Administración | ⚪ Pendiente | — |
@@ -185,7 +187,6 @@ _Próximos cambios de aceite_
 **Pendiente para cerrar:**
 
 - Activar el indicador de captura pendiente al modificar datos, no al abrir el formulario.
-- Distinguir un error al consultar el último aceite de la ausencia de un mantenimiento registrado.
 - Incorporar a las pruebas permanentes los casos recientes de filtros, paginación, resumen y recepción.
 - Completar los recorridos en escritorio y las cinco mediciones con el volumen de prueba definido.
 
@@ -196,13 +197,13 @@ _Próximos cambios de aceite_
 <a id="modulo-ordenes-de-trabajo-taller"></a>
 
 <details>
-<summary><b>03 · Órdenes de Trabajo Taller</b> — 🟢 Ajustes finales · Evaluación: 92/100</summary>
+<summary><b>03 · Órdenes de Trabajo Taller</b> — 🟢 Ajustes finales · Evaluación: 93/100</summary>
 
 **Qué hace:** organiza la atención del vehículo desde la recepción hasta la finalización o cancelación. Reúne servicios, responsable, zanja, materiales y resultado del trabajo, vinculados con Ficha Vehicular e Inventario.
 
 **Funciones principales:**
 
-- **Recepcionar vehículos:** selecciona un vehículo activo, registra kilometraje, pedido y servicio inicial; permite elegir mecánico o dejar la orden libre, evitando otra OT abierta para el mismo vehículo. Los ajustes de recepción frente al PDF se detallan entre los pendientes.
+- **Recepcionar vehículos:** selecciona un vehículo activo, registra kilometraje, pedido y servicio inicial; permite elegir mecánico o dejar la orden libre, evitando otra OT abierta para el mismo vehículo.
 - **Consultar el tablero:** muestra primero las zanjas habilitadas y su ocupación, seguidas de una cola común de espera compacta. El mecánico consulta propias y libres; los trabajos ajenos se presentan sin información privada.
 - **Buscar y listar órdenes:** ofrece páginas de **20 registros**, búsqueda por placa o código, filtros por estado, responsable y fechas, además de vistas de propias y libres. Propone la fecha de Lima y limita el rango a 366 días.
 - **Iniciar trabajo:** exige una zanja habilitada y libre. El mecánico que inicia una orden libre queda asignado en la misma operación; el administrador selecciona responsable cuando falta.
@@ -225,7 +226,7 @@ _Próximos cambios de aceite_
 - Cantidades de granel almacenadas en mililitros, con conversión y valoración verificadas.
 - Identificador de operación en consumos y devoluciones: el backend evita repetir efectos cuando recibe el mismo identificador. Su conservación al reintentar desde la interfaz sigue pendiente.
 - Modal organizado en hook, contenedor y componentes de acciones, servicios e insumos.
-- **12 pruebas de Órdenes aprobadas** en la última revisión reportada, además de comprobaciones adicionales de auditoría, reversión e identificadores repetidos.
+- **13 pruebas de Órdenes aprobadas** en la última revisión reportada, además de comprobaciones adicionales de auditoría, reversión e identificadores repetidos.
 
 **Acceso por rol:**
 
@@ -259,19 +260,103 @@ _Aviso de resultado de una operación_
 
 **Pendiente para cerrar:**
 
-- Conservar el mismo identificador al reintentar una captura tras una respuesta incierta; actualmente la pantalla genera otro UUID.
-- Completar la auditoría de cambios de servicios y la cobertura restante de movimientos.
-- Ajustar la recepción al PDF: responsable inicialmente libre, kilometraje cero válido cuando corresponda y selección de varios servicios con sus cantidades.
-- Completar la actualización manual general y la indicación explícita de datos desactualizados. Los mensajes de error recuperable y los reintentos ante fallos de consulta ya están incorporados.
-- Incorporar pruebas permanentes de reintentos, auditoría y reversión ante fallos.
+- Conservar el mismo identificador al reintentar un retiro o devolución tras una respuesta incierta; la protección de Inventario no se aplica automáticamente a estos formularios.
+- Completar la auditoría de agregar, modificar y retirar servicios de la OT, con pruebas permanentes de reintentos y reversión ante fallos.
 - Completar los recorridos en escritorio y las cinco mediciones con **2.000 OT**.
 
-**Estado:** 🟢 **Ajustes finales · Evaluación: 92/100**. El ciclo principal del taller está implementado; el cierre se concentra en completar la protección de reintentos desde la interfaz, la auditoría restante, los ajustes de recepción y la evidencia de validación.
+**Estado:** 🟢 **Ajustes finales · Evaluación: 93/100**. El ciclo principal del taller está implementado y mantiene su integración con Ficha e Inventario. El cierre se concentra en reintentos desde la interfaz, auditoría de servicios y evidencia de validación.
 
 </details>
 
-**Trabajo actual:** implementar y mejorar **Inventario y Stock (40/100)**, con revisión de catálogos, entradas, consumos y ajustes, manteniendo la consistencia con Taller. El objetivo es alcanzar una evaluación de **90/100 o superior**. Login, Ficha Vehicular y Taller permanecen en ajustes finales, con seguimiento de sus pendientes de cierre.
+<a id="modulo-inventario-y-stock"></a>
 
+<details>
+<summary><b>04 · Inventario y Stock</b> — 🟢 Ajustes finales · Evaluación: 95/100</summary>
+
+**Qué hace:** administra los productos, servicios y proveedores del lubricentro. Controla las existencias, las entradas de mercadería y su valoración, compartiendo el saldo con las órdenes del taller y conservando la trazabilidad de los movimientos.
+
+**Funciones principales:**
+
+- **Consultar productos:** permite buscar por código o nombre, filtrar por categoría y disponibilidad, y consultar **20 registros por página**. El administrador también puede consultar productos inactivos.
+- **Identificar stock crítico:** muestra productos activos cuyo stock es menor o igual al mínimo, incluye el faltante individual y prioriza los productos sin existencias.
+- **Registrar productos:** propone un código y un mínimo de cero. Permite incorporar existencias iniciales con su costo de adquisición; producto, entrada inicial y movimiento se guardan juntos, con referencia automática.
+- **Editar y cambiar estado:** el administrador mantiene los datos del catálogo y desactiva o reactiva con motivo. Se conserva el historial y se bloquea la desactivación cuando existe consumo neto en una OT abierta.
+- **Administrar servicios:** permite registrar y editar servicios, establecer precios y señalar cuáles corresponden a cambio de aceite. Los servicios no tienen stock ni descuentan aceite automáticamente.
+- **Gestionar proveedores:** permite registrar, buscar, editar y reutilizar proveedores desde Entradas o crearlos durante una compra. Admite DNI, RUC y CE, además de contactos opcionales.
+- **Registrar compras recibidas:** incorpora múltiples productos con cantidades y costos por unidad o litro, proveedor y documento opcional. Guarda todas las líneas o ninguna y actualiza la valoración sin registrar pagos de caja.
+- **Consultar entradas:** muestra ingresos iniciales y compras, sus detalles y estado, con filtros por origen, estado y fechas. Permite anular con motivo únicamente cuando no existen movimientos posteriores de sus productos.
+- **Revisar el kardex:** presenta entradas, salidas, cantidades, costos, valores y responsables. Distingue saldo inicial del período, saldo final y saldo actual, y permite consultar el origen del movimiento.
+- **Realizar conteos físicos:** compara la cantidad física total con el saldo registrado y calcula la diferencia. Sin diferencias no genera movimiento ni exige motivo; con diferencias registra el ajuste autorizado.
+- **Recuperar solicitudes inciertas:** conserva el identificador y los datos originales de compras, conteos, ajustes y anulaciones para reintentar sin duplicar efectos. El caso particular del conteo sin diferencias se detalla entre los pendientes.
+- **Recibir avisos de resultado:** presenta mensajes de éxito tras confirmar una operación y errores en el formulario correspondiente, conservando los datos para corregir o reintentar, con el estilo de Ficha Vehicular y Taller.
+
+**Fortalezas de implementación:**
+
+- **Permisos comprobados en Rust:** costos, valoración, proveedores, entradas y kardex quedan restringidos al administrador; los roles de consulta reciben respuestas públicas específicas, sin costos ni valor de stock.
+- **Transacciones y auditoría:** los movimientos, las cantidades, los valores y sus registros relacionados se confirman juntos; los fallos revierten la operación.
+- **Unidades diferenciadas:** productos comunes utilizan UND; granel se muestra en litros y se almacena en mililitros, con validación de precisión.
+- **Valoración e historial:** calcula el promedio de adquisición, conserva los costos históricos de las salidas y deja cantidad y valor en cero al agotar existencias.
+- **Reintentos protegidos:** la interfaz persiste las solicitudes por usuario y ambiente; el backend reconoce operaciones confirmadas y rechaza reutilizar un identificador con datos diferentes.
+- **Consultas consistentes:** paginación y filtros en SQLite, orden definido y protección frente a respuestas antiguas en las consultas principales.
+- **Validación ampliada:** las **13 pruebas nuevas de cierre de inventario pasaron** en la última revisión, además de las pruebas existentes de inventario, idempotencia e integración con Taller.
+- **Rendimiento del backend comprobado:** cinco muestras con **1.000 productos y 10.000 movimientos** registraron aproximadamente **0,2 a 1,8 ms** en catálogo, críticos y kardex utilizando SQLite en memoria. Falta medir el recorrido completo en escritorio.
+
+**Acceso por rol:**
+
+| Rol | Alcance |
+| --- | --- |
+| Administrador | Gestión de productos, servicios y proveedores; compras, entradas, costos, valoración, kardex, conteos y cambios de estado o anulaciones con motivo. |
+| Mecánico | Consulta autorizada de productos y servicios activos, stock y precios de venta; sin costos, valoración ni operaciones administrativas. Los consumos del taller se registran desde OT. |
+| Cajero | Consulta autorizada de productos y servicios activos, stock y precios de venta; sin costos, valoración ni operaciones administrativas de Inventario. |
+
+**Capturas:**
+
+_Catálogo de productos, filtros y existencias_
+
+![Catálogo de productos y stock](docs/images/04-inventario-productos.png)
+
+_Servicios del taller_
+
+![Catálogo de servicios del taller](docs/images/04-inventario-servicios.png)
+
+_Entradas, compras y acceso a proveedores_
+
+![Historial de entradas y compras](docs/images/04-inventario-entradas.png)
+
+_Registro o edición de un producto_
+
+![Formulario de registro o edición de producto](docs/images/04-inventario-producto.png)
+
+_Registro de compra recibida_
+
+![Compra a proveedor con sus productos y costos](docs/images/04-inventario-compra.png)
+
+_Conteo físico y diferencia de existencias_
+
+![Formulario de conteo físico de stock](docs/images/04-inventario-conteo.png)
+
+_Kardex y origen de movimientos_
+
+![Kardex de producto con cantidades, valores y origen](docs/images/04-inventario-kardex.png)
+
+_Aviso de resultado de una operación_
+
+![Aviso de éxito o error en Inventario y Stock](docs/images/04-inventario-avisos.png)
+
+**Pendiente para cerrar:**
+
+- Permitir un sobrante desde stock cero utilizando el costo previo, sin que el formulario obligue indirectamente a capturar otro importe.
+- Dar prioridad al último costo válido cuando existe; solicitar un costo nuevo únicamente cuando no haya antecedente.
+- Permitir recuperar un conteo sin diferencias cuya respuesta fue incierta, aunque después haya cambiado el saldo.
+- Confirmar el descarte al abandonar formularios modificados e integrar el indicador global de captura pendiente.
+- Deshabilitar y mostrar el procesamiento del botón Guardar producto durante el envío.
+- Incorporar los casos adicionales detectados a las pruebas permanentes y completar los recorridos y mediciones con SQLite en disco y la aplicación de escritorio.
+
+**Estado:** 🟢 **Ajustes finales · Evaluación: 95/100**. Las funciones principales están ampliamente alineadas con el PDF. El cierre se concentra en casos particulares del conteo, protección de formularios y evidencia de validación en escritorio. La siguiente etapa de implementación corresponde a **Punto de Venta POS**.
+
+</details>
+
+**Próximo módulo: Punto de Venta POS.** Se trabajará sobre la base de Login, Ficha Vehicular, Taller e Inventario, integrando ventas y cobros con los consumos ya registrados. Los cuatro módulos anteriores permanecen en ajustes finales, con seguimiento de los pendientes documentados.
 
 <a id="roles"></a>
 
@@ -282,7 +367,7 @@ _Aviso de resultado de una operación_
 | Login y Sesión              | Cuenta propia y gestión autorizada.                        | Cuenta propia.                                              | Cuenta propia.                                 |
 | Ficha Vehicular e Historial | Gestión y correcciones autorizadas.                        | Consulta de información pública de atención.                | Registro, edición de datos comunes y consulta. |
 | Órdenes de Trabajo Taller | Gestión del taller, reasignación, devolución y cancelación con motivo. | Inicio de OT permitidas y ejecución de propias; sin notas ajenas ni costos. | Recepción y consulta pública; sin notas internas ni costos. |
-| Inventario y Stock          | Catálogos, entradas, costos, kardex y ajustes.             | Consulta de activos, stock y precios.                       | Consulta de activos, stock y precios.          |
+| Inventario y Stock          | Catálogos, proveedores, entradas, costos, kardex y conteos.             | Consulta de activos, stock y precios.                       | Consulta de activos, stock y precios.          |
 | Punto de Venta POS          | Operaciones con caja propia y gestión documental.          | Sin acceso.                                                 | Ventas propias; excepciones con autorización.  |
 | Caja Chica                  | Turno propio; consulta y cierre administrativo autorizado. | Sin acceso.                                                 | Turnos propios.                                |
 | Backup y Copias             | Configuración, copias y recuperación.                      | Sin acceso.                                                 | Sin acceso.                                    |
@@ -397,7 +482,7 @@ La configuración actual de Tauri invoca `npm run dev` antes del desarrollo y `n
 
 ### 8.1. Qué se verifica
 
-En Login: acceso, sesiones, permisos, bloqueo, recuperación, revocación y consistencia ante fallos. En Ficha Vehicular: registro, edición, identidad histórica, permisos, correcciones, consultas y paginación. En Taller: recepción, estados, responsable, zanjas, servicios, consumos, devoluciones, aceite, auditoría y avisos de resultado. Durante el avance de los demás módulos se validarán también ventas, cobros, cierre, comprobantes, recuperación, numeración y fechas de Lima.
+En Login: acceso, sesiones, permisos, bloqueo, recuperación, revocación y consistencia ante fallos. En Ficha Vehicular: registro, edición, identidad histórica, permisos, correcciones, consultas y paginación. En Taller: recepción, estados, responsable, zanjas, servicios, consumos, devoluciones, aceite, auditoría y avisos de resultado. En Inventario: DTO públicos sin costos, catálogos, proveedores, compras, conteos, valoración de granel, kardex, filtros y reintentos sin duplicación de efectos. En las siguientes etapas se validarán también ventas, cobros, cierre, comprobantes, recuperación, numeración y fechas de Lima.
 
 ### 8.2. Cómo ejecutarlas
 
@@ -414,11 +499,23 @@ Las pruebas de integración externas deben usar datos y credenciales de Prueba. 
 
 ### 8.3. Estado de la validación
 
-La revisión reportada registró **30 pruebas de autenticación**, **16 de vehículos** y **12 de Órdenes aprobadas**. Estos resultados corresponden a los casos ejecutados; los casos recientes y la cobertura pendiente deben consolidarse en las suites permanentes.
+La última evaluación reportó los siguientes resultados. Corresponden a los casos ejecutados, no a una aprobación completa de todos los recorridos:
 
-Por separado, la validación del frontend realizada al incorporar los avisos de Taller aprobó **46 pruebas**, incluidas **19 nuevas** para mensajes, errores, datos conservados, fallos de recarga y cierre automático; también pasaron la comprobación de tipos y la compilación Vite. Esta validación usó servicios simulados y no acredita el funcionamiento completo en Windows/Tauri ni contra la BD real.
+| Comprobación | Resultado reportado |
+| --- | --- |
+| TypeScript | Aprobado. |
+| Pruebas permanentes de frontend y servicios | **78 aprobadas**. |
+| Pruebas Rust seleccionadas de los cuatro módulos y biblioteca | **99 aprobadas**. |
+| Autenticación y regresión, incluidas en el total Rust | **30 aprobadas**. |
+| Ficha Vehicular, incluidas en el total Rust | **16 aprobadas**. |
+| Órdenes de Trabajo, incluidas en el total Rust | **13 aprobadas**. |
+| Nuevas pruebas de cierre de Inventario, incluidas en el total Rust | **13 aprobadas**, además de sus pruebas existentes. |
+| Rendimiento, ejecutado por separado | **1 prueba aprobada**, con cinco muestras. |
+| Comprobaciones adicionales de conteo | **Tres defectos reproducidos**, conservados en los pendientes de Inventario. |
 
-**Evaluación de implementación y alineación con los PDF:** Login **95/100**, Ficha Vehicular **93/100** Taller **92/100** e Inventario y Stock **40/100**. Quedan pendientes los recorridos de escritorio y las mediciones indicadas en cada módulo; para Taller se requieren cinco mediciones con **2.000 OT**.
+Las mediciones de catálogo, críticos y kardex con **1.000 productos y 10.000 movimientos** estuvieron aproximadamente entre **0,2 y 1,8 ms**, usando SQLite **en memoria**. No sustituyen las mediciones con base en disco, comunicación Tauri y presentación de la pantalla. Las pruebas de interfaz con servicios simulados tampoco acreditan por sí solas la integración completa en escritorio.
+
+**Evaluación de implementación y alineación con los PDF:** Login **95/100**, Ficha Vehicular **93/100**, Taller **93/100** e Inventario y Stock **95/100**. Los cuatro están en ajustes finales. Se mantienen los recorridos y mediciones pendientes de cada módulo; Taller requiere cinco mediciones con **2.000 OT**. La siguiente implementación será **Punto de Venta POS**.
 
 **Esquema verificado en SQLite:** 27 casos satisfactorios sobre creación, restricciones, relaciones y flujos seleccionados, correspondientes al esquema revisado. Esta evidencia se distingue de las pruebas de los módulos y no acredita la integración completa con NubeFact. Las revisiones de Login disponibles se enlazan en Documentación.
 
@@ -440,20 +537,20 @@ El informe general y las diez especificaciones funcionales v7 son documentos de 
 
 ## 10. Hoja de ruta
 
-La implementación seguirá este orden:
+Se mantiene la siguiente secuencia de desarrollo. Los cuatro primeros módulos están en ajustes finales; **el siguiente módulo será Punto de Venta POS**.
 
-1. **Login y Sesión (evaluación: 95/100):** cerrar el manejo de errores iniciales, el aviso de cambios pendientes y las evidencias de escritorio.
-2. **Ficha Vehicular e Historial (evaluación: 93/100):** afinar estados y errores de consulta; consolidar pruebas y mediciones.
-3. **Órdenes de Trabajo Taller (evaluación: 92/100):** cerrar reintentos con el mismo identificador, auditoría pendiente, ajustes de recepción y validaciones de escritorio y rendimiento.
-4. **Inventario y Stock — en curso (evaluación: 40/100):** continuar su implementación y mejorar catálogos, entradas, consumos y ajustes, manteniendo la consistencia con Taller y buscando una evaluación de **90/100 o superior**.
-5. **Punto de Venta POS:** completar ventas, cobros y gestión de comprobantes.
+1. **Login y Sesión — ajustes finales (95/100):** completar recuperación del error inicial y evidencias de teclado, foco, salida y tiempos de ingreso.
+2. **Ficha Vehicular e Historial — ajustes finales (93/100):** activar cambios pendientes al modificar datos, consolidar pruebas de interfaz y completar mediciones de escritorio.
+3. **Órdenes de Trabajo Taller — ajustes finales (93/100):** conservar identificadores al reintentar, completar auditoría de servicios y validar recorridos y rendimiento.
+4. **Inventario y Stock — ajustes finales (95/100):** resolver los casos particulares de conteo y costos, proteger capturas modificadas y completar pruebas y mediciones en escritorio.
+5. **Punto de Venta POS — próximo módulo:** implementar ventas directas, cobro de OT sin descontar nuevamente sus insumos, pagos y gestión de comprobantes con NubeFact.
 6. **Caja Chica:** completar aperturas, movimientos y cierres.
 7. **Backup y Copias:** completar copias de seguridad y recuperación.
 8. **Administración:** completar la configuración y gestión autorizada.
 9. **Reportes:** integrar las consultas y exportaciones de los módulos anteriores.
 10. **Inicio Dashboard:** integrar al final los indicadores y resúmenes por rol con los datos de los demás módulos.
 
-Cada módulo avanzará en la tabla de progreso y tendrá su detalle plegable, capturas y evidencias conforme se complete. Este orden de desarrollo no modifica el flujo operativo del taller descrito en la sección 5.
+Cada módulo tendrá su detalle plegable, capturas y evidencias conforme avance. Pasar a la siguiente etapa no elimina los pendientes de los módulos anteriores. Este orden de desarrollo no modifica el flujo operativo del taller descrito en la sección 5.
 
 <a id="autor"></a>
 

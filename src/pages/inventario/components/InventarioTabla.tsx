@@ -1,16 +1,6 @@
-import React from 'react';
-import {
-  Eye,
-  PackageCheck,
-  Sliders,
-  Pencil,
-  Trash2,
-  History,
-  ChevronLeft,
-  ChevronRight,
-} from 'lucide-react';
+import { Eye, Pencil, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Producto, ProductoAdminDTO } from '../../../types/inventario';
-import { getBadgeStyles } from '../inventarioStyles';
+import { MenuAccionesInventario } from './MenuAccionesInventario';
 
 export interface InventarioTablaProps {
   cargando: boolean;
@@ -23,14 +13,13 @@ export interface InventarioTablaProps {
   esVistaCriticos?: boolean;
   onCambiarPagina: (nuevaPagina: number) => void;
   onVer: (p: Producto) => void;
-  onDespachar: (p: Producto) => void;
   onAjustar: (p: Producto) => void;
   onVerKardex: (p: Producto) => void;
   onEditar: (p: Producto) => void;
   onEliminar: (id: number, nombre: string, activo: boolean) => void;
 }
 
-export const InventarioTabla: React.FC<InventarioTablaProps> = ({
+export function InventarioTabla({
   cargando,
   productos,
   esAdmin,
@@ -41,67 +30,55 @@ export const InventarioTabla: React.FC<InventarioTablaProps> = ({
   esVistaCriticos,
   onCambiarPagina,
   onVer,
-  onDespachar,
   onAjustar,
   onVerKardex,
   onEditar,
   onEliminar,
-}) => {
+}: InventarioTablaProps) {
+  const columnas = (esAdmin ? 9 : 8) + (esVistaCriticos ? 2 : 0);
   return (
-    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '12px' }}>
-      <div
-        style={{
-          flex: 1,
-          backgroundColor: 'rgba(15, 23, 42, 0.6)',
-          border: '1px solid #334155',
-          borderRadius: '16px',
-          overflowY: 'auto',
-          maxHeight: 'calc(100vh - 330px)',
-        }}
-      >
-        <table
-          style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '14px' }}
-        >
-          <thead
-            style={{
-              position: 'sticky',
-              top: 0,
-              zIndex: 10,
-              backgroundColor: '#1E293B',
-              boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
-            }}
-          >
-            <tr style={{ borderBottom: '1px solid #334155', color: '#94A3B8' }}>
-              <th style={{ padding: '16px' }}>CÓDIGO</th>
-              <th style={{ padding: '16px' }}>PRODUCTO</th>
-              <th style={{ padding: '16px' }}>CATEGORÍA</th>
-              <th style={{ padding: '16px' }}>UNIDAD</th>
-              {esAdmin && <th style={{ padding: '16px' }}>ÚLTIMO COSTO</th>}
-              <th style={{ padding: '16px' }}>P. VENTA</th>
-              <th style={{ padding: '16px' }}>STOCK</th>
-              <th style={{ padding: '16px' }}>ESTADO</th>
-              <th style={{ padding: '16px', textAlign: 'center' }}>ACCIONES</th>
+    <section className="inv-table-section" aria-label="Catálogo de productos">
+      <div className="inv-table-scroll">
+        <table className="inv-table">
+          <thead>
+            <tr>
+              <th>Código</th>
+              <th>Producto</th>
+              <th>Categoría</th>
+              <th>Unidad</th>
+              {esAdmin && (
+                <th
+                  className="inv-number"
+                  title="Promedio actual por UND o litro; sin existencias se muestra el último costo conocido"
+                >
+                  Costo / UND o L
+                </th>
+              )}
+              <th className="inv-number">Precio venta</th>
+              <th className="inv-number">Stock</th>
+              {esVistaCriticos && (
+                <>
+                  <th className="inv-number">Mínimo</th>
+                  <th className="inv-number">Faltante</th>
+                </>
+              )}
+              <th>Estado</th>
+              <th style={{ textAlign: 'right' }}>Acciones</th>
             </tr>
           </thead>
           <tbody>
             {cargando ? (
               <tr>
-                <td
-                  colSpan={esAdmin ? 9 : 8}
-                  style={{ padding: '32px', textAlign: 'center', color: '#94A3B8' }}
-                >
+                <td className="inv-empty" colSpan={columnas}>
                   Cargando productos...
                 </td>
               </tr>
             ) : productos.length === 0 ? (
               <tr>
-                <td
-                  colSpan={esAdmin ? 9 : 8}
-                  style={{ padding: '32px', textAlign: 'center', color: '#94A3B8' }}
-                >
+                <td className="inv-empty" colSpan={columnas}>
                   {esVistaCriticos
                     ? 'No se encontraron productos en estado crítico de stock.'
-                    : busqueda && busqueda.trim() !== ''
+                    : busqueda?.trim()
                       ? `No se encontraron productos que coincidan con "${busqueda}".`
                       : 'No se encontraron productos en el catálogo.'}
                 </td>
@@ -109,124 +86,98 @@ export const InventarioTabla: React.FC<InventarioTablaProps> = ({
             ) : (
               productos.map((p) => {
                 const esCritico = p.es_critico ?? p.stock_actual <= p.stock_minimo;
-                const pAdmin = p as ProductoAdminDTO;
-                const ultimoCostoSol =
-                  esAdmin && pAdmin.ultimo_costo_micro
-                    ? (pAdmin.ultimo_costo_micro / 1_000_000).toFixed(2)
+                const admin = p as ProductoAdminDTO;
+                const costoBase =
+                  p.stock_actual > 0 && typeof admin.valor_stock_micro === 'number'
+                    ? admin.valor_stock_micro / p.stock_actual
+                    : admin.ultimo_costo_micro;
+                const costo =
+                  esAdmin && costoBase
+                    ? ((costoBase * (p.unidad_medida === 'ML' ? 1000 : 1)) / 1000000).toFixed(4)
                     : null;
-
-                const estaActivo = Boolean(p.activo);
-
+                const cantidad = (n: number) =>
+                  p.unidad_medida === 'ML' ? `${(n / 1000).toFixed(3)} L` : `${n} UND`;
+                const activo = Boolean(p.activo);
                 return (
-                  <tr
-                    key={p.id_producto}
-                    style={{
-                      borderBottom: '1px solid rgba(51, 65, 85, 0.4)',
-                      opacity: estaActivo ? 1 : 0.6,
-                    }}
-                  >
-                    <td style={{ padding: '16px', color: '#38BDF8', fontFamily: 'monospace' }}>
-                      {p.codigo}
+                  <tr key={p.id_producto} style={{ opacity: activo ? 1 : 0.65 }}>
+                    <td className="inv-code">{p.codigo}</td>
+                    <td className="inv-name">
+                      {p.nombre}
+                      {!activo && <span className="inv-muted-line">Producto inactivo</span>}
                     </td>
-                    <td style={{ padding: '16px', fontWeight: '600', color: '#F8FAFC' }}>
-                      {p.nombre}{' '}
-                      {!estaActivo && <small style={{ color: '#EF4444' }}>(Inactivo)</small>}
-                    </td>
-                    <td style={{ padding: '16px', color: '#94A3B8' }}>{p.categoria}</td>
-                    <td style={{ padding: '16px', color: '#94A3B8' }}>{p.unidad_medida}</td>
+                    <td className="inv-meta">{p.categoria.toLowerCase()}</td>
+                    <td className="inv-meta">{p.unidad_medida === 'ML' ? 'L' : 'UND'}</td>
                     {esAdmin && (
-                      <td style={{ padding: '16px', color: '#CBD5E1' }}>
-                        {ultimoCostoSol ? `S/ ${ultimoCostoSol}` : 'Sin costo'}
+                      <td className="inv-number">
+                        {costo ? `S/ ${costo}` : <span className="inv-meta">Sin costo</span>}
                       </td>
                     )}
-                    <td style={{ padding: '16px', fontWeight: '700', color: '#34D399' }}>
-                      S/ {(p.precio_venta_cent / 100).toFixed(2)}
+                    <td className="inv-number">S/ {(p.precio_venta_cent / 100).toFixed(2)}</td>
+                    <td className="inv-number">
+                      <strong>{cantidad(p.stock_actual)}</strong>
                     </td>
-                    <td
-                      style={{
-                        padding: '16px',
-                        fontWeight: '700',
-                        color: esCritico ? '#EF4444' : '#F8FAFC',
-                      }}
-                    >
-                      {p.unidad_medida === 'ML'
-                        ? `${(p.stock_actual / 1000).toFixed(2)} L`
-                        : `${p.stock_actual} UND`}
-                    </td>
-                    <td style={{ padding: '16px' }}>
-                      <span style={getBadgeStyles(esCritico)}>
-                        {esCritico ? 'CRÍTICO' : 'NORMAL'}
+                    {esVistaCriticos && (
+                      <>
+                        <td className="inv-number">{cantidad(p.stock_minimo)}</td>
+                        <td className="inv-number">
+                          {cantidad(Math.max(p.stock_minimo - p.stock_actual, 0))}
+                        </td>
+                      </>
+                    )}
+                    <td>
+                      <span
+                        className={`inv-badge ${!activo ? 'is-muted' : p.stock_actual === 0 ? 'is-danger' : esCritico ? 'is-warning' : ''}`}
+                      >
+                        {!activo
+                          ? 'Inactivo'
+                          : p.stock_actual === 0
+                            ? 'Sin stock'
+                            : esCritico
+                              ? 'Crítico'
+                              : 'Disponible'}
                       </span>
                     </td>
-                    <td style={{ padding: '16px', textAlign: 'center' }}>
-                      <div style={{ display: 'flex', justifyContent: 'center', gap: '8px' }}>
-                        <button onClick={() => onVer(p)} title="Ver Detalle" style={btnAccionStyle}>
-                          <Eye size={16} color="#38BDF8" />
+                    <td>
+                      <div className="inv-row-actions">
+                        <button
+                          className="inv-icon-button"
+                          title="Ver Detalle"
+                          aria-label={`Ver detalle de ${p.nombre}`}
+                          onClick={() => onVer(p)}
+                        >
+                          <Eye size={16} />
                         </button>
-
-                        {p.categoria === 'GRANEL' && estaActivo && (
-                          <button
-                            onClick={() => onDespachar(p)}
-                            title="Despachar Granel (Taller)"
-                            style={{
-                              ...btnAccionStyle,
-                              backgroundColor: 'rgba(16, 185, 129, 0.15)',
-                              border: '1px solid rgba(16, 185, 129, 0.3)',
-                            }}
-                          >
-                            <PackageCheck size={16} color="#10B981" />
-                          </button>
-                        )}
-
                         {esAdmin && (
                           <>
                             <button
-                              onClick={() => onVerKardex(p)}
-                              title="Ver Historial Kárdex"
-                              style={{
-                                ...btnAccionStyle,
-                                backgroundColor: 'rgba(56, 189, 248, 0.15)',
-                                border: '1px solid rgba(56, 189, 248, 0.3)',
-                              }}
-                            >
-                              <History size={16} color="#38BDF8" />
-                            </button>
-
-                            <button
-                              onClick={() => onAjustar(p)}
-                              title="Conteo Físico Reconciliado"
-                              style={{
-                                ...btnAccionStyle,
-                                backgroundColor: 'rgba(168, 85, 247, 0.15)',
-                                border: '1px solid rgba(168, 85, 247, 0.3)',
-                              }}
-                            >
-                              <Sliders size={16} color="#C084FC" />
-                            </button>
-
-                            <button
-                              onClick={() => onEditar(p)}
+                              className="inv-icon-button"
                               title="Editar Producto"
-                              style={btnAccionStyle}
+                              aria-label={`Editar ${p.nombre}`}
+                              onClick={() => onEditar(p)}
                             >
-                              <Pencil size={16} color="#FBBF24" />
+                              <Pencil size={15} />
                             </button>
-
-                            <button
-                              onClick={() => onEliminar(p.id_producto, p.nombre, estaActivo)}
-                              title={estaActivo ? 'Dar de Baja Producto' : 'Reactivar Producto'}
-                              style={{
-                                ...btnAccionStyle,
-                                backgroundColor: estaActivo
-                                  ? 'rgba(239, 68, 68, 0.15)'
-                                  : 'rgba(16, 185, 129, 0.15)',
-                                border: estaActivo
-                                  ? '1px solid rgba(239, 68, 68, 0.3)'
-                                  : '1px solid rgba(16, 185, 129, 0.3)',
-                              }}
-                            >
-                              <Trash2 size={16} color={estaActivo ? '#EF4444' : '#10B981'} />
-                            </button>
+                            <MenuAccionesInventario
+                              nombre={p.nombre}
+                              acciones={[
+                                {
+                                  texto: 'Ver Kardex',
+                                  titulo: 'Ver Historial Kárdex',
+                                  ejecutar: () => onVerKardex(p),
+                                },
+                                {
+                                  texto: 'Conteo físico',
+                                  titulo: 'Conteo Físico Reconciliado',
+                                  ejecutar: () => onAjustar(p),
+                                },
+                                {
+                                  texto: activo ? 'Desactivar producto' : 'Reactivar producto',
+                                  titulo: activo ? 'Dar de Baja Producto' : 'Reactivar Producto',
+                                  peligro: activo,
+                                  ejecutar: () => onEliminar(p.id_producto, p.nombre, activo),
+                                },
+                              ]}
+                            />
                           </>
                         )}
                       </div>
@@ -238,78 +189,32 @@ export const InventarioTabla: React.FC<InventarioTablaProps> = ({
           </tbody>
         </table>
       </div>
-
-      {/* Barra de Paginación */}
-      <div
-        style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          padding: '12px 16px',
-          backgroundColor: '#1E293B',
-          borderRadius: '12px',
-          border: '1px solid #334155',
-          fontSize: '13px',
-          color: '#CBD5E1',
-        }}
-      >
+      <footer className="inv-table-footer">
         <span>
-          Total de productos: <strong style={{ color: '#F8FAFC' }}>{totalRegistros}</strong>
+          Total de productos: <strong>{totalRegistros}</strong>
         </span>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+        <div className="inv-pagination">
           <span>
-            Página <strong style={{ color: '#F8FAFC' }}>{paginaActual}</strong> de{' '}
-            <strong style={{ color: '#F8FAFC' }}>{totalPaginas || 1}</strong>
+            Página <strong>{paginaActual}</strong> de <strong>{totalPaginas || 1}</strong>
           </span>
-          <div style={{ display: 'flex', gap: '6px' }}>
-            <button
-              disabled={paginaActual <= 1}
-              onClick={() => onCambiarPagina(paginaActual - 1)}
-              style={{
-                padding: '6px 12px',
-                backgroundColor: paginaActual <= 1 ? 'rgba(51, 65, 85, 0.3)' : '#0F172A',
-                border: '1px solid #334155',
-                color: paginaActual <= 1 ? '#64748B' : '#F8FAFC',
-                borderRadius: '8px',
-                cursor: paginaActual <= 1 ? 'not-allowed' : 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '4px',
-              }}
-            >
-              <ChevronLeft size={16} /> Anterior
-            </button>
-            <button
-              disabled={paginaActual >= totalPaginas}
-              onClick={() => onCambiarPagina(paginaActual + 1)}
-              style={{
-                padding: '6px 12px',
-                backgroundColor: paginaActual >= totalPaginas ? 'rgba(51, 65, 85, 0.3)' : '#0F172A',
-                border: '1px solid #334155',
-                color: paginaActual >= totalPaginas ? '#64748B' : '#F8FAFC',
-                borderRadius: '8px',
-                cursor: paginaActual >= totalPaginas ? 'not-allowed' : 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '4px',
-              }}
-            >
-              Siguiente <ChevronRight size={16} />
-            </button>
-          </div>
+          <button
+            className="inv-button"
+            disabled={paginaActual <= 1}
+            onClick={() => onCambiarPagina(paginaActual - 1)}
+          >
+            <ChevronLeft size={14} />
+            Anterior
+          </button>
+          <button
+            className="inv-button"
+            disabled={paginaActual >= totalPaginas}
+            onClick={() => onCambiarPagina(paginaActual + 1)}
+          >
+            Siguiente
+            <ChevronRight size={14} />
+          </button>
         </div>
-      </div>
-    </div>
+      </footer>
+    </section>
   );
-};
-
-const btnAccionStyle: React.CSSProperties = {
-  padding: '6px 10px',
-  backgroundColor: 'rgba(30, 41, 59, 0.8)',
-  border: '1px solid #334155',
-  borderRadius: '8px',
-  cursor: 'pointer',
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-};
+}

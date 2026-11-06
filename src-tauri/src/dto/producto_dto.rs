@@ -130,4 +130,38 @@ pub struct MovimientoKardexDto {
     pub motivo: Option<String>,
     pub fecha_movimiento: String,
     pub usuario_nombre: Option<String>,
+    pub id_ingreso: Option<i64>,
+    pub id_ot: Option<i64>,
+    pub id_venta: Option<i64>,
+    pub id_devolucion: Option<i64>,
+    pub codigo_origen: Option<String>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct LineaOrigenKardexDto {
+    pub nombre: String,
+    pub unidad_medida: String,
+    pub cantidad: i64,
+    pub valor_micro: Option<i64>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct ComprobanteOrigenKardexDto {
+    pub id_comprobante: i64,
+    pub numero: String,
+    pub tipo_comprobante: String,
+    pub estado_envio: String,
+    pub total_cent: i64,
+}
+
+#[derive(Debug, Serialize)]
+pub struct OrigenKardexDto {
+    pub tipo: String,
+    pub codigo: String,
+    pub fecha: String,
+    pub estado: String,
+    pub documento: Option<String>,
+    pub resumen: Option<String>,
+    pub lineas: Vec<LineaOrigenKardexDto>,
+    pub comprobantes: Vec<ComprobanteOrigenKardexDto>,
 }

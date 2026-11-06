@@ -2,11 +2,13 @@ pub mod ajustes;
 pub mod compras;
 pub mod idempotencia;
 pub mod kardex;
+pub mod origen;
 pub mod productos;
 pub mod proveedores;
 pub mod servicios;
+mod validaciones;
 
-use crate::dto::producto_dto::ProductoAdminDto;
+use crate::dto::producto_dto::{ProductoAdminDto, ProductoPublicoDto};
 use crate::errors::AppError;
 use chrono::{FixedOffset, Utc};
 use serde::Serialize;
@@ -31,6 +33,13 @@ pub struct ResumenSaldosKardexDto {
 #[derive(Debug, Serialize)]
 pub struct ProductosPaginadosDto {
     pub productos: Vec<ProductoAdminDto>,
+    pub total_registros: i64,
+}
+
+/// Respuesta pública: no contiene costos ni valor de inventario.
+#[derive(Debug, Serialize)]
+pub struct ProductosPublicosPaginadosDto {
+    pub productos: Vec<ProductoPublicoDto>,
     pub total_registros: i64,
 }
 

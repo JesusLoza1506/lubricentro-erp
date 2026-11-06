@@ -74,8 +74,10 @@ pub fn run() {
             buscar_vehiculos_candidatos_cmd,
             // Inventario, Proveedores, Ingresos & Servicios V7.0 (Módulo 05 - FASE 4)
             listar_productos_cmd,
+            proponer_codigo_inventario_cmd,
             listar_productos_admin_paginado_cmd,
             listar_productos_publicos_cmd,
+            listar_productos_publicos_paginado_cmd,
             listar_productos_criticos_cmd,
             registrar_producto_cmd,
             actualizar_producto_cmd,
@@ -85,6 +87,7 @@ pub fn run() {
             ajustar_stock_cmd,
             procesar_conteo_fisico_cmd,
             listar_kardex_producto_cmd,
+            obtener_origen_kardex_cmd,
             obtener_resumen_saldos_kardex_cmd,
             listar_categorias_cmd,
             registrar_ingreso_compra_cmd,

@@ -1,7 +1,7 @@
 use crate::dto::ingreso_dto::{AnularIngresoDto, IngresoStockResponseDto, RegistrarIngresoDto};
 use crate::dto::producto_dto::{
     ActualizarProductoDto, AjustarStockDto, ConteoFisicoDto, CrearProductoDto, MovimientoKardexDto,
-    ProductoAdminDto, ProductoPublicoDto,
+    OrigenKardexDto, ProductoAdminDto, ProductoPublicoDto,
 };
 use crate::dto::proveedor_dto::{
     ActualizarProveedorDto, ActualizarServicioDto, CrearProveedorDto, CrearServicioDto,
@@ -10,7 +10,7 @@ use crate::dto::proveedor_dto::{
 use crate::entities::categoria::CategoriaEntity;
 use crate::errors::AppError;
 use crate::services::inventario_service::{
-    InventarioService, ProductosPaginadosDto, ResumenSaldosKardexDto,
+    InventarioService, ProductosPaginadosDto, ProductosPublicosPaginadosDto, ResumenSaldosKardexDto,
 };
 use crate::services::session_manager::SessionState;
 use rusqlite::Connection;
@@ -75,6 +75,7 @@ pub fn listar_productos_cmd(
 }
 
 #[tauri::command]
+#[allow(clippy::too_many_arguments)]
 pub fn listar_productos_admin_paginado_cmd(
     db_state: State<'_, Mutex<Connection>>,
     session_state: State<'_, Mutex<SessionState>>,
@@ -83,6 +84,9 @@ pub fn listar_productos_admin_paginado_cmd(
     incluir_inactivos: Option<bool>,
     limite: Option<i64>,
     offset: Option<i64>,
+    solo_criticos: Option<bool>,
+    stock: Option<String>,
+    estado: Option<String>,
 ) -> Result<ProductosPaginadosDto, AppError> {
     let mut session = session_state
         .lock()
@@ -93,13 +97,16 @@ pub fn listar_productos_admin_paginado_cmd(
 
     verificar_permiso_sesion(&mut session, &conn, &["ADMINISTRADOR"])?;
 
-    InventarioService::listar_productos_admin_paginado(
+    InventarioService::listar_productos_admin_consulta(
         &conn,
         busqueda,
         categoria,
         incluir_inactivos,
         limite.unwrap_or(20),
         offset.unwrap_or(0),
+        solo_criticos.unwrap_or(false),
+        stock,
+        estado,
     )
 }
 
@@ -125,6 +132,7 @@ pub fn listar_productos_publicos_cmd(
 }
 
 #[tauri::command]
+#[allow(clippy::too_many_arguments)]
 pub fn listar_productos_publicos_paginado_cmd(
     db_state: State<'_, Mutex<Connection>>,
     session_state: State<'_, Mutex<SessionState>>,
@@ -132,7 +140,10 @@ pub fn listar_productos_publicos_paginado_cmd(
     categoria: Option<String>,
     limite: Option<i64>,
     offset: Option<i64>,
-) -> Result<ProductosPaginadosDto, AppError> {
+    solo_criticos: Option<bool>,
+    stock: Option<String>,
+    estado: Option<String>,
+) -> Result<ProductosPublicosPaginadosDto, AppError> {
     let mut session = session_state
         .lock()
         .map_err(|_| AppError::Validation("Error de sesión".into()))?;
@@ -146,12 +157,15 @@ pub fn listar_productos_publicos_paginado_cmd(
         &["ADMINISTRADOR", "CAJERO", "MECANICO"],
     )?;
 
-    InventarioService::listar_productos_publicos_paginado(
+    InventarioService::listar_productos_publicos_consulta(
         &conn,
         busqueda,
         categoria,
         limite.unwrap_or(20),
         offset.unwrap_or(0),
+        solo_criticos.unwrap_or(false),
+        stock,
+        estado,
     )
 }
 
@@ -266,33 +280,17 @@ pub fn despachar_producto_granel_cmd(
     cantidad: i64,
     motivo: Option<String>,
 ) -> Result<Value, AppError> {
-    let mut session = session_state
-        .lock()
-        .map_err(|_| AppError::Validation("Error de sesión".into()))?;
-    let mut conn = db_state
-        .lock()
-        .map_err(|_| AppError::Validation("Error de BD".into()))?;
-
-    let (id_u, _) = verificar_permiso_sesion(
+    let mut session = session_state.lock().map_err(|_| AppError::DbLock)?;
+    let conn = db_state.lock().map_err(|_| AppError::DbLock)?;
+    verificar_permiso_sesion(
         &mut session,
         &conn,
         &["ADMINISTRADOR", "CAJERO", "MECANICO"],
     )?;
-
-    let motivo_valido = match motivo {
-        Some(m) if m.trim().len() >= 5 => m.trim().to_string(),
-        _ => "Despacho directo de lubricante a granel".to_string(),
-    };
-
-    let payload = AjustarStockDto {
-        id_producto,
-        tipo_ajuste: "SALIDA".to_string(),
-        cantidad,
-        costo_unitario_micro: None,
-        motivo: motivo_valido,
-    };
-
-    InventarioService::ajustar_stock(&mut conn, payload, None, id_u)
+    let _ = (id_producto, cantidad, motivo);
+    Err(AppError::Validation(
+        "Registre el consumo de materiales desde su orden de trabajo o la venta desde POS.".into(),
+    ))
 }
 
 #[tauri::command]
@@ -315,6 +313,7 @@ pub fn registrar_ingreso_compra_cmd(
 }
 
 #[tauri::command]
+#[allow(clippy::too_many_arguments)]
 pub fn listar_ingresos_stock_cmd(
     db_state: State<'_, Mutex<Connection>>,
     session_state: State<'_, Mutex<SessionState>>,
@@ -322,6 +321,8 @@ pub fn listar_ingresos_stock_cmd(
     offset: Option<i64>,
     estado: Option<String>,
     origen: Option<String>,
+    fecha_inicio: Option<String>,
+    fecha_fin: Option<String>,
 ) -> Result<Vec<IngresoStockResponseDto>, AppError> {
     let mut session = session_state
         .lock()
@@ -332,12 +333,14 @@ pub fn listar_ingresos_stock_cmd(
 
     verificar_permiso_sesion(&mut session, &conn, &["ADMINISTRADOR"])?;
 
-    InventarioService::listar_ingresos_stock(
+    InventarioService::listar_ingresos_stock_filtrado(
         &conn,
         limite.unwrap_or(20),
         offset.unwrap_or(0),
         estado,
         origen,
+        fecha_inicio,
+        fecha_fin,
     )
 }
 
@@ -623,4 +626,32 @@ pub fn cambiar_estado_servicio_cmd(
     let (id_u, _) = verificar_permiso_sesion(&mut session, &conn, &["ADMINISTRADOR"])?;
 
     InventarioService::cambiar_estado_servicio(&mut conn, id_servicio, activo, &motivo, id_u)
+}
+
+#[tauri::command]
+pub fn obtener_origen_kardex_cmd(
+    db_state: State<'_, Mutex<Connection>>,
+    session_state: State<'_, Mutex<SessionState>>,
+    id_movimiento: i64,
+) -> Result<OrigenKardexDto, AppError> {
+    let mut session = session_state
+        .lock()
+        .map_err(|_| AppError::Validation("Error de sesión".into()))?;
+    let conn = db_state
+        .lock()
+        .map_err(|_| AppError::Validation("Error de BD".into()))?;
+    verificar_permiso_sesion(&mut session, &conn, &["ADMINISTRADOR"])?;
+    InventarioService::obtener_origen_kardex(&conn, id_movimiento)
+}
+
+#[tauri::command]
+pub fn proponer_codigo_inventario_cmd(
+    db_state: State<'_, Mutex<Connection>>,
+    session_state: State<'_, Mutex<SessionState>>,
+    tipo: String,
+) -> Result<String, AppError> {
+    let mut session = session_state.lock().map_err(|_| AppError::DbLock)?;
+    let conn = db_state.lock().map_err(|_| AppError::DbLock)?;
+    verificar_permiso_sesion(&mut session, &conn, &["ADMINISTRADOR"])?;
+    InventarioService::proponer_codigo(&conn, &tipo)
 }

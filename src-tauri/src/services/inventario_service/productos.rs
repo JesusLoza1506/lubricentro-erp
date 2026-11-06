@@ -1,4 +1,6 @@
-use super::{InventarioService, ProductosPaginadosDto, CATEGORIAS_VALIDAS};
+use super::{
+    InventarioService, ProductosPaginadosDto, ProductosPublicosPaginadosDto, CATEGORIAS_VALIDAS,
+};
 use crate::dto::producto_dto::{
     ActualizarProductoDto, CrearProductoDto, ProductoAdminDto, ProductoPublicoDto,
 };
@@ -82,6 +84,7 @@ impl InventarioService {
         )?;
 
         if let Some(cant_init_f) = req.cantidad_inicial {
+            super::validaciones::cantidad_comercial(cant_init_f, &un_upper)?;
             if cant_init_f > 0.0 {
                 // Validación de precisión según unidad de medida
                 if un_upper == "UND" {
@@ -116,29 +119,26 @@ impl InventarioService {
                     ));
                 }
 
-                let ref_init = req.referencia_inicial.ok_or_else(|| {
-                    AppError::Validation(
-                        "Referencia inicial obligatoria para stock inicial.".to_string(),
-                    )
-                })?;
+                let ref_init = req
+                    .referencia_inicial
+                    .filter(|v| !v.trim().is_empty())
+                    .unwrap_or_else(|| format!("INICIAL-{}", uuid::Uuid::new_v4().simple()));
 
-                let costo_efectivo_micro = (costo_micro_ingresado / 10_000) * 10_000;
+                let costo_efectivo_micro =
+                    super::validaciones::costo_capturado(costo_micro_ingresado)?;
                 if costo_efectivo_micro <= 0 {
                     return Err(AppError::Validation(
                         "El costo unitario inicial redondeado no es válido.".to_string(),
                     ));
                 }
 
-                let (cant_init, total_aporte, costo_unitario_kardex) = if un_upper == "ML" {
-                    let cant_ml = (cant_init_f * 1000.0).round() as i64;
-                    let total =
-                        ((cant_ml as i128 * costo_efectivo_micro as i128 + 500) / 1000) as i64;
-                    let costo_kardex = (total / cant_ml.max(1)).max(1);
-                    (cant_ml, total, costo_kardex)
+                let cant_init = super::validaciones::cantidad_comercial(cant_init_f, &un_upper)?;
+                let total_aporte =
+                    super::validaciones::aporte_micro(cant_init, costo_efectivo_micro, &un_upper)?;
+                let costo_unitario_kardex = if un_upper == "ML" {
+                    (total_aporte / cant_init).max(1)
                 } else {
-                    let cant_und = cant_init_f.round() as i64;
-                    let total = cant_und * costo_efectivo_micro;
-                    (cant_und, total, costo_efectivo_micro)
+                    costo_efectivo_micro
                 };
 
                 let id_op_ingreso = uuid::Uuid::new_v4().to_string();
@@ -301,7 +301,7 @@ impl InventarioService {
         id_usuario: i64,
     ) -> Result<(), AppError> {
         let motivo_trim = motivo.trim();
-        if motivo_trim.len() < 5 || motivo_trim.len() > 250 {
+        if motivo_trim.chars().count() < 5 || motivo_trim.chars().count() > 250 {
             return Err(AppError::Validation(
                 "El motivo administrativo debe contener entre 5 y 250 caracteres.".to_string(),
             ));
@@ -385,7 +385,7 @@ impl InventarioService {
         id_usuario: i64,
     ) -> Result<(), AppError> {
         let motivo_trim = motivo.trim();
-        if motivo_trim.len() < 5 || motivo_trim.len() > 250 {
+        if motivo_trim.chars().count() < 5 || motivo_trim.chars().count() > 250 {
             return Err(AppError::Validation(
                 "El motivo administrativo debe contener entre 5 y 250 caracteres.".to_string(),
             ));
@@ -481,9 +481,58 @@ impl InventarioService {
         categoria: Option<String>,
         limite: i64,
         offset: i64,
-    ) -> Result<ProductosPaginadosDto, AppError> {
+    ) -> Result<ProductosPublicosPaginadosDto, AppError> {
+        Self::listar_productos_publicos_paginado_filtrado(
+            conn, busqueda, categoria, limite, offset, false,
+        )
+    }
+
+    pub fn listar_productos_publicos_paginado_filtrado(
+        conn: &Connection,
+        busqueda: Option<String>,
+        categoria: Option<String>,
+        limite: i64,
+        offset: i64,
+        solo_criticos: bool,
+    ) -> Result<ProductosPublicosPaginadosDto, AppError> {
+        Self::listar_productos_publicos_consulta(
+            conn,
+            busqueda,
+            categoria,
+            limite,
+            offset,
+            solo_criticos,
+            None,
+            None,
+        )
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub fn listar_productos_publicos_consulta(
+        conn: &Connection,
+        busqueda: Option<String>,
+        categoria: Option<String>,
+        limite: i64,
+        offset: i64,
+        solo_criticos: bool,
+        stock: Option<String>,
+        estado: Option<String>,
+    ) -> Result<ProductosPublicosPaginadosDto, AppError> {
+        if !(1..=100).contains(&limite) || offset < 0 {
+            return Err(AppError::Validation(
+                "Paginación inválida: límite de 1 a 100 y desplazamiento no negativo.".into(),
+            ));
+        }
+
+        if estado.as_deref().is_some_and(|s| s != "ACTIVO") {
+            return Err(AppError::PermisoDenegado);
+        }
         let mut where_clause = String::from(" WHERE activo = 1");
         let mut params_vec: Vec<Box<dyn rusqlite::ToSql>> = Vec::new();
+
+        if solo_criticos {
+            where_clause.push_str(" AND activo = 1 AND stock_actual <= stock_minimo");
+        }
 
         if let Some(b) = busqueda {
             let b_trim = b.trim();
@@ -505,6 +554,22 @@ impl InventarioService {
             }
         }
 
+        match stock.as_deref().unwrap_or("TODOS") {
+            "TODOS" => {}
+            "SIN_STOCK" => where_clause.push_str(" AND stock_actual = 0"),
+            "CRITICO" => where_clause.push_str(" AND stock_actual <= stock_minimo"),
+            "DISPONIBLE" => where_clause.push_str(" AND stock_actual > 0"),
+            _ => return Err(AppError::Validation("Filtro de stock inválido.".into())),
+        }
+        let orden = if solo_criticos || stock.as_deref() == Some("CRITICO") {
+            "(stock_actual=0) DESC, nombre ASC, codigo ASC, id_producto ASC"
+        } else {
+            "nombre ASC, codigo ASC, id_producto ASC"
+        };
+
+        let lectura = conn.unchecked_transaction()?;
+        let conn = &lectura;
+
         let count_sql = format!("SELECT COUNT(*) FROM productos{}", where_clause);
         let mut stmt_count = conn.prepare(&count_sql)?;
         let count_params: Vec<&dyn rusqlite::ToSql> =
@@ -512,7 +577,7 @@ impl InventarioService {
         let total_registros: i64 = stmt_count.query_row(count_params.as_slice(), |r| r.get(0))?;
 
         let mut data_sql = format!(
-            "SELECT id_producto, codigo, nombre, descripcion, categoria, unidad_medida, stock_actual, stock_minimo, valor_stock_micro, ultimo_costo_micro, precio_venta_cent, activo FROM productos{}",
+            "SELECT id_producto, codigo, nombre, descripcion, categoria, unidad_medida, stock_actual, stock_minimo, precio_venta_cent, activo FROM productos{}",
             where_clause
         );
         params_vec.push(Box::new(limite));
@@ -521,7 +586,7 @@ impl InventarioService {
         let offset_idx = params_vec.len();
 
         data_sql.push_str(&format!(
-            " ORDER BY nombre ASC LIMIT ?{} OFFSET ?{}",
+            " ORDER BY {orden} LIMIT ?{} OFFSET ?{}",
             limit_idx, offset_idx
         ));
 
@@ -530,21 +595,21 @@ impl InventarioService {
             params_vec.iter().map(|p| p.as_ref()).collect();
 
         let iter = stmt_data.query_map(data_params.as_slice(), |row| {
-            let entity = ProductoEntity {
+            let stock_actual: i64 = row.get(6)?;
+            let stock_minimo: i64 = row.get(7)?;
+            Ok(ProductoPublicoDto {
                 id_producto: row.get(0)?,
                 codigo: row.get(1)?,
                 nombre: row.get(2)?,
                 descripcion: row.get(3)?,
                 categoria: row.get(4)?,
                 unidad_medida: row.get(5)?,
-                stock_actual: row.get(6)?,
-                stock_minimo: row.get(7)?,
-                valor_stock_micro: row.get(8)?,
-                ultimo_costo_micro: row.get(9)?,
-                precio_venta_cent: row.get(10)?,
-                activo: row.get(11)?,
-            };
-            Ok(ProductoAdminDto::desde_entity(entity))
+                stock_actual,
+                stock_minimo,
+                precio_venta_cent: row.get(8)?,
+                activo: row.get::<_, i64>(9)? == 1,
+                es_critico: stock_actual <= stock_minimo,
+            })
         })?;
 
         let mut productos = Vec::new();
@@ -552,7 +617,7 @@ impl InventarioService {
             productos.push(i?);
         }
 
-        Ok(ProductosPaginadosDto {
+        Ok(ProductosPublicosPaginadosDto {
             productos,
             total_registros,
         })
@@ -602,11 +667,84 @@ impl InventarioService {
         limite: i64,
         offset: i64,
     ) -> Result<ProductosPaginadosDto, AppError> {
+        Self::listar_productos_admin_paginado_filtrado(
+            conn,
+            busqueda,
+            categoria,
+            incluir_inactivos,
+            limite,
+            offset,
+            false,
+        )
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub fn listar_productos_admin_paginado_filtrado(
+        conn: &Connection,
+        busqueda: Option<String>,
+        categoria: Option<String>,
+        incluir_inactivos: Option<bool>,
+        limite: i64,
+        offset: i64,
+        solo_criticos: bool,
+    ) -> Result<ProductosPaginadosDto, AppError> {
+        Self::listar_productos_admin_consulta(
+            conn,
+            busqueda,
+            categoria,
+            incluir_inactivos,
+            limite,
+            offset,
+            solo_criticos,
+            None,
+            None,
+        )
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub fn listar_productos_admin_consulta(
+        conn: &Connection,
+        busqueda: Option<String>,
+        categoria: Option<String>,
+        incluir_inactivos: Option<bool>,
+        limite: i64,
+        offset: i64,
+        solo_criticos: bool,
+        stock: Option<String>,
+        estado: Option<String>,
+    ) -> Result<ProductosPaginadosDto, AppError> {
+        if !(1..=100).contains(&limite) || offset < 0 {
+            return Err(AppError::Validation(
+                "Paginación inválida: límite de 1 a 100 y desplazamiento no negativo.".into(),
+            ));
+        }
+
         let mut where_clause = String::from(" WHERE 1=1");
         let mut params_vec: Vec<Box<dyn rusqlite::ToSql>> = Vec::new();
 
-        if !incluir_inactivos.unwrap_or(false) {
+        if estado
+            .as_deref()
+            .unwrap_or(if incluir_inactivos.unwrap_or(false) {
+                "TODOS"
+            } else {
+                "ACTIVO"
+            })
+            == "ACTIVO"
+        {
             where_clause.push_str(" AND activo = 1");
+        }
+
+        if estado.as_deref() == Some("INACTIVO") {
+            where_clause.push_str(" AND activo = 0");
+        }
+        if estado
+            .as_deref()
+            .is_some_and(|s| !["ACTIVO", "INACTIVO", "TODOS"].contains(&s))
+        {
+            return Err(AppError::Validation("Filtro de estado inválido.".into()));
+        }
+        if solo_criticos {
+            where_clause.push_str(" AND activo = 1 AND stock_actual <= stock_minimo");
         }
 
         if let Some(b) = busqueda {
@@ -629,6 +767,22 @@ impl InventarioService {
             }
         }
 
+        match stock.as_deref().unwrap_or("TODOS") {
+            "TODOS" => {}
+            "SIN_STOCK" => where_clause.push_str(" AND stock_actual = 0"),
+            "CRITICO" => where_clause.push_str(" AND stock_actual <= stock_minimo"),
+            "DISPONIBLE" => where_clause.push_str(" AND stock_actual > 0"),
+            _ => return Err(AppError::Validation("Filtro de stock inválido.".into())),
+        }
+        let orden = if solo_criticos || stock.as_deref() == Some("CRITICO") {
+            "(stock_actual=0) DESC, nombre ASC, codigo ASC, id_producto ASC"
+        } else {
+            "nombre ASC, codigo ASC, id_producto ASC"
+        };
+
+        let lectura = conn.unchecked_transaction()?;
+        let conn = &lectura;
+
         let count_sql = format!("SELECT COUNT(*) FROM productos{}", where_clause);
         let mut stmt_count = conn.prepare(&count_sql)?;
         let count_params: Vec<&dyn rusqlite::ToSql> =
@@ -645,7 +799,7 @@ impl InventarioService {
         let offset_idx = params_vec.len();
 
         data_sql.push_str(&format!(
-            " ORDER BY nombre ASC LIMIT ?{} OFFSET ?{}",
+            " ORDER BY {orden} LIMIT ?{} OFFSET ?{}",
             limit_idx, offset_idx
         ));
 
@@ -687,7 +841,7 @@ impl InventarioService {
     ) -> Result<Vec<ProductoPublicoDto>, AppError> {
         let mut stmt = conn.prepare(
             "SELECT id_producto, codigo, nombre, descripcion, categoria, unidad_medida, stock_actual, stock_minimo, valor_stock_micro, ultimo_costo_micro, precio_venta_cent, activo
-             FROM productos WHERE activo = 1 AND stock_actual <= stock_minimo ORDER BY (stock_actual - stock_minimo) ASC, nombre ASC",
+             FROM productos WHERE activo = 1 AND stock_actual <= stock_minimo ORDER BY (stock_actual=0) DESC, nombre ASC, codigo ASC, id_producto ASC",
         )?;
 
         let iter = stmt.query_map([], |row| {
@@ -720,7 +874,7 @@ impl InventarioService {
     ) -> Result<Vec<ProductoAdminDto>, AppError> {
         let mut stmt = conn.prepare(
             "SELECT id_producto, codigo, nombre, descripcion, categoria, unidad_medida, stock_actual, stock_minimo, valor_stock_micro, ultimo_costo_micro, precio_venta_cent, activo
-             FROM productos WHERE activo = 1 AND stock_actual <= stock_minimo ORDER BY (stock_actual - stock_minimo) ASC, nombre ASC",
+             FROM productos WHERE activo = 1 AND stock_actual <= stock_minimo ORDER BY (stock_actual=0) DESC, nombre ASC, codigo ASC, id_producto ASC",
         )?;
 
         let iter = stmt.query_map([], |row| {
@@ -776,5 +930,39 @@ impl InventarioService {
                 activo: 1,
             },
         ])
+    }
+}
+
+impl InventarioService {
+    pub fn proponer_codigo(conn: &Connection, tipo: &str) -> Result<String, AppError> {
+        let (tabla, prefijo) = match tipo {
+            "PRODUCTO" => ("productos", "PROD"),
+            "SERVICIO" => ("servicios", "SERV"),
+            _ => return Err(AppError::Validation("Tipo de catálogo inválido.".into())),
+        };
+        let mut numero: i64 = conn.query_row(
+            &format!(
+                "SELECT coalesce(max(id_{}),0)+1 FROM {tabla}",
+                if tipo == "PRODUCTO" {
+                    "producto"
+                } else {
+                    "servicio"
+                }
+            ),
+            [],
+            |r| r.get(0),
+        )?;
+        loop {
+            let codigo = format!("{prefijo}-{numero:06}");
+            let existe: bool = conn.query_row(
+                &format!("SELECT EXISTS(SELECT 1 FROM {tabla} WHERE codigo=?1)"),
+                [&codigo],
+                |r| r.get(0),
+            )?;
+            if !existe {
+                return Ok(codigo);
+            }
+            numero += 1;
+        }
     }
 }

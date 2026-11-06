@@ -1,7 +1,7 @@
 use super::{InventarioService, ResumenSaldosKardexDto};
 use crate::dto::producto_dto::MovimientoKardexDto;
 use crate::errors::AppError;
-use rusqlite::Connection;
+use rusqlite::{Connection, OptionalExtension};
 
 impl InventarioService {
     pub fn listar_kardex_producto(
@@ -13,20 +13,11 @@ impl InventarioService {
         fecha_fin: Option<String>,
         tipo_movimiento: Option<String>,
     ) -> Result<Vec<MovimientoKardexDto>, AppError> {
-        if let (Some(fi), Some(ff)) = (&fecha_inicio, &fecha_fin) {
-            if !fi.trim().is_empty() && !ff.trim().is_empty() {
-                if let (Ok(d_start), Ok(d_end)) = (
-                    chrono::NaiveDate::parse_from_str(fi.trim(), "%Y-%m-%d"),
-                    chrono::NaiveDate::parse_from_str(ff.trim(), "%Y-%m-%d"),
-                ) {
-                    if (d_end - d_start).num_days() > 366 {
-                        return Err(AppError::Validation(
-                            "El rango de consulta del Kárdex no puede ser superior a 366 días."
-                                .to_string(),
-                        ));
-                    }
-                }
-            }
+        validar_fechas_kardex(fecha_inicio.as_deref(), fecha_fin.as_deref())?;
+        if !(1..=100).contains(&limite) || offset < 0 {
+            return Err(AppError::Validation(
+                "Paginación de Kardex inválida.".into(),
+            ));
         }
 
         let mut query = String::from(
@@ -38,11 +29,22 @@ impl InventarioService {
                         WHEN ing.codigo IS NOT NULL THEN '[' || COALESCE(ing.origen, 'COMPRA') || ': ' || ing.codigo || '] ' || COALESCE(m.motivo, '')
                         ELSE m.motivo 
                     END as motivo_completo,
-                    m.fecha_movimiento, u.nombre_completo
+                    m.fecha_movimiento, u.nombre_completo,
+                    ing.id_ingreso, ot.id_ot, COALESCE(v.id_venta, vd.id_venta), dev.id_devolucion,
+                    COALESCE(ing.codigo, ot.codigo_ot,
+                        CASE WHEN dev.id_devolucion IS NOT NULL THEN 'Devolución #' || dev.id_devolucion END,
+                        CASE WHEN v.id_venta IS NOT NULL THEN 'Venta #' || v.id_venta END)
              FROM movimientos_inventario m
              LEFT JOIN usuarios u ON u.id_usuario = m.id_usuario
              LEFT JOIN detalle_ingreso det ON det.id_detalle = m.id_detalle_ingreso
              LEFT JOIN ingresos_stock ing ON ing.id_ingreso = det.id_ingreso
+             LEFT JOIN detalle_ot_productos consumo ON consumo.id_detalle = m.id_consumo_ot
+             LEFT JOIN ordenes_trabajo ot ON ot.id_ot = consumo.id_ot
+             LEFT JOIN detalle_venta dv ON dv.id_detalle = m.id_detalle_venta
+             LEFT JOIN ventas v ON v.id_venta = dv.id_venta
+             LEFT JOIN detalle_devolucion dd ON dd.id_detalle = m.id_detalle_devolucion
+             LEFT JOIN devoluciones dev ON dev.id_devolucion = dd.id_devolucion
+             LEFT JOIN ventas vd ON vd.id_venta = dev.id_venta
              WHERE m.id_producto = ?1",
         );
 
@@ -81,7 +83,7 @@ impl InventarioService {
         let offset_idx = query_params.len();
 
         query.push_str(&format!(
-            " ORDER BY m.id_movimiento DESC LIMIT ?{} OFFSET ?{}",
+            " ORDER BY m.fecha_movimiento DESC, m.id_movimiento DESC LIMIT ?{} OFFSET ?{}",
             limit_idx, offset_idx
         ));
 
@@ -105,6 +107,11 @@ impl InventarioService {
                 motivo: r.get(11)?,
                 fecha_movimiento: r.get(12)?,
                 usuario_nombre: r.get(13)?,
+                id_ingreso: r.get(14)?,
+                id_ot: r.get(15)?,
+                id_venta: r.get(16)?,
+                id_devolucion: r.get(17)?,
+                codigo_origen: r.get(18)?,
             })
         })?;
 
@@ -120,112 +127,78 @@ impl InventarioService {
         id_producto: i64,
         fecha_inicio: Option<String>,
         fecha_fin: Option<String>,
-        tipo_movimiento: Option<String>,
+        _tipo_movimiento: Option<String>,
     ) -> Result<ResumenSaldosKardexDto, AppError> {
-        let saldo_actual: i64 = conn
-            .query_row(
-                "SELECT stock_actual FROM productos WHERE id_producto = ?1",
+        validar_fechas_kardex(fecha_inicio.as_deref(), fecha_fin.as_deref())?;
+        // Los saldos son físicos del período completo, no sumas parciales por tipo.
+        let lectura = conn.unchecked_transaction()?;
+        let conn = &lectura;
+        let saldo_actual: i64 = conn.query_row(
+            "SELECT stock_actual FROM productos WHERE id_producto = ?1",
+            [id_producto],
+            |r| r.get(0),
+        )?;
+        let inicio = fecha_inicio
+            .as_deref()
+            .filter(|v| !v.trim().is_empty())
+            .map(|v| format!("{} 00:00:00", v.trim()));
+        let fin = fecha_fin
+            .as_deref()
+            .filter(|v| !v.trim().is_empty())
+            .map(|v| format!("{} 23:59:59", v.trim()));
+        let saldo_inicial = if let Some(inicio) = inicio {
+            conn.query_row(
+                "SELECT stock_resultante FROM movimientos_inventario
+                 WHERE id_producto = ?1 AND fecha_movimiento < ?2
+                 ORDER BY fecha_movimiento DESC, id_movimiento DESC LIMIT 1",
+                rusqlite::params![id_producto, inicio],
+                |r| r.get(0),
+            )
+            .optional()?
+            .unwrap_or(0)
+        } else {
+            conn.query_row(
+                "SELECT stock_anterior FROM movimientos_inventario WHERE id_producto = ?1
+                 ORDER BY fecha_movimiento ASC, id_movimiento ASC LIMIT 1",
                 [id_producto],
                 |r| r.get(0),
             )
-            .unwrap_or(0);
-
-        let fecha_primer_mov: Option<String> = conn
-            .query_row(
-                "SELECT fecha_movimiento FROM movimientos_inventario WHERE id_producto = ?1 ORDER BY id_movimiento ASC LIMIT 1",
-                [id_producto],
-                |r| r.get(0),
-            )
-            .ok();
-
-        if let (Some(ref ff), Some(ref f_primer)) = (&fecha_fin, &fecha_primer_mov) {
-            let ff_str = format!("{} 23:59:59", ff.trim());
-            if !ff.trim().is_empty() && ff_str < *f_primer {
-                return Ok(ResumenSaldosKardexDto {
-                    saldo_inicial: 0,
-                    saldo_final: 0,
-                    saldo_actual,
-                });
-            }
-        }
-
-        let mut query_base = String::from(
-            "SELECT stock_anterior, stock_resultante FROM movimientos_inventario WHERE id_producto = ?1"
-        );
-        let mut query_params: Vec<Box<dyn rusqlite::ToSql>> = vec![Box::new(id_producto)];
-
-        if let Some(ref fi) = fecha_inicio {
-            if !fi.trim().is_empty() {
-                query_params.push(Box::new(format!("{} 00:00:00", fi.trim())));
-                query_base.push_str(&format!(" AND fecha_movimiento >= ?{}", query_params.len()));
-            }
-        }
-
-        if let Some(ref ff) = fecha_fin {
-            if !ff.trim().is_empty() {
-                query_params.push(Box::new(format!("{} 23:59:59", ff.trim())));
-                query_base.push_str(&format!(" AND fecha_movimiento <= ?{}", query_params.len()));
-            }
-        }
-
-        if let Some(ref tm) = tipo_movimiento {
-            if !tm.trim().is_empty() && tm.trim().to_uppercase() != "TODOS" {
-                query_params.push(Box::new(tm.trim().to_uppercase()));
-                query_base.push_str(&format!(" AND tipo_movimiento = ?{}", query_params.len()));
-            }
-        }
-
-        let params_slice: Vec<&dyn rusqlite::ToSql> =
-            query_params.iter().map(|p| p.as_ref()).collect();
-
-        let query_first = format!("{} ORDER BY id_movimiento ASC LIMIT 1", query_base);
-        let primer_mov: Option<(i64, i64)> = conn
-            .query_row(&query_first, params_slice.as_slice(), |r| {
-                Ok((r.get(0)?, r.get(1)?))
-            })
-            .ok();
-
-        let query_last = format!("{} ORDER BY id_movimiento DESC LIMIT 1", query_base);
-        let ultimo_mov: Option<(i64, i64)> = conn
-            .query_row(&query_last, params_slice.as_slice(), |r| {
-                Ok((r.get(0)?, r.get(1)?))
-            })
-            .ok();
-
-        let (saldo_inicial, saldo_final) = match (primer_mov, ultimo_mov) {
-            (Some(f), Some(l)) => (f.0, l.1),
-            _ => {
-                let mut last_before_query = String::from(
-                    "SELECT stock_resultante FROM movimientos_inventario WHERE id_producto = ?1",
-                );
-                let mut params_before: Vec<Box<dyn rusqlite::ToSql>> = vec![Box::new(id_producto)];
-
-                if let Some(ref fi) = fecha_inicio {
-                    if !fi.trim().is_empty() {
-                        params_before.push(Box::new(format!("{} 00:00:00", fi.trim())));
-                        last_before_query
-                            .push_str(&format!(" AND fecha_movimiento < ?{}", params_before.len()));
-                    }
-                }
-                last_before_query.push_str(" ORDER BY id_movimiento DESC LIMIT 1");
-
-                let params_before_slice: Vec<&dyn rusqlite::ToSql> =
-                    params_before.iter().map(|p| p.as_ref()).collect();
-
-                let stock_arrastrado: i64 = conn
-                    .query_row(&last_before_query, params_before_slice.as_slice(), |r| {
-                        r.get(0)
-                    })
-                    .unwrap_or(0);
-
-                (stock_arrastrado, stock_arrastrado)
-            }
+            .optional()?
+            .unwrap_or(0)
         };
-
+        let saldo_final = conn
+            .query_row(
+                "SELECT stock_resultante FROM movimientos_inventario
+             WHERE id_producto = ?1 AND (?2 IS NULL OR fecha_movimiento <= ?2)
+             ORDER BY fecha_movimiento DESC, id_movimiento DESC LIMIT 1",
+                rusqlite::params![id_producto, fin],
+                |r| r.get(0),
+            )
+            .optional()?
+            .unwrap_or(0);
         Ok(ResumenSaldosKardexDto {
             saldo_inicial,
             saldo_final,
             saldo_actual,
         })
     }
+}
+
+fn validar_fechas_kardex(inicio: Option<&str>, fin: Option<&str>) -> Result<(), AppError> {
+    let parsear = |valor: Option<&str>| -> Result<Option<chrono::NaiveDate>, AppError> {
+        valor
+            .filter(|v| !v.trim().is_empty())
+            .map(|v| {
+                chrono::NaiveDate::parse_from_str(v.trim(), "%Y-%m-%d").map_err(|_| {
+                    AppError::Validation("Fecha de Kardex inválida. Use AAAA-MM-DD.".into())
+                })
+            })
+            .transpose()
+    };
+    if let (Some(a), Some(b)) = (parsear(inicio)?, parsear(fin)?) {
+        if b < a || (b - a).num_days() > 366 {
+            return Err(AppError::Validation("El rango de consulta del Kárdex debe estar ordenado y no puede ser superior a 366 días.".into()));
+        }
+    }
+    Ok(())
 }

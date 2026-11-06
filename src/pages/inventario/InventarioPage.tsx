@@ -1,5 +1,12 @@
-import React, { useEffect, useState } from 'react';
-import { CheckCircle2, XCircle, Wrench, Package, History } from 'lucide-react';
+import './inventarioVisual.css';
+import {
+  AvisosInventarioContext,
+  AvisoInventarioVisible,
+  useAvisosInventario,
+} from './AvisosInventario';
+import { configurarContextoInventario, solesAMicro } from '../../services/operacionInventario';
+import React, { useEffect, useState, useRef } from 'react';
+import { Wrench, Package, History, Search } from 'lucide-react';
 import {
   Producto,
   Categoria,
@@ -17,7 +24,6 @@ import { InventarioHeader } from './components/InventarioHeader';
 import { InventarioFiltros } from './components/InventarioFiltros';
 import { InventarioTabla } from './components/InventarioTabla';
 import { InventarioModal, ModoModal } from './components/InventarioModal';
-import { ModalDespacho } from './components/ModalDespacho';
 import { ModalAjusteStock } from './components/ModalAjusteStock';
 import { ModalRegistroCompra } from './components/ModalRegistroCompra';
 import { ModalKardex } from './components/ModalKardex';
@@ -25,8 +31,22 @@ import { ModalServicio } from './components/ModalServicio';
 import { ModalHistorialEntradas } from './components/ModalHistorialEntradas';
 import { ModalMotivoEstadoServicio } from './components/ModalMotivoEstadoServicio';
 import { ServiciosTabla } from './components/ServiciosTabla';
-import { ConfirmModal } from '../../components/ConfirmModal';
+import { ModalMotivoEstadoProducto } from './components/ModalMotivoEstadoProducto';
 import { useAuth } from '../../context/AuthContext';
+
+function cantidadMinimaBase(valor: number, granel: boolean): number {
+  const base = Number(valor || 0) * (granel ? 1000 : 1);
+  if (
+    !Number.isFinite(base) ||
+    base < 0 ||
+    Math.abs(base - Math.round(base)) > 0.000001 ||
+    base > (granel ? 9999999999 : 9999999)
+  )
+    throw new Error(
+      'Stock mínimo inválido: usa unidades enteras o hasta tres decimales en litros.'
+    );
+  return Math.round(base);
+}
 
 const prodInicial: ProductoForm = {
   codigo: '',
@@ -34,7 +54,7 @@ const prodInicial: ProductoForm = {
   descripcion: '',
   categoria: 'ACEITE',
   unidad_medida: 'UND',
-  stock_minimo: 5,
+  stock_minimo: 0,
   precio_venta_soles: 0,
   tiene_stock_inicial: false,
   cantidad_inicial: 0,
@@ -43,10 +63,15 @@ const prodInicial: ProductoForm = {
 };
 
 export const InventarioPage: React.FC = () => {
-  const { usuario } = useAuth();
+  const { usuario, ambienteActual } = useAuth();
+  if (usuario)
+    configurarContextoInventario(
+      usuario.id_usuario,
+      ambienteActual || usuario.ambiente_actual || 'DESCONOCIDO'
+    );
   const esAdmin = usuario?.rol?.toUpperCase() === 'ADMINISTRADOR';
 
-  const [tabActiva, setTabActiva] = useState<'PRODUCTOS' | 'SERVICIOS'>('PRODUCTOS');
+  const [tabActiva, setTabActiva] = useState<'PRODUCTOS' | 'SERVICIOS' | 'ENTRADAS'>('PRODUCTOS');
 
   // Estado de Productos (Paginados)
   const [productos, setProductos] = useState<Producto[]>([]);
@@ -58,11 +83,16 @@ export const InventarioPage: React.FC = () => {
   const [servicios, setServicios] = useState<ServicioDTO[]>([]);
 
   const [categorias, setCategorias] = useState<Categoria[]>([]);
+  const [datosDesactualizados, setDatosDesactualizados] = useState(false);
   const [cargando, setCargando] = useState<boolean>(true);
-  const [despachando, setDespachando] = useState<boolean>(false);
   const [busqueda, setBusqueda] = useState<string>('');
   const [filtroCritico, setFiltroCritico] = useState<boolean>(false);
   const [mostrarInactivos, setMostrarInactivos] = useState<boolean>(false);
+  const [categoriaFiltro, setCategoriaFiltro] = useState('TODOS');
+  const [stockFiltro, setStockFiltro] = useState('TODOS');
+  const [estadoFiltro, setEstadoFiltro] = useState('ACTIVO');
+  const [busquedaServicios, setBusquedaServicios] = useState('');
+  const guardandoProducto = useRef(false);
 
   // Modales
   const [modalAbierto, setModalAbierto] = useState<boolean>(false);
@@ -85,13 +115,6 @@ export const InventarioPage: React.FC = () => {
     producto: null,
   });
 
-  const [modalDespacho, setModalDespacho] = useState<{
-    abierto: boolean;
-    producto: Producto | null;
-    cantidad: number;
-    motivo: string;
-  }>({ abierto: false, producto: null, cantidad: 1, motivo: '' });
-
   const [modalAjuste, setModalAjuste] = useState<{
     abierto: boolean;
     producto: Producto | null;
@@ -104,54 +127,59 @@ export const InventarioPage: React.FC = () => {
     accion: 'DESACTIVAR' | 'REACTIVAR';
   }>({ abierto: false, id: null, nombre: '', accion: 'DESACTIVAR' });
 
-  const [notificacion, setNotificacion] = useState<string | null>(null);
-  const [errorModalMsg, setErrorModalMsg] = useState<string | null>(null);
+  const consultaProductos = useRef(0);
 
-  const mostrarToast = (msg: string) => {
-    setNotificacion(msg);
-    setTimeout(() => setNotificacion(null), 3500);
-  };
+  const { aviso, notificar, cerrar } = useAvisosInventario();
+  const [errorProducto, setErrorProducto] = useState('');
+  const [productoGuardando, setProductoGuardando] = useState(false);
+  const [errorEstadoServicio, setErrorEstadoServicio] = useState('');
+  const mostrarToast = (msg: string) => notificar(msg, 'EXITO');
+  const setErrorModalMsg = (msg: string) => notificar(msg, 'ERROR');
 
   const cargarProductosPaginados = async () => {
+    const consulta = ++consultaProductos.current;
     setCargando(true);
     try {
-      if (filtroCritico) {
-        const prodsCriticos = await inventarioService.listarProductosCriticos();
-        setProductos((prodsCriticos as Producto[]) || []);
-        setTotalRegistros(prodsCriticos ? prodsCriticos.length : 0);
-      } else if (esAdmin) {
-        const offset = (paginaActual - 1) * limitePagina;
-        const resp = await inventarioService.listarProductosAdminPaginado(
-          busqueda.trim() || undefined,
-          undefined,
-          mostrarInactivos,
-          limitePagina,
-          offset
-        );
-        setProductos(resp.productos || []);
-        setTotalRegistros(resp.total_registros || 0);
-      } else {
-        const prodsPublicos = await inventarioService.listarProductosPublicos();
-        let filtrados = prodsPublicos || [];
-        if (busqueda.trim()) {
-          const q = busqueda.trim().toLowerCase();
-          filtrados = filtrados.filter(
-            (p) => p.nombre.toLowerCase().includes(q) || p.codigo.toLowerCase().includes(q)
+      const offset = (paginaActual - 1) * limitePagina;
+      const resp = esAdmin
+        ? await inventarioService.listarProductosAdminPaginado(
+            busqueda.trim() || undefined,
+            categoriaFiltro,
+            mostrarInactivos,
+            limitePagina,
+            offset,
+            filtroCritico,
+            stockFiltro,
+            estadoFiltro
+          )
+        : await inventarioService.listarProductosPublicosPaginado(
+            busqueda.trim() || undefined,
+            categoriaFiltro,
+            limitePagina,
+            offset,
+            filtroCritico,
+            stockFiltro,
+            'ACTIVO'
           );
-        }
-        setTotalRegistros(filtrados.length);
-        const offset = (paginaActual - 1) * limitePagina;
-        const paginados = filtrados.slice(offset, offset + limitePagina);
-        setProductos(paginados as Producto[]);
+      if (consulta !== consultaProductos.current) return;
+      const ultimaPagina = Math.max(1, Math.ceil(resp.total_registros / limitePagina));
+      setTotalRegistros(resp.total_registros);
+      if (paginaActual > ultimaPagina) {
+        setPaginaActual(ultimaPagina);
+        return;
       }
+      setProductos(resp.productos);
+      setDatosDesactualizados(false);
     } catch (err: unknown) {
+      if (consulta !== consultaProductos.current) return;
       const msg =
         typeof err === 'string'
           ? err
           : (err as { message?: string })?.message || 'Error al cargar productos';
+      setDatosDesactualizados(true);
       setErrorModalMsg(msg);
     } finally {
-      setCargando(false);
+      if (consulta === consultaProductos.current) setCargando(false);
     }
   };
 
@@ -189,20 +217,63 @@ export const InventarioPage: React.FC = () => {
   useEffect(() => {
     if (tabActiva === 'PRODUCTOS') {
       cargarProductosPaginados();
-    } else {
+    } else if (tabActiva === 'SERVICIOS') {
       cargarServicios();
     }
-  }, [tabActiva, paginaActual, filtroCritico, mostrarInactivos, busqueda, esAdmin]);
+    return () => {
+      consultaProductos.current += 1;
+    };
+  }, [
+    tabActiva,
+    paginaActual,
+    filtroCritico,
+    mostrarInactivos,
+    busqueda,
+    esAdmin,
+    categoriaFiltro,
+    stockFiltro,
+    estadoFiltro,
+  ]);
+
+  useEffect(() => {
+    const refrescar = () => {
+      if (document.visibilityState === 'hidden') return;
+      if (tabActiva === 'PRODUCTOS') void cargarProductosPaginados();
+      if (tabActiva === 'SERVICIOS') void cargarServicios();
+    };
+    window.addEventListener('focus', refrescar);
+    document.addEventListener('visibilitychange', refrescar);
+    return () => {
+      window.removeEventListener('focus', refrescar);
+      document.removeEventListener('visibilitychange', refrescar);
+    };
+  }, [
+    tabActiva,
+    paginaActual,
+    busqueda,
+    filtroCritico,
+    categoriaFiltro,
+    stockFiltro,
+    estadoFiltro,
+    esAdmin,
+  ]);
 
   const totalPaginas = Math.max(1, Math.ceil(totalRegistros / limitePagina));
 
-  const abrirModalCrear = () => {
+  const abrirModalCrear = async () => {
+    setErrorProducto('');
     setModoModal('CREAR');
-    setProdForm(prodInicial);
-    setModalAbierto(true);
+    try {
+      const codigo = await inventarioService.proponerCodigo('PRODUCTO');
+      setProdForm({ ...prodInicial, codigo });
+      setModalAbierto(true);
+    } catch (error) {
+      setErrorModalMsg(String(error));
+    }
   };
 
   const abrirModalVer = (p: Producto) => {
+    setErrorProducto('');
     setModoModal('VER');
     const pAdmin = p as ProductoAdminDTO;
     const costoSol = pAdmin.ultimo_costo_micro ? pAdmin.ultimo_costo_micro / 1_000_000 : 0;
@@ -213,7 +284,7 @@ export const InventarioPage: React.FC = () => {
       descripcion: p.descripcion || '',
       categoria: p.categoria,
       unidad_medida: p.unidad_medida,
-      stock_minimo: p.stock_minimo,
+      stock_minimo: p.unidad_medida === 'ML' ? p.stock_minimo / 1000 : p.stock_minimo,
       precio_venta_soles: p.precio_venta_cent / 100,
       tiene_stock_inicial: false,
       cantidad_inicial: p.stock_actual,
@@ -224,6 +295,7 @@ export const InventarioPage: React.FC = () => {
   };
 
   const abrirModalEditar = (p: Producto) => {
+    setErrorProducto('');
     setModoModal('EDITAR');
     setProdForm({
       id_producto: p.id_producto,
@@ -232,7 +304,7 @@ export const InventarioPage: React.FC = () => {
       descripcion: p.descripcion || '',
       categoria: p.categoria,
       unidad_medida: p.unidad_medida,
-      stock_minimo: p.stock_minimo,
+      stock_minimo: p.unidad_medida === 'ML' ? p.stock_minimo / 1000 : p.stock_minimo,
       precio_venta_soles: p.precio_venta_cent / 100,
       tiene_stock_inicial: false,
       cantidad_inicial: 0,
@@ -244,8 +316,12 @@ export const InventarioPage: React.FC = () => {
 
   const handleGuardarProducto = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (guardandoProducto.current) return;
+    guardandoProducto.current = true;
+    setProductoGuardando(true);
+    setErrorProducto('');
     try {
-      const precioVentaCentimos = Math.round(Number(prodForm.precio_venta_soles || 0) * 100);
+      const precioVentaCentimos = solesAMicro(Number(prodForm.precio_venta_soles || 0)) / 10000;
 
       if (modoModal === 'CREAR') {
         const payloadCrear: CrearProductoDTO = {
@@ -254,13 +330,13 @@ export const InventarioPage: React.FC = () => {
           descripcion: prodForm.descripcion?.trim() || null,
           categoria: prodForm.categoria,
           unidad_medida: prodForm.categoria === 'GRANEL' ? 'ML' : 'UND',
-          stock_minimo: Number(prodForm.stock_minimo || 0),
+          stock_minimo: cantidadMinimaBase(prodForm.stock_minimo, prodForm.categoria === 'GRANEL'),
           precio_venta_cent: precioVentaCentimos,
           cantidad_inicial: prodForm.tiene_stock_inicial
             ? Number(prodForm.cantidad_inicial || 0)
             : null,
           costo_unitario_inicial_micro: prodForm.tiene_stock_inicial
-            ? Math.round(Number(prodForm.costo_unitario_soles || 0) * 1_000_000)
+            ? solesAMicro(Number(prodForm.costo_unitario_soles || 0))
             : null,
           referencia_inicial: prodForm.tiene_stock_inicial
             ? prodForm.referencia_inicial.trim()
@@ -273,7 +349,7 @@ export const InventarioPage: React.FC = () => {
           id_producto: Number(prodForm.id_producto),
           nombre: prodForm.nombre.trim(),
           descripcion: prodForm.descripcion?.trim() || null,
-          stock_minimo: Number(prodForm.stock_minimo || 0),
+          stock_minimo: cantidadMinimaBase(prodForm.stock_minimo, prodForm.categoria === 'GRANEL'),
           precio_venta_cent: precioVentaCentimos,
         };
         await inventarioService.actualizarProducto(payloadEditar);
@@ -286,69 +362,48 @@ export const InventarioPage: React.FC = () => {
         typeof err === 'string'
           ? err
           : (err as { message?: string })?.message || 'Error al guardar el producto';
-      setErrorModalMsg(msg);
-    }
-  };
-
-  const ejecutarDespacho = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!modalDespacho.producto || despachando) return;
-    try {
-      setDespachando(true);
-      await inventarioService.despacharProductoGranel(
-        modalDespacho.producto.id_producto,
-        Number(modalDespacho.cantidad),
-        modalDespacho.motivo.trim() || undefined
-      );
-      mostrarToast(`Despacho registrado para "${modalDespacho.producto.nombre}"`);
-      setModalDespacho({ abierto: false, producto: null, cantidad: 1, motivo: '' });
-      cargarProductosPaginados();
-    } catch (err: unknown) {
-      const msg =
-        typeof err === 'string'
-          ? err
-          : (err as { message?: string })?.message || 'Error al procesar el despacho';
+      setErrorProducto(msg);
       setErrorModalMsg(msg);
     } finally {
-      setDespachando(false);
+      guardandoProducto.current = false;
+      setProductoGuardando(false);
     }
   };
 
   const ejecutarAjusteConteo = async (payload: ConteoFisicoDTO) => {
+    let resultado;
     try {
-      await inventarioService.procesarConteoFisico(payload);
-      mostrarToast('Conteo físico reconciliado correctamente');
-      cargarProductosPaginados();
-    } catch (err: unknown) {
-      const msg =
-        typeof err === 'string'
-          ? err
-          : (err as { message?: string })?.message || 'Error al aplicar el conteo físico';
-      setErrorModalMsg(msg);
-      throw err;
+      resultado = await inventarioService.procesarConteoFisico(payload);
+    } catch (error) {
+      notificar(
+        typeof error === 'string'
+          ? error
+          : error instanceof Error
+            ? error.message
+            : 'No se pudo guardar el conteo.',
+        'ERROR'
+      );
+      throw error;
     }
+    mostrarToast(
+      resultado?.sin_diferencias
+        ? 'Conteo verificado: sin diferencias de stock'
+        : 'Conteo físico reconciliado correctamente'
+    );
+    void cargarProductosPaginados();
   };
 
-  const ejecutarCambioEstado = async () => {
-    if (!confirmModal.id) return;
-    try {
-      if (confirmModal.accion === 'DESACTIVAR') {
-        await inventarioService.eliminarProducto(confirmModal.id);
-        mostrarToast(`Producto "${confirmModal.nombre}" dado de baja correctamente`);
-      } else {
-        await inventarioService.reactivarProducto(confirmModal.id);
-        mostrarToast(`Producto "${confirmModal.nombre}" reactivado correctamente`);
-      }
-      setConfirmModal({ abierto: false, id: null, nombre: '', accion: 'DESACTIVAR' });
-      cargarProductosPaginados();
-    } catch (err: unknown) {
-      setConfirmModal({ abierto: false, id: null, nombre: '', accion: 'DESACTIVAR' });
-      const msg =
-        typeof err === 'string'
-          ? err
-          : (err as { message?: string })?.message || 'Error al cambiar estado del producto';
-      setErrorModalMsg(msg);
+  const ejecutarCambioEstado = async (motivo: string) => {
+    if (!confirmModal.id || !esAdmin) throw new Error('No tienes permisos para cambiar el estado.');
+    if (confirmModal.accion === 'DESACTIVAR') {
+      await inventarioService.eliminarProducto(confirmModal.id, motivo);
+      mostrarToast(`Producto "${confirmModal.nombre}" dado de baja correctamente`);
+    } else {
+      await inventarioService.reactivarProducto(confirmModal.id, motivo);
+      mostrarToast(`Producto "${confirmModal.nombre}" reactivado correctamente`);
     }
+    setConfirmModal({ abierto: false, id: null, nombre: '', accion: 'DESACTIVAR' });
+    void cargarProductosPaginados();
   };
 
   const handleGuardarServicio = async (payload: CrearServicioDTO | ActualizarServicioDTO) => {
@@ -372,6 +427,7 @@ export const InventarioPage: React.FC = () => {
   };
 
   const handleIniciarToggleEstadoServicio = (s: ServicioDTO) => {
+    setErrorEstadoServicio('');
     setModalMotivoServicio({
       abierto: true,
       servicio: s,
@@ -407,361 +463,300 @@ export const InventarioPage: React.FC = () => {
         typeof err === 'string'
           ? err
           : (err as { message?: string })?.message || 'Error al cambiar estado del servicio';
+      setErrorEstadoServicio(msg);
       setErrorModalMsg(msg);
     }
   };
 
   return (
-    <div
-      style={{
-        flex: 1,
-        padding: '32px',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '20px',
-        height: '100%',
-        boxSizing: 'border-box',
-        overflow: 'hidden',
-        position: 'relative',
-      }}
-    >
-      {notificacion && (
-        <div
-          style={{
-            position: 'fixed',
-            bottom: '24px',
-            right: '24px',
-            backgroundColor: '#10B981',
-            color: '#FFFFFF',
-            padding: '12px 20px',
-            borderRadius: '10px',
-            boxShadow: '0 10px 25px rgba(0,0,0,0.5)',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '10px',
-            zIndex: 1200,
-            fontWeight: '600',
-          }}
-        >
-          <CheckCircle2 size={18} />
-          {notificacion}
-        </div>
-      )}
-
-      {errorModalMsg && (
-        <div
-          style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            width: '100vw',
-            height: '100vh',
-            backgroundColor: 'rgba(0,0,0,0.8)',
-            backdropFilter: 'blur(4px)',
-            display: 'flex',
-            justifyContent: 'center',
-            alignItems: 'center',
-            zIndex: 1300,
-          }}
-        >
-          <div
-            style={{
-              width: '420px',
-              backgroundColor: '#0F172A',
-              border: '1px solid #EF4444',
-              borderRadius: '16px',
-              padding: '24px',
-              boxShadow: '0 20px 40px rgba(239, 68, 68, 0.2)',
-              textAlign: 'center',
-            }}
-          >
-            <XCircle size={48} color="#EF4444" style={{ marginBottom: '12px' }} />
-            <h3
-              style={{ fontSize: '18px', fontWeight: '800', color: '#F8FAFC', margin: '0 0 8px 0' }}
-            >
-              Error en la Operación
-            </h3>
-            <p
-              style={{
-                color: '#CBD5E1',
-                fontSize: '14px',
-                lineHeight: '1.5',
-                marginBottom: '20px',
-              }}
-            >
-              {errorModalMsg}
-            </p>
-            <button
-              onClick={() => setErrorModalMsg(null)}
-              style={{
-                padding: '10px 24px',
-                backgroundColor: '#EF4444',
-                color: '#FFFFFF',
-                border: 'none',
-                borderRadius: '8px',
-                fontWeight: '700',
-                cursor: 'pointer',
-              }}
-            >
-              Entendido
-            </button>
-          </div>
-        </div>
-      )}
-
-      <InventarioHeader
-        esAdmin={esAdmin}
-        onAbrirModalCrear={abrirModalCrear}
-        onAbrirModalCompra={() => setModalCompraAbierto(true)}
-      />
-
-      {/* Selector de Pestañas */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div
-          style={{
-            display: 'flex',
-            gap: '8px',
-            backgroundColor: '#1E293B',
-            padding: '4px',
-            borderRadius: '10px',
-          }}
-        >
-          <button
-            onClick={() => setTabActiva('PRODUCTOS')}
-            style={{
-              padding: '8px 16px',
-              backgroundColor: tabActiva === 'PRODUCTOS' ? '#2563EB' : 'transparent',
-              color: tabActiva === 'PRODUCTOS' ? '#FFFFFF' : '#94A3B8',
-              border: 'none',
-              borderRadius: '8px',
-              fontWeight: '700',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              fontSize: '13px',
-            }}
-          >
-            <Package size={16} /> Productos
-          </button>
-          <button
-            onClick={() => setTabActiva('SERVICIOS')}
-            style={{
-              padding: '8px 16px',
-              backgroundColor: tabActiva === 'SERVICIOS' ? '#2563EB' : 'transparent',
-              color: tabActiva === 'SERVICIOS' ? '#FFFFFF' : '#94A3B8',
-              border: 'none',
-              borderRadius: '8px',
-              fontWeight: '700',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              fontSize: '13px',
-            }}
-          >
-            <Wrench size={16} /> Servicios de Taller
-          </button>
-        </div>
-
-        {esAdmin && (
-          <button
-            onClick={() => setModalHistorialEntradas(true)}
-            style={{
-              padding: '8px 14px',
-              backgroundColor: 'rgba(56, 189, 248, 0.15)',
-              border: '1px solid rgba(56, 189, 248, 0.3)',
-              color: '#38BDF8',
-              borderRadius: '8px',
-              fontWeight: '600',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              fontSize: '13px',
-            }}
-          >
-            <History size={16} /> Ver Historial Entradas / Compras
-          </button>
-        )}
-      </div>
-
-      {tabActiva === 'PRODUCTOS' ? (
-        <>
-          {esAdmin && (
-            <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-              <label
-                style={{
-                  fontSize: '13px',
-                  color: '#CBD5E1',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                }}
-              >
-                <input
-                  type="checkbox"
-                  checked={mostrarInactivos}
-                  onChange={(e) => {
-                    setMostrarInactivos(e.target.checked);
-                    setPaginaActual(1);
-                  }}
-                />
-                Mostrar Productos Inactivos / Dados de Baja
-              </label>
-            </div>
-          )}
-
-          <InventarioFiltros
-            busqueda={busqueda}
-            setBusqueda={(b) => {
-              setBusqueda(b);
-              setPaginaActual(1);
-            }}
-            filtroCritico={filtroCritico}
-            setFiltroCritico={(fc) => {
-              setFiltroCritico(fc);
-              setPaginaActual(1);
-            }}
-            onRefresh={cargarProductosPaginados}
-          />
-
-          <InventarioTabla
-            cargando={cargando}
-            productos={productos}
-            esAdmin={esAdmin}
-            paginaActual={paginaActual}
-            totalPaginas={totalPaginas}
-            totalRegistros={totalRegistros}
-            onCambiarPagina={(n) => setPaginaActual(n)}
-            onVer={abrirModalVer}
-            onDespachar={(p: Producto) =>
-              setModalDespacho({ abierto: true, producto: p, cantidad: 1, motivo: '' })
-            }
-            onAjustar={(p: Producto) => setModalAjuste({ abierto: true, producto: p })}
-            onVerKardex={(p: Producto) => setModalKardex({ abierto: true, producto: p })}
-            onEditar={abrirModalEditar}
-            onEliminar={(id: number, nombre: string, activo: boolean) =>
-              setConfirmModal({
-                abierto: true,
-                id,
-                nombre,
-                accion: activo ? 'DESACTIVAR' : 'REACTIVAR',
-              })
-            }
-          />
-        </>
-      ) : (
-        <ServiciosTabla
-          cargando={cargando}
-          servicios={servicios}
+    <AvisosInventarioContext.Provider value={notificar}>
+      <div className="inventario-page">
+        <AvisoInventarioVisible aviso={aviso} onCerrar={cerrar} />
+        <InventarioHeader
           esAdmin={esAdmin}
-          onEditar={(s: ServicioDTO) => {
-            setServicioAEditar(s);
-            setModalServicioAbierto(true);
-          }}
-          onToggleEstado={handleIniciarToggleEstadoServicio}
+          seccion={tabActiva}
           onNuevoServicio={() => {
             setServicioAEditar(null);
             setModalServicioAbierto(true);
           }}
+          onAbrirModalCrear={abrirModalCrear}
+          onAbrirModalCompra={() => setModalCompraAbierto(true)}
         />
-      )}
 
-      {/* Modales */}
-      <ModalMotivoEstadoServicio
-        abierto={modalMotivoServicio.abierto}
-        servicio={modalMotivoServicio.servicio}
-        motivo={modalMotivoServicio.motivo}
-        setMotivo={(mot) => setModalMotivoServicio({ ...modalMotivoServicio, motivo: mot })}
-        onClose={() => setModalMotivoServicio({ abierto: false, servicio: null, motivo: '' })}
-        onSubmit={handleConfirmarToggleEstadoServicio}
-      />
+        <nav className="inv-tabs" aria-label="Secciones de inventario">
+          <button
+            className={tabActiva === 'PRODUCTOS' ? 'is-active' : ''}
+            aria-current={tabActiva === 'PRODUCTOS' ? 'page' : undefined}
+            onClick={() => setTabActiva('PRODUCTOS')}
+          >
+            <Package size={17} />
+            Productos
+          </button>
+          <button
+            className={tabActiva === 'SERVICIOS' ? 'is-active' : ''}
+            aria-current={tabActiva === 'SERVICIOS' ? 'page' : undefined}
+            onClick={() => setTabActiva('SERVICIOS')}
+          >
+            <Wrench size={17} />
+            Servicios de Taller
+          </button>
+          {esAdmin && (
+            <button
+              className={tabActiva === 'ENTRADAS' ? 'is-active' : ''}
+              aria-current={tabActiva === 'ENTRADAS' ? 'page' : undefined}
+              onClick={() => setTabActiva('ENTRADAS')}
+            >
+              <History size={17} />
+              Entradas / Compras
+            </button>
+          )}
+        </nav>
 
-      <InventarioModal
-        modalAbierto={modalAbierto}
-        setModalAbierto={setModalAbierto}
-        modo={modoModal}
-        prodForm={prodForm}
-        setProdForm={setProdForm}
-        categorias={categorias}
-        handleGuardar={handleGuardarProducto}
-      />
+        {tabActiva === 'PRODUCTOS' ? (
+          <>
+            {datosDesactualizados && (
+              <p role="status" style={{ color: '#FBBF24' }}>
+                No se pudieron actualizar los datos. Se conserva la última consulta.{' '}
+                <button onClick={() => void cargarProductosPaginados()}>Reintentar consulta</button>
+              </p>
+            )}
+            <section className="inv-filter-panel" aria-label="Filtros de productos">
+              <div className="inv-filter-fields">
+                <label>
+                  Categoría{' '}
+                  <select
+                    style={{
+                      background: '#0F172A',
+                      color: '#CBD5E1',
+                      border: '1px solid #334155',
+                      borderRadius: 8,
+                      padding: 8,
+                      marginLeft: 8,
+                    }}
+                    aria-label="Categoría"
+                    value={categoriaFiltro}
+                    onChange={(e) => {
+                      setCategoriaFiltro(e.target.value);
+                      setPaginaActual(1);
+                    }}
+                  >
+                    {['TODOS', 'ACEITE', 'FILTRO', 'ADITIVO', 'GRANEL', 'OTRO'].map((c) => (
+                      <option key={c} value={c}>
+                        {c === 'TODOS' ? 'Todas' : c}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  Stock{' '}
+                  <select
+                    style={{
+                      background: '#0F172A',
+                      color: '#CBD5E1',
+                      border: '1px solid #334155',
+                      borderRadius: 8,
+                      padding: 8,
+                      marginLeft: 8,
+                    }}
+                    aria-label="Stock"
+                    value={stockFiltro}
+                    onChange={(e) => {
+                      setStockFiltro(e.target.value);
+                      setFiltroCritico(false);
+                      setPaginaActual(1);
+                    }}
+                  >
+                    <option value="TODOS">Todos</option>
+                    <option value="SIN_STOCK">Sin stock</option>
+                    <option value="CRITICO">Crítico</option>
+                    <option value="DISPONIBLE">Disponible</option>
+                  </select>
+                </label>
+                {esAdmin && (
+                  <label>
+                    Estado{' '}
+                    <select
+                      style={{
+                        background: '#0F172A',
+                        color: '#CBD5E1',
+                        border: '1px solid #334155',
+                        borderRadius: 8,
+                        padding: 8,
+                        marginLeft: 8,
+                      }}
+                      aria-label="Estado del producto"
+                      value={estadoFiltro}
+                      onChange={(e) => {
+                        setEstadoFiltro(e.target.value);
+                        setMostrarInactivos(e.target.value !== 'ACTIVO');
+                        setPaginaActual(1);
+                      }}
+                    >
+                      <option value="ACTIVO">Activos</option>
+                      <option value="INACTIVO">Inactivos</option>
+                      <option value="TODOS">Todos</option>
+                    </select>
+                  </label>
+                )}
+              </div>
 
-      <ModalDespacho
-        abierto={modalDespacho.abierto}
-        producto={modalDespacho.producto}
-        cantidad={modalDespacho.cantidad}
-        setCantidad={(cant) => setModalDespacho({ ...modalDespacho, cantidad: cant })}
-        motivo={modalDespacho.motivo}
-        setMotivo={(mot) => setModalDespacho({ ...modalDespacho, motivo: mot })}
-        onClose={() =>
-          setModalDespacho({ abierto: false, producto: null, cantidad: 1, motivo: '' })
-        }
-        onSubmit={ejecutarDespacho}
-        loading={despachando}
-      />
+              <InventarioFiltros
+                busqueda={busqueda}
+                setBusqueda={(b) => {
+                  setBusqueda(b);
+                  setPaginaActual(1);
+                }}
+                filtroCritico={filtroCritico || stockFiltro === 'CRITICO'}
+                setFiltroCritico={(fc) => {
+                  setFiltroCritico(fc);
+                  setStockFiltro('TODOS');
+                  setPaginaActual(1);
+                }}
+                onRefresh={cargarProductosPaginados}
+              />
+            </section>
 
-      <ModalAjusteStock
-        abierto={modalAjuste.abierto}
-        producto={modalAjuste.producto}
-        onClose={() => setModalAjuste({ abierto: false, producto: null })}
-        onSubmit={ejecutarAjusteConteo}
-      />
+            <InventarioTabla
+              cargando={cargando}
+              productos={productos}
+              esAdmin={esAdmin}
+              paginaActual={paginaActual}
+              totalPaginas={totalPaginas}
+              totalRegistros={totalRegistros}
+              busqueda={busqueda}
+              esVistaCriticos={filtroCritico || stockFiltro === 'CRITICO'}
+              onCambiarPagina={(n) => setPaginaActual(n)}
+              onVer={abrirModalVer}
+              onAjustar={(p: Producto) => setModalAjuste({ abierto: true, producto: p })}
+              onVerKardex={(p: Producto) => setModalKardex({ abierto: true, producto: p })}
+              onEditar={abrirModalEditar}
+              onEliminar={(id: number, nombre: string, activo: boolean) =>
+                setConfirmModal({
+                  abierto: true,
+                  id,
+                  nombre,
+                  accion: activo ? 'DESACTIVAR' : 'REACTIVAR',
+                })
+              }
+            />
+          </>
+        ) : tabActiva === 'SERVICIOS' ? (
+          <>
+            <div className="inv-search inv-service-search">
+              <Search size={17} />
+              <input
+                aria-label="Buscar servicios"
+                placeholder="Buscar servicio por nombre o código"
+                value={busquedaServicios}
+                onChange={(e) => setBusquedaServicios(e.target.value)}
+              />
+            </div>
+            <ServiciosTabla
+              cargando={cargando}
+              servicios={servicios.filter((s) =>
+                `${s.codigo} ${s.nombre}`
+                  .toLocaleLowerCase()
+                  .includes(busquedaServicios.trim().toLocaleLowerCase())
+              )}
+              esAdmin={esAdmin}
+              onEditar={(s: ServicioDTO) => {
+                setServicioAEditar(s);
+                setModalServicioAbierto(true);
+              }}
+              onToggleEstado={handleIniciarToggleEstadoServicio}
+              onNuevoServicio={() => {
+                setServicioAEditar(null);
+                setModalServicioAbierto(true);
+              }}
+            />
+          </>
+        ) : esAdmin ? (
+          <ModalHistorialEntradas
+            abierto
+            integrado
+            onClose={() => setTabActiva('PRODUCTOS')}
+            onError={setErrorModalMsg}
+            onActualizado={cargarProductosPaginados}
+          />
+        ) : null}
 
-      <ModalKardex
-        abierto={modalKardex.abierto}
-        producto={modalKardex.producto}
-        onClose={() => setModalKardex({ abierto: false, producto: null })}
-      />
+        {/* Modales */}
+        <ModalMotivoEstadoServicio
+          abierto={modalMotivoServicio.abierto}
+          servicio={modalMotivoServicio.servicio}
+          motivo={modalMotivoServicio.motivo}
+          error={errorEstadoServicio}
+          setMotivo={(mot) => setModalMotivoServicio({ ...modalMotivoServicio, motivo: mot })}
+          onClose={() => setModalMotivoServicio({ abierto: false, servicio: null, motivo: '' })}
+          onSubmit={handleConfirmarToggleEstadoServicio}
+        />
 
-      <ModalRegistroCompra
-        abierto={modalCompraAbierto}
-        productos={productos}
-        onClose={() => setModalCompraAbierto(false)}
-        onCompraExitosa={() => {
-          mostrarToast('Compra e ingreso de stock registrados con éxito');
-          cargarProductosPaginados();
-        }}
-        onError={(msg) => setErrorModalMsg(msg)}
-      />
+        <InventarioModal
+          modalAbierto={modalAbierto}
+          setModalAbierto={setModalAbierto}
+          modo={modoModal}
+          prodForm={prodForm}
+          setProdForm={setProdForm}
+          categorias={categorias}
+          handleGuardar={handleGuardarProducto}
+          guardando={productoGuardando}
+          error={errorProducto}
+        />
 
-      <ModalServicio
-        abierto={modalServicioAbierto}
-        servicioAEditar={servicioAEditar}
-        onClose={() => {
-          setModalServicioAbierto(false);
-          setServicioAEditar(null);
-        }}
-        onGuardar={handleGuardarServicio}
-      />
+        <ModalAjusteStock
+          abierto={modalAjuste.abierto}
+          producto={modalAjuste.producto}
+          onClose={() => setModalAjuste({ abierto: false, producto: null })}
+          onSubmit={ejecutarAjusteConteo}
+        />
 
-      <ModalHistorialEntradas
-        abierto={modalHistorialEntradas}
-        onClose={() => setModalHistorialEntradas(false)}
-        onError={(msg) => setErrorModalMsg(msg)}
-        onActualizado={() => {
-          mostrarToast('Entrada anulada correctamente');
-          cargarProductosPaginados();
-        }}
-      />
+        <ModalKardex
+          abierto={modalKardex.abierto}
+          producto={modalKardex.producto}
+          onClose={() => setModalKardex({ abierto: false, producto: null })}
+        />
 
-      <ConfirmModal
-        abierto={confirmModal.abierto}
-        titulo={
-          confirmModal.accion === 'DESACTIVAR' ? 'Dar de Baja Producto' : 'Reactivar Producto'
-        }
-        mensaje={
-          confirmModal.accion === 'DESACTIVAR'
-            ? `¿Estás seguro de que deseas desactivar "${confirmModal.nombre}"? Se conservará su historial de Kardex.`
-            : `¿Deseas volver a activar "${confirmModal.nombre}" en el catálogo principal?`
-        }
-        onConfirmar={ejecutarCambioEstado}
-        onCancelar={() =>
-          setConfirmModal({ abierto: false, id: null, nombre: '', accion: 'DESACTIVAR' })
-        }
-      />
-    </div>
+        <ModalRegistroCompra
+          abierto={modalCompraAbierto}
+          productos={productos}
+          onClose={() => setModalCompraAbierto(false)}
+          onCompraExitosa={() => {
+            mostrarToast('Compra e ingreso de stock registrados con éxito');
+            cargarProductosPaginados();
+          }}
+          onError={(msg) => setErrorModalMsg(msg)}
+        />
+
+        <ModalServicio
+          abierto={modalServicioAbierto}
+          servicioAEditar={servicioAEditar}
+          onClose={() => {
+            setModalServicioAbierto(false);
+            setServicioAEditar(null);
+          }}
+          onGuardar={handleGuardarServicio}
+        />
+
+        <ModalHistorialEntradas
+          abierto={modalHistorialEntradas}
+          onClose={() => setModalHistorialEntradas(false)}
+          onError={(msg) => setErrorModalMsg(msg)}
+          onActualizado={() => {
+            mostrarToast('Entrada anulada correctamente');
+            cargarProductosPaginados();
+          }}
+        />
+
+        <ModalMotivoEstadoProducto
+          abierto={confirmModal.abierto}
+          nombre={confirmModal.nombre}
+          accion={confirmModal.accion}
+          onConfirmar={ejecutarCambioEstado}
+          onCancelar={() =>
+            setConfirmModal({ abierto: false, id: null, nombre: '', accion: 'DESACTIVAR' })
+          }
+        />
+      </div>
+    </AvisosInventarioContext.Provider>
   );
 };

@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 pub struct DetalleIngresoRequestDto {
     pub id_producto: i64,
     pub cantidad: i64,             // En UND o ML
-    pub costo_efectivo_micro: i64, // Micro-soles por unidad/ML
+    pub costo_efectivo_micro: i64, // Micro-soles por UND o litro (captura comercial de dos decimales)
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
