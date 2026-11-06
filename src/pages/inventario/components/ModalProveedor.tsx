@@ -7,7 +7,8 @@ interface ModalProveedorProps {
   abierto: boolean;
   proveedorAEditar?: ProveedorDTO | null;
   onClose: () => void;
-  onGuardar: (proveedor: CrearProveedorDTO | ActualizarProveedorDTO) => Promise<void>;
+  onGuardar: (proveedor: CrearProveedorDTO) => Promise<void>;
+  onEditar?: (proveedor: ActualizarProveedorDTO) => Promise<void>;
 }
 
 export const ModalProveedor: React.FC<ModalProveedorProps> = ({
@@ -15,6 +16,7 @@ export const ModalProveedor: React.FC<ModalProveedorProps> = ({
   proveedorAEditar,
   onClose,
   onGuardar,
+  onEditar,
 }) => {
   const [form, setForm] = useState<CrearProveedorDTO>({
     tipo_documento: 'RUC',
@@ -60,18 +62,28 @@ export const ModalProveedor: React.FC<ModalProveedorProps> = ({
     setErrorModal(null);
     try {
       setGuardando(true);
-      if (proveedorAEditar) {
-        await onGuardar({
+      if (proveedorAEditar && onEditar) {
+        await onEditar({
           ...form,
           id_proveedor: proveedorAEditar.id_proveedor,
+          tipo_documento: form.tipo_documento.trim().toUpperCase(),
           numero_documento: form.numero_documento.trim(),
           nombre_razon_social: form.nombre_razon_social.trim(),
+          telefono: form.telefono?.trim() || null,
+          correo: form.correo?.trim() || null,
+          direccion: form.direccion?.trim() || null,
+          contacto_asesor: form.contacto_asesor?.trim() || null,
         } as ActualizarProveedorDTO);
       } else {
         await onGuardar({
           ...form,
+          tipo_documento: form.tipo_documento.trim().toUpperCase(),
           numero_documento: form.numero_documento.trim(),
           nombre_razon_social: form.nombre_razon_social.trim(),
+          telefono: form.telefono?.trim() || null,
+          correo: form.correo?.trim() || null,
+          direccion: form.direccion?.trim() || null,
+          contacto_asesor: form.contacto_asesor?.trim() || null,
         });
       }
       onClose();
@@ -234,6 +246,47 @@ export const ModalProveedor: React.FC<ModalProveedorProps> = ({
                 type="text"
                 value={form.contacto_asesor || ''}
                 onChange={(e) => setForm({ ...form, contacto_asesor: e.target.value })}
+                style={modalInputStyle}
+              />
+            </div>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+            <div>
+              <label
+                style={{
+                  display: 'block',
+                  fontSize: '11px',
+                  color: '#94A3B8',
+                  marginBottom: '4px',
+                }}
+              >
+                Correo Electrónico
+              </label>
+              <input
+                type="email"
+                placeholder="contacto@proveedor.com"
+                value={form.correo || ''}
+                onChange={(e) => setForm({ ...form, correo: e.target.value })}
+                style={modalInputStyle}
+              />
+            </div>
+            <div>
+              <label
+                style={{
+                  display: 'block',
+                  fontSize: '11px',
+                  color: '#94A3B8',
+                  marginBottom: '4px',
+                }}
+              >
+                Dirección Fiscal
+              </label>
+              <input
+                type="text"
+                placeholder="Av. Industrial 123"
+                value={form.direccion || ''}
+                onChange={(e) => setForm({ ...form, direccion: e.target.value })}
                 style={modalInputStyle}
               />
             </div>

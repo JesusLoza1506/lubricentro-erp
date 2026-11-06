@@ -73,7 +73,7 @@ impl ProductoAdminDto {
     }
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CrearProductoDto {
     pub codigo: String,
     pub nombre: String,
@@ -87,7 +87,7 @@ pub struct CrearProductoDto {
     pub referencia_inicial: Option<String>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ActualizarProductoDto {
     pub id_producto: i64,
     pub nombre: String,
@@ -96,7 +96,7 @@ pub struct ActualizarProductoDto {
     pub precio_venta_cent: i64,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AjustarStockDto {
     pub id_producto: i64,
     pub tipo_ajuste: String,               // "ENTRADA" | "SALIDA"
@@ -105,7 +105,7 @@ pub struct AjustarStockDto {
     pub motivo: String,                    // Obligatorio de 5 a 250 caracteres
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ConteoFisicoDto {
     pub id_producto: i64,
     pub stock_fisico_contado: f64, // En unidades o litros según el caso

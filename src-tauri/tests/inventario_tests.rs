@@ -62,7 +62,7 @@ mod tests {
         let id_u = setup_usuario_admin(&conn);
 
         let id_prov = InventarioService::crear_proveedor(
-            &conn,
+            &mut conn,
             CrearProveedorDto {
                 tipo_documento: "RUC".to_string(),
                 numero_documento: "20100070970".to_string(),
@@ -72,6 +72,7 @@ mod tests {
                 direccion: None,
                 contacto_asesor: None,
             },
+            id_u,
         )
         .unwrap();
 
@@ -108,17 +109,84 @@ mod tests {
             }],
         };
 
-        // Primer intento exitoso
-        let res1 = InventarioService::registrar_ingreso_compra(&mut conn, req_compra.clone(), id_u);
+        // Primer intento exitoso sin id_operacion explicito
+        let res1 =
+            InventarioService::registrar_ingreso_compra(&mut conn, req_compra.clone(), None, id_u);
         assert!(res1.is_ok());
 
-        // Segundo intento duplicado (mismo proveedor, tipo y número de documento) debe fallar por idempotencia
-        let res2 = InventarioService::registrar_ingreso_compra(&mut conn, req_compra, id_u);
+        // Segundo intento duplicado (mismo proveedor, tipo y número de documento) debe fallar por validación de negocio
+        let res2 = InventarioService::registrar_ingreso_compra(&mut conn, req_compra, None, id_u);
         assert!(res2.is_err());
         assert!(res2
             .unwrap_err()
             .to_string()
             .contains("Ya existe un ingreso registrado"));
+    }
+
+    #[test]
+    fn test_idempotencia_con_id_operacion_y_reintento_transaccional() {
+        let dir = tempdir().unwrap();
+        let mut conn = init_db(dir.path().to_path_buf()).unwrap();
+        let id_u = setup_usuario_admin(&conn);
+
+        let id_prod = InventarioService::registrar_producto(
+            &mut conn,
+            CrearProductoDto {
+                codigo: "PROD-IDEMP-SHA".to_string(),
+                nombre: "Producto Idempotencia SHA Test".to_string(),
+                descripcion: None,
+                categoria: "FILTRO".to_string(),
+                unidad_medida: "UND".to_string(),
+                stock_minimo: 1,
+                precio_venta_cent: 1500,
+                cantidad_inicial: Some(10.0),
+                costo_unitario_inicial_micro: Some(5_000_000),
+                referencia_inicial: Some("REF-IDEMP-01".to_string()),
+            },
+            id_u,
+        )
+        .unwrap();
+
+        let op_id = "op-test-idempotencia-1234567890";
+        let adj_dto = AjustarStockDto {
+            id_producto: id_prod,
+            tipo_ajuste: "ENTRADA".to_string(),
+            cantidad: 5,
+            costo_unitario_micro: Some(5_000_000),
+            motivo: "Ajuste por lote verificado".to_string(),
+        };
+
+        // 1. Ejecución inicial exitosa
+        let res1 = InventarioService::ajustar_stock(&mut conn, adj_dto.clone(), Some(op_id), id_u)
+            .unwrap();
+        assert_eq!(res1["status"], "OK");
+        assert_eq!(res1["stock_resultante"], 15);
+
+        // 2. Reintento con la misma id_operacion y mismo payload: debe devolver la respuesta original sin alterar stock
+        let res2 = InventarioService::ajustar_stock(&mut conn, adj_dto.clone(), Some(op_id), id_u)
+            .unwrap();
+        assert_eq!(res2["status"], "OK");
+        assert_eq!(res2["stock_resultante"], 15);
+
+        let stock_actual: i64 = conn
+            .query_row(
+                "SELECT stock_actual FROM productos WHERE id_producto = ?1",
+                [id_prod],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(stock_actual, 15);
+
+        // 3. Intento con la misma id_operacion pero payload distinto: debe rechazar por conflicto de SHA-256
+        let mut adj_modificado = adj_dto.clone();
+        adj_modificado.cantidad = 10;
+        let res_conflicto =
+            InventarioService::ajustar_stock(&mut conn, adj_modificado, Some(op_id), id_u);
+        assert!(res_conflicto.is_err());
+        assert!(res_conflicto
+            .unwrap_err()
+            .to_string()
+            .contains("Conflicto de Idempotencia"));
     }
 
     #[test]
@@ -176,6 +244,54 @@ mod tests {
     }
 
     #[test]
+    fn test_fase2_rechazo_costo_cero_y_precision_granel() {
+        let dir = tempdir().unwrap();
+        let mut conn = init_db(dir.path().to_path_buf()).unwrap();
+        let id_u = setup_usuario_admin(&conn);
+
+        // 1. Rechazo de costo cero en stock inicial
+        let req_costo_cero = CrearProductoDto {
+            codigo: "VALVOLINE-00".to_string(),
+            nombre: "Aceite Costo Cero Invalido".to_string(),
+            descripcion: None,
+            categoria: "ACEITE".to_string(),
+            unidad_medida: "UND".to_string(),
+            stock_minimo: 3,
+            precio_venta_cent: 4000,
+            cantidad_inicial: Some(5.0),
+            costo_unitario_inicial_micro: Some(0), // Costo cero no permitido
+            referencia_inicial: Some("REF-ZERO".to_string()),
+        };
+        let res_costo_cero = InventarioService::registrar_producto(&mut conn, req_costo_cero, id_u);
+        assert!(res_costo_cero.is_err());
+        assert!(res_costo_cero
+            .unwrap_err()
+            .to_string()
+            .contains("costo cero no permitido"));
+
+        // 2. Rechazo de más de 3 decimales en Granel
+        let req_granel_exceso_decimales = CrearProductoDto {
+            codigo: "GRANEL-DEC".to_string(),
+            nombre: "Aceite Granel Exceso Decimales".to_string(),
+            descripcion: None,
+            categoria: "GRANEL".to_string(),
+            unidad_medida: "ML".to_string(),
+            stock_minimo: 1000,
+            precio_venta_cent: 50,
+            cantidad_inicial: Some(4.5009), // 4 decimales no permitido
+            costo_unitario_inicial_micro: Some(15_000),
+            referencia_inicial: Some("REF-GRANEL-DEC".to_string()),
+        };
+        let res_dec =
+            InventarioService::registrar_producto(&mut conn, req_granel_exceso_decimales, id_u);
+        assert!(res_dec.is_err());
+        assert!(res_dec
+            .unwrap_err()
+            .to_string()
+            .contains("máximo de 3 decimales"));
+    }
+
+    #[test]
     fn test_alta_producto_con_stock_inicial_atomico() {
         let dir = tempdir().unwrap();
         let mut conn = init_db(dir.path().to_path_buf()).unwrap();
@@ -226,7 +342,7 @@ mod tests {
         let id_u = setup_usuario_admin(&conn);
 
         let id_prov = InventarioService::crear_proveedor(
-            &conn,
+            &mut conn,
             CrearProveedorDto {
                 tipo_documento: "RUC".to_string(),
                 numero_documento: "20100070970".to_string(),
@@ -236,6 +352,7 @@ mod tests {
                 direccion: None,
                 contacto_asesor: None,
             },
+            id_u,
         )
         .unwrap();
 
@@ -272,8 +389,10 @@ mod tests {
             }],
         };
 
-        let id_ingreso =
-            InventarioService::registrar_ingreso_compra(&mut conn, req_compra_sd, id_u).unwrap();
+        let res_compra =
+            InventarioService::registrar_ingreso_compra(&mut conn, req_compra_sd, None, id_u)
+                .unwrap();
+        let id_ingreso = res_compra["id_ingreso"].as_i64().unwrap();
         assert!(id_ingreso > 0);
 
         let (stock, valor): (i64, i64) = conn
@@ -295,7 +414,7 @@ mod tests {
         let id_u = setup_usuario_admin(&conn);
 
         let id_prov = InventarioService::crear_proveedor(
-            &conn,
+            &mut conn,
             CrearProveedorDto {
                 tipo_documento: "RUC".to_string(),
                 numero_documento: "20100070970".to_string(),
@@ -305,6 +424,7 @@ mod tests {
                 direccion: None,
                 contacto_asesor: None,
             },
+            id_u,
         )
         .unwrap();
 
@@ -326,7 +446,7 @@ mod tests {
         )
         .unwrap();
 
-        let id_ingreso = InventarioService::registrar_ingreso_compra(
+        let res_compra = InventarioService::registrar_ingreso_compra(
             &mut conn,
             RegistrarIngresoDto {
                 origen: "COMPRA".to_string(),
@@ -342,9 +462,12 @@ mod tests {
                     costo_efectivo_micro: 18_000_000,
                 }],
             },
+            None,
             id_u,
         )
         .unwrap();
+
+        let id_ingreso = res_compra["id_ingreso"].as_i64().unwrap();
 
         let adj_salida = AjustarStockDto {
             id_producto: id_prod,
@@ -353,7 +476,7 @@ mod tests {
             costo_unitario_micro: None,
             motivo: "Despacho manual de muestra".to_string(),
         };
-        InventarioService::ajustar_stock(&mut conn, adj_salida, id_u).unwrap();
+        InventarioService::ajustar_stock(&mut conn, adj_salida, None, id_u).unwrap();
 
         let res_anulacion_fallida = InventarioService::anular_ingreso_compra(
             &mut conn,
@@ -361,6 +484,7 @@ mod tests {
                 id_ingreso,
                 motivo: "Anulación por error en la factura ingresada".to_string(),
             },
+            None,
             id_u,
         );
 
@@ -419,6 +543,7 @@ mod tests {
                 costo_unitario_micro: None,
                 motivo: "Ajuste intermedio por otro usuario".to_string(),
             },
+            None,
             id_u,
         )
         .unwrap();
@@ -432,6 +557,7 @@ mod tests {
                 costo_unitario_micro: None,
                 motivo: "Conteo de inventario nocturno".to_string(),
             },
+            None,
             id_u,
         );
 
@@ -495,10 +621,11 @@ mod tests {
     #[test]
     fn test_crud_proveedores_y_validacion_ruc() {
         let dir = tempdir().unwrap();
-        let conn = init_db(dir.path().to_path_buf()).unwrap();
+        let mut conn = init_db(dir.path().to_path_buf()).unwrap();
+        let id_u = setup_usuario_admin(&conn);
 
         let res_ruc_malo = InventarioService::crear_proveedor(
-            &conn,
+            &mut conn,
             CrearProveedorDto {
                 tipo_documento: "RUC".to_string(),
                 numero_documento: "20100070979".to_string(),
@@ -508,11 +635,12 @@ mod tests {
                 direccion: None,
                 contacto_asesor: None,
             },
+            id_u,
         );
         assert!(res_ruc_malo.is_err());
 
         let id_prov = InventarioService::crear_proveedor(
-            &conn,
+            &mut conn,
             CrearProveedorDto {
                 tipo_documento: "RUC".to_string(),
                 numero_documento: "20100070970".to_string(),
@@ -522,11 +650,12 @@ mod tests {
                 direccion: None,
                 contacto_asesor: None,
             },
+            id_u,
         )
         .unwrap();
 
         let update_res = InventarioService::actualizar_proveedor(
-            &conn,
+            &mut conn,
             ActualizarProveedorDto {
                 id_proveedor: id_prov,
                 tipo_documento: "RUC".to_string(),
@@ -537,6 +666,7 @@ mod tests {
                 direccion: Some("Av. Industrial 123".to_string()),
                 contacto_asesor: Some("Juan Pérez".to_string()),
             },
+            id_u,
         );
         assert!(update_res.is_ok());
     }
@@ -573,9 +703,22 @@ mod tests {
         )
         .unwrap();
 
-        assert!(
-            InventarioService::cambiar_estado_servicio(&mut conn, id_serv, false, id_u).is_ok()
-        );
-        assert!(InventarioService::cambiar_estado_servicio(&mut conn, id_serv, true, id_u).is_ok());
+        assert!(InventarioService::cambiar_estado_servicio(
+            &mut conn,
+            id_serv,
+            false,
+            "Desactivación temporal por mantenimiento de catálogo",
+            id_u
+        )
+        .is_ok());
+
+        assert!(InventarioService::cambiar_estado_servicio(
+            &mut conn,
+            id_serv,
+            true,
+            "Reactivación de servicio para atención al público",
+            id_u
+        )
+        .is_ok());
     }
 }

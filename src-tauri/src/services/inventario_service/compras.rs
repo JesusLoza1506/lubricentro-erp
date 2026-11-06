@@ -1,17 +1,19 @@
-use super::{obtener_fecha_lima, InventarioService};
+use super::{idempotencia::IdempotenciaService, obtener_fecha_lima, InventarioService};
 use crate::dto::ingreso_dto::{
     AnularIngresoDto, DetalleIngresoResponseDto, IngresoStockResponseDto, RegistrarIngresoDto,
 };
 use crate::errors::AppError;
 use crate::services::auditoria_service::AuditoriaService;
 use rusqlite::{params, Connection};
+use serde_json::Value;
 
 impl InventarioService {
     pub fn registrar_ingreso_compra(
         conn: &mut Connection,
         req: RegistrarIngresoDto,
+        id_operacion: Option<&str>,
         id_usuario: i64,
-    ) -> Result<i64, AppError> {
+    ) -> Result<Value, AppError> {
         if req.detalles.is_empty() || req.detalles.len() > 100 {
             return Err(AppError::Validation(
                 "El ingreso debe contener entre 1 y 100 productos.".to_string(),
@@ -22,9 +24,7 @@ impl InventarioService {
             .id_proveedor
             .ok_or_else(|| AppError::Validation("Proveedor requerido para compras.".to_string()))?;
 
-        let tipo_doc_raw = req
-            .tipo_documento
-            .unwrap_or_else(|| "SIN_DOCUMENTO".to_string());
+        let tipo_doc_raw = req.tipo_documento.as_deref().unwrap_or("SIN_DOCUMENTO");
         let tipo_doc = tipo_doc_raw.trim().to_uppercase();
 
         let now_lima = obtener_fecha_lima();
@@ -33,11 +33,13 @@ impl InventarioService {
             format!("SD-{}", now_lima.format("%Y%m%d-%H%M%S"))
         } else {
             req.numero_documento
+                .as_deref()
                 .filter(|s| !s.trim().is_empty())
                 .ok_or_else(|| AppError::Validation("Número de documento requerido.".to_string()))?
+                .to_string()
         };
 
-        // Verificación de idempotencia
+        // Verificación de duplicado en negocio por documento
         if tipo_doc != "SIN_DOCUMENTO" {
             let existe_compra: i64 = conn.query_row(
                 "SELECT COUNT(*) FROM ingresos_stock WHERE id_proveedor = ?1 AND tipo_documento = ?2 AND numero_documento = ?3 AND estado != 'ANULADO'",
@@ -57,11 +59,26 @@ impl InventarioService {
             now_lima.format("%Y-%m-%d").to_string()
         } else {
             req.fecha_documento
+                .as_deref()
                 .filter(|s| !s.trim().is_empty())
                 .ok_or_else(|| AppError::Validation("Fecha de documento requerida.".to_string()))?
+                .to_string()
         };
 
+        // INICIO DE LA TRANSACCIÓN ÚNICA Y ATÓMICA
         let tx = conn.transaction()?;
+
+        // Idempotencia Atómica
+        if let Some(resultado_previo) = IdempotenciaService::evaluar_y_registrar(
+            &tx,
+            id_operacion,
+            "REGISTRAR_COMPRA",
+            &req,
+            id_usuario,
+        )? {
+            tx.commit()?;
+            return Ok(resultado_previo);
+        }
 
         let prov_snapshot: String = tx.query_row(
             "SELECT json_object('id_proveedor', id_proveedor, 'tipo_documento', tipo_documento, 'numero_documento', numero_documento, 'nombre_razon_social', nombre_razon_social)
@@ -70,9 +87,62 @@ impl InventarioService {
             |r| r.get(0),
         ).map_err(|_| AppError::NotFound("Proveedor no encontrado.".to_string()))?;
 
+        // Precalculamos aportes considerando UND vs ML y validaciones estrictas
+        let mut detalles_calculados = Vec::new();
         let mut total_costo_micro = 0i64;
+
         for d in &req.detalles {
-            total_costo_micro += d.cantidad * d.costo_efectivo_micro;
+            if d.cantidad <= 0 {
+                return Err(AppError::Validation(format!(
+                    "La cantidad del producto ID {} debe ser mayor a cero.",
+                    d.id_producto
+                )));
+            }
+
+            if d.costo_efectivo_micro <= 0 {
+                return Err(AppError::Validation(format!(
+                    "El costo unitario del producto ID {} debe ser mayor a cero (costo cero no permitido).",
+                    d.id_producto
+                )));
+            }
+
+            let (cod_prod, nom_prod, un_prod, stock_ant, val_ant_micro): (String, String, String, i64, i64) = tx.query_row(
+                "SELECT codigo, nombre, unidad_medida, stock_actual, valor_stock_micro FROM productos WHERE id_producto = ?1 AND activo = 1",
+                [d.id_producto],
+                |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?, r.get(4)?)),
+            ).map_err(|_| AppError::NotFound(format!("Producto ID {} no encontrado.", d.id_producto)))?;
+
+            let costo_efectivo_micro = (d.costo_efectivo_micro / 10_000) * 10_000;
+            if costo_efectivo_micro <= 0 {
+                return Err(AppError::Validation(format!(
+                    "El costo unitario redondeado del producto ID {} no es válido.",
+                    d.id_producto
+                )));
+            }
+
+            let (aporte_micro, costo_unitario_kardex) = if un_prod.to_uppercase() == "ML" {
+                let total =
+                    ((d.cantidad as i128 * costo_efectivo_micro as i128 + 500) / 1000) as i64;
+                let costo_k = (total / d.cantidad.max(1)).max(1);
+                (total, costo_k)
+            } else {
+                let total = d.cantidad * costo_efectivo_micro;
+                (total, costo_efectivo_micro)
+            };
+
+            total_costo_micro += aporte_micro;
+            detalles_calculados.push((
+                d.id_producto,
+                cod_prod,
+                nom_prod,
+                un_prod,
+                d.cantidad,
+                costo_efectivo_micro,
+                aporte_micro,
+                costo_unitario_kardex,
+                stock_ant,
+                val_ant_micro,
+            ));
         }
 
         let id_op = uuid::Uuid::new_v4().to_string();
@@ -85,34 +155,38 @@ impl InventarioService {
         )?;
         let id_ingreso = tx.last_insert_rowid();
 
-        for d in &req.detalles {
-            let (cod_prod, nom_prod, un_prod, stock_ant, val_ant_micro): (String, String, String, i64, i64) = tx.query_row(
-                "SELECT codigo, nombre, unidad_medida, stock_actual, valor_stock_micro FROM productos WHERE id_producto = ?1 AND activo = 1",
-                [d.id_producto],
-                |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?, r.get(4)?)),
-            ).map_err(|_| AppError::NotFound(format!("Producto ID {} no encontrado.", d.id_producto)))?;
-
-            let aporte_micro = d.cantidad * d.costo_efectivo_micro;
-
+        for (
+            id_prod,
+            cod_prod,
+            nom_prod,
+            un_prod,
+            cant,
+            costo_efectivo_micro,
+            aporte_micro,
+            costo_kardex,
+            stock_ant,
+            val_ant_micro,
+        ) in detalles_calculados
+        {
             tx.execute(
                 "INSERT INTO detalle_ingreso (id_ingreso, id_producto, codigo_snapshot, nombre_snapshot, unidad_medida, cantidad, costo_efectivo_micro, valor_aporte_micro)
                  VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
-                params![id_ingreso, d.id_producto, cod_prod, nom_prod, un_prod, d.cantidad, d.costo_efectivo_micro, aporte_micro],
+                params![id_ingreso, id_prod, cod_prod, nom_prod, un_prod, cant, costo_efectivo_micro, aporte_micro],
             )?;
             let id_det = tx.last_insert_rowid();
 
-            let stock_res = stock_ant + d.cantidad;
+            let stock_res = stock_ant + cant;
             let val_res_micro = val_ant_micro + aporte_micro;
 
             tx.execute(
                 "INSERT INTO movimientos_inventario (id_operacion, id_producto, id_usuario, tipo_movimiento, id_detalle_ingreso, unidad_medida, stock_anterior, diferencia, stock_resultante, valor_anterior_micro, valor_delta_micro, valor_resultante_micro, costo_unitario_micro)
                  VALUES (?1, ?2, ?3, 'COMPRA', ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)",
-                params![uuid::Uuid::new_v4().to_string(), d.id_producto, id_usuario, id_det, un_prod, stock_ant, d.cantidad, stock_res, val_ant_micro, aporte_micro, val_res_micro, d.costo_efectivo_micro],
+                params![uuid::Uuid::new_v4().to_string(), id_prod, id_usuario, id_det, un_prod, stock_ant, cant, stock_res, val_ant_micro, aporte_micro, val_res_micro, costo_kardex],
             )?;
 
             tx.execute(
                 "UPDATE productos SET stock_actual = ?1, valor_stock_micro = ?2, ultimo_costo_micro = ?3 WHERE id_producto = ?4",
-                params![stock_res, val_res_micro, d.costo_efectivo_micro, d.id_producto],
+                params![stock_res, val_res_micro, costo_kardex, id_prod],
             )?;
         }
 
@@ -152,8 +226,17 @@ impl InventarioService {
             "OK",
         )?;
 
+        let response_payload = serde_json::json!({
+            "id_ingreso": id_ingreso,
+            "codigo": cod_ingreso,
+            "total_costo_micro": total_costo_micro
+        });
+
+        // Finalizar Idempotencia en la transacción
+        IdempotenciaService::finalizar_solicitud(&tx, id_operacion, &response_payload)?;
+
         tx.commit()?;
-        Ok(id_ingreso)
+        Ok(response_payload)
     }
 
     pub fn listar_ingresos_stock(
@@ -167,7 +250,8 @@ impl InventarioService {
             "SELECT i.id_ingreso, i.id_operacion, i.codigo, i.origen, i.id_proveedor, 
                     p.nombre_razon_social, i.tipo_documento, i.numero_documento, i.fecha_documento, 
                     i.estado, i.total_costo_micro, i.id_usuario, u.nombre_completo, 
-                    i.observacion, i.fecha_registro, i.fecha_anulacion, i.motivo_anulacion
+                    i.observacion, i.fecha_registro, i.fecha_anulacion, i.motivo_anulacion,
+                    i.proveedor_snapshot
              FROM ingresos_stock i
              LEFT JOIN proveedores p ON p.id_proveedor = i.id_proveedor
              LEFT JOIN usuarios u ON u.id_usuario = i.id_usuario
@@ -204,24 +288,56 @@ impl InventarioService {
         let slice: Vec<&dyn rusqlite::ToSql> = params_vec.iter().map(|p| p.as_ref()).collect();
 
         let iter = stmt.query_map(slice.as_slice(), |r| {
+            let id_ingreso: i64 = r.get(0)?;
+            let id_operacion: String = r.get(1)?;
+            let codigo: String = r.get(2)?;
+            let origen_str: String = r.get(3)?;
+            let id_proveedor: Option<i64> = r.get(4)?;
+            let proveedor_nombre_join: Option<String> = r.get(5)?;
+            let tipo_documento: Option<String> = r.get(6)?;
+            let numero_documento: Option<String> = r.get(7)?;
+            let fecha_documento: Option<String> = r.get(8)?;
+            let estado_str: String = r.get(9)?;
+            let total_costo_micro: i64 = r.get(10)?;
+            let id_usuario: i64 = r.get(11)?;
+            let usuario_nombre: Option<String> = r.get(12)?;
+            let observacion: Option<String> = r.get(13)?;
+            let fecha_registro: String = r.get(14)?;
+            let fecha_anulacion: Option<String> = r.get(15)?;
+            let motivo_anulacion: Option<String> = r.get(16)?;
+            let proveedor_snapshot_raw: Option<String> = r.get(17)?;
+
+            let proveedor_nombre = if let Some(ref raw_json) = proveedor_snapshot_raw {
+                if let Ok(v) = serde_json::from_str::<Value>(raw_json) {
+                    v.get("nombre_razon_social")
+                        .and_then(|s| s.as_str())
+                        .map(|s| s.to_string())
+                        .or(proveedor_nombre_join)
+                } else {
+                    proveedor_nombre_join
+                }
+            } else {
+                proveedor_nombre_join
+            };
+
             Ok(IngresoStockResponseDto {
-                id_ingreso: r.get(0)?,
-                id_operacion: r.get(1)?,
-                codigo: r.get(2)?,
-                origen: r.get(3)?,
-                id_proveedor: r.get(4)?,
-                proveedor_nombre: r.get(5)?,
-                tipo_documento: r.get(6)?,
-                numero_documento: r.get(7)?,
-                fecha_documento: r.get(8)?,
-                estado: r.get(9)?,
-                total_costo_micro: r.get(10)?,
-                id_usuario: r.get(11)?,
-                usuario_nombre: r.get(12)?,
-                observacion: r.get(13)?,
-                fecha_registro: r.get(14)?,
-                fecha_anulacion: r.get(15)?,
-                motivo_anulacion: r.get(16)?,
+                id_ingreso,
+                id_operacion,
+                codigo,
+                origen: origen_str,
+                id_proveedor,
+                proveedor_nombre,
+                tipo_documento,
+                numero_documento,
+                fecha_documento,
+                estado: estado_str,
+                total_costo_micro,
+                id_usuario,
+                usuario_nombre,
+                observacion,
+                fecha_registro,
+                fecha_anulacion,
+                motivo_anulacion,
                 detalles: Vec::new(),
             })
         })?;
@@ -258,8 +374,9 @@ impl InventarioService {
     pub fn anular_ingreso_compra(
         conn: &mut Connection,
         req: AnularIngresoDto,
+        id_operacion: Option<&str>,
         id_usuario: i64,
-    ) -> Result<(), AppError> {
+    ) -> Result<Value, AppError> {
         let motivo_trim = req.motivo.trim();
         if motivo_trim.len() < 5 || motivo_trim.len() > 250 {
             return Err(AppError::Validation(
@@ -282,6 +399,18 @@ impl InventarioService {
         }
 
         let tx = conn.transaction()?;
+
+        // Idempotencia Atómica
+        if let Some(resultado_previo) = IdempotenciaService::evaluar_y_registrar(
+            &tx,
+            id_operacion,
+            "ANULAR_COMPRA",
+            &req,
+            id_usuario,
+        )? {
+            tx.commit()?;
+            return Ok(resultado_previo);
+        }
 
         let detalles: Vec<(i64, i64, String, i64, i64, i64)> = {
             let mut stmt = tx.prepare(
@@ -315,7 +444,17 @@ impl InventarioService {
             }
 
             let stock_res = stock_ant - cant;
-            let val_res = val_ant - val_aporte;
+
+            let val_res = if stock_res == 0 {
+                0
+            } else {
+                val_ant - val_aporte
+            };
+            let val_delta = if stock_res == 0 {
+                -val_ant
+            } else {
+                -val_aporte
+            };
 
             tx.execute(
                 "INSERT INTO movimientos_inventario (
@@ -334,7 +473,7 @@ impl InventarioService {
                     -cant,
                     stock_res,
                     val_ant,
-                    -val_aporte,
+                    val_delta,
                     val_res,
                     costo_unit,
                     motivo_trim
@@ -401,7 +540,15 @@ impl InventarioService {
             "OK",
         )?;
 
+        let response_payload = serde_json::json!({
+            "status": "OK",
+            "message": "Ingreso de compra anulado exitosamente",
+            "id_ingreso": req.id_ingreso
+        });
+
+        IdempotenciaService::finalizar_solicitud(&tx, id_operacion, &response_payload)?;
+
         tx.commit()?;
-        Ok(())
+        Ok(response_payload)
     }
 }

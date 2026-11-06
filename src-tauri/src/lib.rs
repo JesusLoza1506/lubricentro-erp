@@ -94,6 +94,7 @@ pub fn run() {
             crear_proveedor_cmd,
             actualizar_proveedor_cmd,
             listar_servicios_admin_cmd,
+            listar_servicios_publicos_cmd,
             crear_servicio_cmd,
             actualizar_servicio_cmd,
             cambiar_estado_servicio_cmd,

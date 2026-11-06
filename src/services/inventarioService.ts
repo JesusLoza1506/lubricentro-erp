@@ -54,6 +54,20 @@ export const inventarioService = {
     return await invoke<ProductoPublicoDTO[]>('listar_productos_publicos_cmd');
   },
 
+  listarProductosPublicosPaginado: async (
+    busqueda?: string,
+    categoria?: string,
+    limite: number = 20,
+    offset: number = 0
+  ): Promise<ProductosPaginadosDTO> => {
+    return await invoke<ProductosPaginadosDTO>('listar_productos_publicos_paginado_cmd', {
+      busqueda,
+      categoria,
+      limite,
+      offset,
+    });
+  },
+
   listarProductosCriticos: async (): Promise<(ProductoAdminDTO | ProductoPublicoDTO)[]> => {
     return await invoke<(ProductoAdminDTO | ProductoPublicoDTO)[]>('listar_productos_criticos_cmd');
   },
@@ -66,12 +80,18 @@ export const inventarioService = {
     return await invoke('actualizar_producto_cmd', { payload });
   },
 
-  eliminarProducto: async (idProducto: number): Promise<void> => {
-    return await invoke('eliminar_producto_cmd', { idProducto });
+  eliminarProducto: async (
+    idProducto: number,
+    motivo: string = 'Desactivación administrativa desde interfaz'
+  ): Promise<void> => {
+    return await invoke('eliminar_producto_cmd', { idProducto, motivo });
   },
 
-  reactivarProducto: async (idProducto: number): Promise<void> => {
-    return await invoke('reactivar_producto_cmd', { idProducto });
+  reactivarProducto: async (
+    idProducto: number,
+    motivo: string = 'Reactivación administrativa desde interfaz'
+  ): Promise<void> => {
+    return await invoke('reactivar_producto_cmd', { idProducto, motivo });
   },
 
   despacharProductoGranel: async (
@@ -176,7 +196,11 @@ export const inventarioService = {
     return await invoke('actualizar_servicio_cmd', { payload });
   },
 
-  cambiarEstadoServicio: async (idServicio: number, activo: boolean): Promise<void> => {
-    return await invoke('cambiar_estado_servicio_cmd', { idServicio, activo });
+  cambiarEstadoServicio: async (
+    idServicio: number,
+    activo: boolean,
+    motivo: string
+  ): Promise<void> => {
+    return await invoke('cambiar_estado_servicio_cmd', { idServicio, activo, motivo });
   },
 };

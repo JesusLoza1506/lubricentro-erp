@@ -33,6 +33,32 @@ impl InventarioService {
         Ok(lista)
     }
 
+    pub fn listar_servicios_publicos(
+        conn: &Connection,
+    ) -> Result<Vec<ServicioMantenimientoDto>, AppError> {
+        let mut stmt = conn.prepare(
+            "SELECT id_servicio, codigo, nombre, descripcion, precio_venta_cent, es_cambio_aceite, activo 
+             FROM servicios WHERE activo = 1 ORDER BY nombre ASC",
+        )?;
+        let iter = stmt.query_map([], |r| {
+            Ok(ServicioMantenimientoDto {
+                id_servicio: r.get(0)?,
+                codigo: r.get(1)?,
+                nombre: r.get(2)?,
+                descripcion: r.get(3)?,
+                precio_venta_cent: r.get(4)?,
+                es_cambio_aceite: r.get::<_, i32>(5)? == 1,
+                activo: r.get::<_, i32>(6)? == 1,
+            })
+        })?;
+
+        let mut lista = Vec::new();
+        for item in iter {
+            lista.push(item?);
+        }
+        Ok(lista)
+    }
+
     pub fn crear_servicio(
         conn: &mut Connection,
         req: CrearServicioDto,
@@ -194,8 +220,16 @@ impl InventarioService {
         conn: &mut Connection,
         id_servicio: i64,
         activo: bool,
+        motivo: &str,
         id_usuario: i64,
     ) -> Result<(), AppError> {
+        let motivo_trim = motivo.trim();
+        if motivo_trim.len() < 5 || motivo_trim.len() > 250 {
+            return Err(AppError::Validation(
+                "El motivo del cambio de estado debe tener entre 5 y 250 caracteres.".into(),
+            ));
+        }
+
         let (cod_srv, nom_srv, activo_ant): (String, String, bool) = conn
             .query_row(
                 "SELECT codigo, nombre, activo FROM servicios WHERE id_servicio = ?1",
@@ -238,11 +272,7 @@ impl InventarioService {
             Some(&id_servicio.to_string()),
             Some(&antes_json),
             Some(&despues_json),
-            Some(if activo {
-                "Reactivación de servicio"
-            } else {
-                "Desactivación de servicio"
-            }),
+            Some(motivo_trim),
             "OK",
         )?;
 

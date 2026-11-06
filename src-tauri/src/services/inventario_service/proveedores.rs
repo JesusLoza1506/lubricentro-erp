@@ -1,6 +1,7 @@
 use super::InventarioService;
 use crate::dto::proveedor_dto::{ActualizarProveedorDto, CrearProveedorDto, ProveedorDto};
 use crate::errors::AppError;
+use crate::services::auditoria_service::AuditoriaService;
 use rusqlite::{params, Connection};
 
 fn validar_ruc_peruano(ruc: &str) -> bool {
@@ -78,7 +79,11 @@ impl InventarioService {
         Ok(list)
     }
 
-    pub fn crear_proveedor(conn: &Connection, req: CrearProveedorDto) -> Result<i64, AppError> {
+    pub fn crear_proveedor(
+        conn: &mut Connection,
+        req: CrearProveedorDto,
+        id_usuario: i64,
+    ) -> Result<i64, AppError> {
         validar_documento_proveedor(&req.tipo_documento, &req.numero_documento)?;
 
         let nombre = req.nombre_razon_social.trim();
@@ -88,27 +93,71 @@ impl InventarioService {
             ));
         }
 
-        conn.execute(
+        let tx = conn.transaction()?;
+
+        tx.execute(
             "INSERT INTO proveedores (tipo_documento, numero_documento, nombre_razon_social, telefono, correo, direccion, contacto_asesor)
              VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
-            params![req.tipo_documento.trim().to_uppercase(), req.numero_documento.trim(), nombre, req.telefono, req.correo, req.direccion, req.contacto_asesor],
+            params![
+                req.tipo_documento.trim().to_uppercase(),
+                req.numero_documento.trim(),
+                nombre,
+                req.telefono,
+                req.correo,
+                req.direccion,
+                req.contacto_asesor
+            ],
         )?;
-        Ok(conn.last_insert_rowid())
+
+        let id_proveedor = tx.last_insert_rowid();
+
+        let despues_json = serde_json::json!({
+            "id_proveedor": id_proveedor,
+            "tipo_documento": req.tipo_documento.trim().to_uppercase(),
+            "numero_documento": req.numero_documento.trim(),
+            "nombre_razon_social": nombre,
+        })
+        .to_string();
+
+        AuditoriaService::registrar_transaccion_v5(
+            &tx,
+            Some(id_usuario),
+            "USUARIO",
+            None,
+            None,
+            None,
+            "INVENTARIO",
+            "CREAR_PROVEEDOR",
+            Some("proveedores"),
+            Some(&id_proveedor.to_string()),
+            None,
+            Some(&despues_json),
+            Some("Alta de nuevo proveedor"),
+            "OK",
+        )?;
+
+        tx.commit()?;
+        Ok(id_proveedor)
     }
 
+    #[allow(clippy::type_complexity)]
     pub fn actualizar_proveedor(
-        conn: &Connection,
+        conn: &mut Connection,
         req: ActualizarProveedorDto,
+        id_usuario: i64,
     ) -> Result<(), AppError> {
-        let count: i32 = conn.query_row(
-            "SELECT COUNT(*) FROM proveedores WHERE id_proveedor = ?1",
-            [req.id_proveedor],
-            |r| r.get(0),
-        )?;
+        let prov_ant: Option<(String, String, String, Option<String>, Option<String>, Option<String>, Option<String>)> = conn
+            .query_row(
+                "SELECT tipo_documento, numero_documento, nombre_razon_social, telefono, correo, direccion, contacto_asesor FROM proveedores WHERE id_proveedor = ?1",
+                [req.id_proveedor],
+                |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?, r.get(4)?, r.get(5)?, r.get(6)?)),
+            )
+            .ok();
 
-        if count == 0 {
-            return Err(AppError::NotFound("Proveedor no encontrado.".to_string()));
-        }
+        let (tipo_ant, num_ant, nom_ant, tel_ant, cor_ant, dir_ant, con_ant) = match prov_ant {
+            Some(p) => p,
+            None => return Err(AppError::NotFound("Proveedor no encontrado.".to_string())),
+        };
 
         validar_documento_proveedor(&req.tipo_documento, &req.numero_documento)?;
 
@@ -119,7 +168,9 @@ impl InventarioService {
             ));
         }
 
-        conn.execute(
+        let tx = conn.transaction()?;
+
+        tx.execute(
             "UPDATE proveedores 
              SET tipo_documento = ?1, numero_documento = ?2, nombre_razon_social = ?3, 
                  telefono = ?4, correo = ?5, direccion = ?6, contacto_asesor = ?7 
@@ -136,6 +187,46 @@ impl InventarioService {
             ],
         )?;
 
+        let antes_json = serde_json::json!({
+            "tipo_documento": tipo_ant,
+            "numero_documento": num_ant,
+            "nombre_razon_social": nom_ant,
+            "telefono": tel_ant,
+            "correo": cor_ant,
+            "direccion": dir_ant,
+            "contacto_asesor": con_ant,
+        })
+        .to_string();
+
+        let despues_json = serde_json::json!({
+            "tipo_documento": req.tipo_documento.trim().to_uppercase(),
+            "numero_documento": req.numero_documento.trim(),
+            "nombre_razon_social": nombre,
+            "telefono": req.telefono,
+            "correo": req.correo,
+            "direccion": req.direccion,
+            "contacto_asesor": req.contacto_asesor,
+        })
+        .to_string();
+
+        AuditoriaService::registrar_transaccion_v5(
+            &tx,
+            Some(id_usuario),
+            "USUARIO",
+            None,
+            None,
+            None,
+            "INVENTARIO",
+            "ACTUALIZAR_PROVEEDOR",
+            Some("proveedores"),
+            Some(&req.id_proveedor.to_string()),
+            Some(&antes_json),
+            Some(&despues_json),
+            Some("Actualización de datos de proveedor"),
+            "OK",
+        )?;
+
+        tx.commit()?;
         Ok(())
     }
 }

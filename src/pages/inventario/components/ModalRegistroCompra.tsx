@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Trash2, UserPlus } from 'lucide-react';
+import { Plus, Trash2, UserPlus, Edit } from 'lucide-react';
 import {
   Producto,
   ProveedorDTO,
   CrearProveedorDTO,
+  ActualizarProveedorDTO,
   RegistrarIngresoDTO,
   DetalleIngresoRequestDTO,
 } from '../../../types/inventario';
@@ -27,6 +28,20 @@ interface ItemDetalleForm {
   costoUnitarioSoles: number; // En Soles por unidad o litro
 }
 
+function getFechaActualLima(): string {
+  const options: Intl.DateTimeFormatOptions = {
+    timeZone: 'America/Lima',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  };
+  const parts = new Intl.DateTimeFormat('en-CA', options).formatToParts(new Date());
+  const year = parts.find((p) => p.type === 'year')?.value;
+  const month = parts.find((p) => p.type === 'month')?.value;
+  const day = parts.find((p) => p.type === 'day')?.value;
+  return `${year}-${month}-${day}`;
+}
+
 export const ModalRegistroCompra: React.FC<ModalRegistroCompraProps> = ({
   abierto,
   productos,
@@ -38,13 +53,12 @@ export const ModalRegistroCompra: React.FC<ModalRegistroCompraProps> = ({
   const [idProveedor, setIdProveedor] = useState<number | ''>('');
   const [tipoDocumento, setTipoDocumento] = useState<string>('FACTURA');
   const [numeroDocumento, setNumeroDocumento] = useState<string>('');
-  const [fechaDocumento, setFechaDocumento] = useState<string>(
-    new Date().toISOString().split('T')[0]
-  );
+  const [fechaDocumento, setFechaDocumento] = useState<string>(getFechaActualLima());
   const [observacion, setObservacion] = useState<string>('');
 
   const [detalles, setDetalles] = useState<ItemDetalleForm[]>([]);
   const [modalProvAbierto, setModalProvAbierto] = useState<boolean>(false);
+  const [proveedorAEditar, setProveedorAEditar] = useState<ProveedorDTO | null>(null);
   const [guardando, setGuardando] = useState<boolean>(false);
 
   const [prodSeleccionadoId, setProdSeleccionadoId] = useState<number | ''>('');
@@ -53,6 +67,7 @@ export const ModalRegistroCompra: React.FC<ModalRegistroCompraProps> = ({
 
   useEffect(() => {
     if (abierto) {
+      setFechaDocumento(getFechaActualLima());
       inventarioService
         .listarProveedores()
         .then(setProveedores)
@@ -107,6 +122,29 @@ export const ModalRegistroCompra: React.FC<ModalRegistroCompraProps> = ({
     }
   };
 
+  const handleActualizarProveedor = async (payload: ActualizarProveedorDTO) => {
+    try {
+      await inventarioService.actualizarProveedor(payload);
+      const listaActualizada = await inventarioService.listarProveedores();
+      setProveedores(listaActualizada);
+    } catch (err: unknown) {
+      const msg =
+        typeof err === 'string'
+          ? err
+          : (err as { message?: string })?.message || 'Error al actualizar proveedor';
+      onError(msg);
+    }
+  };
+
+  const handleEditarProveedorSeleccionado = () => {
+    if (!idProveedor) return;
+    const prov = proveedores.find((p) => p.id_proveedor === Number(idProveedor));
+    if (prov) {
+      setProveedorAEditar(prov);
+      setModalProvAbierto(true);
+    }
+  };
+
   const totalCompraSoles = detalles.reduce(
     (acc, item) => acc + item.cantidadInput * item.costoUnitarioSoles,
     0
@@ -132,16 +170,8 @@ export const ModalRegistroCompra: React.FC<ModalRegistroCompraProps> = ({
           ? Math.round(d.cantidadInput * 1000)
           : Math.round(d.cantidadInput);
 
-        let costoMicroCalculado = 0;
-        if (esML) {
-          const costoSolesPorML = d.costoUnitarioSoles / 1000;
-          const microRaw = Math.round(costoSolesPorML * 1_000_000);
-          costoMicroCalculado = Math.round(microRaw / 10_000) * 10_000;
-        } else {
-          const microRaw = Math.round(d.costoUnitarioSoles * 1_000_000);
-          costoMicroCalculado = Math.round(microRaw / 10_000) * 10_000;
-        }
-
+        const microRaw = Math.round(d.costoUnitarioSoles * 1_000_000);
+        const costoMicroCalculado = Math.round(microRaw / 10_000) * 10_000;
         const costoEfectivoMicro = Math.max(costoMicroCalculado, 10_000);
 
         return {
@@ -244,25 +274,51 @@ export const ModalRegistroCompra: React.FC<ModalRegistroCompraProps> = ({
                 ))}
               </select>
             </div>
-            <button
-              type="button"
-              onClick={() => setModalProvAbierto(true)}
-              style={{
-                padding: '10px 14px',
-                backgroundColor: '#1E293B',
-                border: '1px solid #334155',
-                color: '#38BDF8',
-                borderRadius: '8px',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-                fontWeight: '600',
-              }}
-            >
-              <UserPlus size={16} />
-              Nuevo
-            </button>
+            <div style={{ display: 'flex', gap: '6px' }}>
+              <button
+                type="button"
+                onClick={() => {
+                  setProveedorAEditar(null);
+                  setModalProvAbierto(true);
+                }}
+                style={{
+                  padding: '10px 14px',
+                  backgroundColor: '#1E293B',
+                  border: '1px solid #334155',
+                  color: '#38BDF8',
+                  borderRadius: '8px',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  fontWeight: '600',
+                }}
+              >
+                <UserPlus size={16} />
+                Nuevo
+              </button>
+              {idProveedor && (
+                <button
+                  type="button"
+                  onClick={handleEditarProveedorSeleccionado}
+                  style={{
+                    padding: '10px 14px',
+                    backgroundColor: '#1E293B',
+                    border: '1px solid #334155',
+                    color: '#FBBF24',
+                    borderRadius: '8px',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    fontWeight: '600',
+                  }}
+                >
+                  <Edit size={16} />
+                  Editar
+                </button>
+              )}
+            </div>
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px' }}>
@@ -513,13 +569,15 @@ export const ModalRegistroCompra: React.FC<ModalRegistroCompraProps> = ({
               <button
                 type="button"
                 onClick={onClose}
+                disabled={guardando}
                 style={{
                   padding: '10px 16px',
                   backgroundColor: 'transparent',
                   border: '1px solid #334155',
                   color: '#CBD5E1',
                   borderRadius: '8px',
-                  cursor: 'pointer',
+                  cursor: guardando ? 'not-allowed' : 'pointer',
+                  opacity: guardando ? 0.6 : 1,
                 }}
               >
                 Cancelar
@@ -534,7 +592,8 @@ export const ModalRegistroCompra: React.FC<ModalRegistroCompraProps> = ({
                   border: 'none',
                   borderRadius: '8px',
                   fontWeight: '700',
-                  cursor: 'pointer',
+                  cursor: guardando ? 'not-allowed' : 'pointer',
+                  opacity: guardando ? 0.6 : 1,
                 }}
               >
                 {guardando ? 'Guardando...' : 'Registrar Compra'}
@@ -546,8 +605,13 @@ export const ModalRegistroCompra: React.FC<ModalRegistroCompraProps> = ({
 
       <ModalProveedor
         abierto={modalProvAbierto}
-        onClose={() => setModalProvAbierto(false)}
+        proveedorAEditar={proveedorAEditar}
+        onClose={() => {
+          setModalProvAbierto(false);
+          setProveedorAEditar(null);
+        }}
         onGuardar={handleCrearProveedor}
+        onEditar={handleActualizarProveedor}
       />
     </div>
   );

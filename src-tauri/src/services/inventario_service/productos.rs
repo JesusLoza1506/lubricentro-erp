@@ -26,7 +26,7 @@ impl InventarioService {
 
         if cat_upper == "GRANEL" && un_upper != "ML" {
             return Err(AppError::Validation(
-                "La categoría GRANEL debe usar strictly la unidad ML.".to_string(),
+                "La categoría GRANEL debe usar estrictamente la unidad ML.".to_string(),
             ));
         }
         if cat_upper != "GRANEL" && un_upper != "UND" {
@@ -83,37 +83,62 @@ impl InventarioService {
 
         if let Some(cant_init_f) = req.cantidad_inicial {
             if cant_init_f > 0.0 {
-                if un_upper == "UND" && (cant_init_f - cant_init_f.round()).abs() > 0.0001 {
-                    return Err(AppError::Validation(
-                        "No se permiten cantidades fraccionadas para productos en unidades (UND)."
-                            .to_string(),
-                    ));
+                // Validación de precisión según unidad de medida
+                if un_upper == "UND" {
+                    if (cant_init_f - cant_init_f.round()).abs() > 0.0001 {
+                        return Err(AppError::Validation(
+                            "No se permiten cantidades fraccionadas para productos en unidades (UND)."
+                                .to_string(),
+                        ));
+                    }
+                } else if un_upper == "ML" {
+                    // FASE 2: Validar máximo 3 decimales en litros (precisión exacta a mililitros)
+                    let ml_exacto = cant_init_f * 1000.0;
+                    if (ml_exacto - ml_exacto.round()).abs() > 0.0001 {
+                        return Err(AppError::Validation(
+                            "Para productos a GRANEL se permite un máximo de 3 decimales en litros (ej. 4.500 L)."
+                                .to_string(),
+                        ));
+                    }
                 }
 
+                // FASE 2: Validación estricta de costo inicial > 0 sin fallback automático a S/ 0.01
                 let costo_micro_ingresado = req.costo_unitario_inicial_micro.ok_or_else(|| {
                     AppError::Validation(
                         "Costo unitario inicial obligatorio si hay stock inicial.".to_string(),
                     )
                 })?;
+
+                if costo_micro_ingresado <= 0 {
+                    return Err(AppError::Validation(
+                        "El costo unitario inicial debe ser mayor a cero (costo cero no permitido)."
+                            .to_string(),
+                    ));
+                }
+
                 let ref_init = req.referencia_inicial.ok_or_else(|| {
                     AppError::Validation(
                         "Referencia inicial obligatoria para stock inicial.".to_string(),
                     )
                 })?;
 
-                let (cant_init, costo_micro, total_aporte) = if un_upper == "ML" {
+                let costo_efectivo_micro = (costo_micro_ingresado / 10_000) * 10_000;
+                if costo_efectivo_micro <= 0 {
+                    return Err(AppError::Validation(
+                        "El costo unitario inicial redondeado no es válido.".to_string(),
+                    ));
+                }
+
+                let (cant_init, total_aporte, costo_unitario_kardex) = if un_upper == "ML" {
                     let cant_ml = (cant_init_f * 1000.0).round() as i64;
-                    let costo_ml_micro_raw = (costo_micro_ingresado as f64 / 1000.0).round() as i64;
-                    let costo_ml_validado = (costo_ml_micro_raw / 10_000) * 10_000;
-                    let costo_ml_final = costo_ml_validado.max(10_000);
-                    let total = cant_ml * costo_ml_final;
-                    (cant_ml, costo_ml_final, total)
+                    let total =
+                        ((cant_ml as i128 * costo_efectivo_micro as i128 + 500) / 1000) as i64;
+                    let costo_kardex = (total / cant_ml.max(1)).max(1);
+                    (cant_ml, total, costo_kardex)
                 } else {
                     let cant_und = cant_init_f.round() as i64;
-                    let costo_validado = (costo_micro_ingresado / 10_000) * 10_000;
-                    let costo_final = costo_validado.max(10_000);
-                    let total = cant_und * costo_final;
-                    (cant_und, costo_final, total)
+                    let total = cant_und * costo_efectivo_micro;
+                    (cant_und, total, costo_efectivo_micro)
                 };
 
                 let id_op_ingreso = uuid::Uuid::new_v4().to_string();
@@ -136,7 +161,7 @@ impl InventarioService {
                         req.nombre.trim(),
                         un_upper,
                         cant_init,
-                        costo_micro,
+                        costo_efectivo_micro,
                         total_aporte,
                     ],
                 )?;
@@ -153,13 +178,13 @@ impl InventarioService {
                         un_upper,
                         cant_init,
                         total_aporte,
-                        costo_micro,
+                        costo_unitario_kardex,
                     ],
                 )?;
 
                 tx.execute(
                     "UPDATE productos SET stock_actual = ?1, valor_stock_micro = ?2, ultimo_costo_micro = ?3 WHERE id_producto = ?4",
-                    params![cant_init, total_aporte, costo_micro, id_producto],
+                    params![cant_init, total_aporte, costo_unitario_kardex, id_producto],
                 )?;
 
                 tx.execute(
@@ -171,7 +196,7 @@ impl InventarioService {
                     "id_ingreso": id_ingreso,
                     "referencia_inicial": ref_init.trim(),
                     "cantidad_ingresada": cant_init,
-                    "costo_efectivo_micro": costo_micro,
+                    "costo_efectivo_micro": costo_efectivo_micro,
                     "total_aporte_micro": total_aporte,
                 })
                 .to_string();
@@ -272,8 +297,16 @@ impl InventarioService {
     pub fn eliminar_producto(
         conn: &mut Connection,
         id_producto: i64,
+        motivo: &str,
         id_usuario: i64,
     ) -> Result<(), AppError> {
+        let motivo_trim = motivo.trim();
+        if motivo_trim.len() < 5 || motivo_trim.len() > 250 {
+            return Err(AppError::Validation(
+                "El motivo administrativo debe contener entre 5 y 250 caracteres.".to_string(),
+            ));
+        }
+
         let consumo_neto_abierto: i64 = conn.query_row(
             "SELECT COALESCE(SUM(p.cantidad - COALESCE((
                 SELECT SUM(m.diferencia) 
@@ -320,6 +353,7 @@ impl InventarioService {
             "codigo": cod_prod,
             "nombre": nom_prod,
             "activo": 0,
+            "motivo": motivo_trim,
         })
         .to_string();
 
@@ -336,7 +370,7 @@ impl InventarioService {
             Some(&id_producto.to_string()),
             Some(&antes_json),
             Some(&despues_json),
-            Some("Desactivación lógica de producto del catálogo"),
+            Some(motivo_trim),
             "OK",
         )?;
 
@@ -347,8 +381,16 @@ impl InventarioService {
     pub fn reactivar_producto(
         conn: &mut Connection,
         id_producto: i64,
+        motivo: &str,
         id_usuario: i64,
     ) -> Result<(), AppError> {
+        let motivo_trim = motivo.trim();
+        if motivo_trim.len() < 5 || motivo_trim.len() > 250 {
+            return Err(AppError::Validation(
+                "El motivo administrativo debe contener entre 5 y 250 caracteres.".to_string(),
+            ));
+        }
+
         let (cod_prod, nom_prod): (String, String) = conn
             .query_row(
                 "SELECT codigo, nombre FROM productos WHERE id_producto = ?1",
@@ -375,6 +417,7 @@ impl InventarioService {
             "codigo": cod_prod,
             "nombre": nom_prod,
             "activo": 1,
+            "motivo": motivo_trim,
         })
         .to_string();
 
@@ -391,7 +434,7 @@ impl InventarioService {
             Some(&id_producto.to_string()),
             Some(&antes_json),
             Some(&despues_json),
-            Some("Reactivación de producto en catálogo"),
+            Some(motivo_trim),
             "OK",
         )?;
 
@@ -430,6 +473,89 @@ impl InventarioService {
             list.push(i?);
         }
         Ok(list)
+    }
+
+    pub fn listar_productos_publicos_paginado(
+        conn: &Connection,
+        busqueda: Option<String>,
+        categoria: Option<String>,
+        limite: i64,
+        offset: i64,
+    ) -> Result<ProductosPaginadosDto, AppError> {
+        let mut where_clause = String::from(" WHERE activo = 1");
+        let mut params_vec: Vec<Box<dyn rusqlite::ToSql>> = Vec::new();
+
+        if let Some(b) = busqueda {
+            let b_trim = b.trim();
+            if !b_trim.is_empty() {
+                params_vec.push(Box::new(format!("%{}%", b_trim.to_uppercase())));
+                let p_idx = params_vec.len();
+                where_clause.push_str(&format!(
+                    " AND (codigo LIKE ?{0} OR upper(nombre) LIKE ?{0})",
+                    p_idx
+                ));
+            }
+        }
+
+        if let Some(cat) = categoria {
+            let cat_trim = cat.trim().to_uppercase();
+            if !cat_trim.is_empty() && cat_trim != "TODOS" {
+                params_vec.push(Box::new(cat_trim));
+                where_clause.push_str(&format!(" AND categoria = ?{}", params_vec.len()));
+            }
+        }
+
+        let count_sql = format!("SELECT COUNT(*) FROM productos{}", where_clause);
+        let mut stmt_count = conn.prepare(&count_sql)?;
+        let count_params: Vec<&dyn rusqlite::ToSql> =
+            params_vec.iter().map(|p| p.as_ref()).collect();
+        let total_registros: i64 = stmt_count.query_row(count_params.as_slice(), |r| r.get(0))?;
+
+        let mut data_sql = format!(
+            "SELECT id_producto, codigo, nombre, descripcion, categoria, unidad_medida, stock_actual, stock_minimo, valor_stock_micro, ultimo_costo_micro, precio_venta_cent, activo FROM productos{}",
+            where_clause
+        );
+        params_vec.push(Box::new(limite));
+        let limit_idx = params_vec.len();
+        params_vec.push(Box::new(offset));
+        let offset_idx = params_vec.len();
+
+        data_sql.push_str(&format!(
+            " ORDER BY nombre ASC LIMIT ?{} OFFSET ?{}",
+            limit_idx, offset_idx
+        ));
+
+        let mut stmt_data = conn.prepare(&data_sql)?;
+        let data_params: Vec<&dyn rusqlite::ToSql> =
+            params_vec.iter().map(|p| p.as_ref()).collect();
+
+        let iter = stmt_data.query_map(data_params.as_slice(), |row| {
+            let entity = ProductoEntity {
+                id_producto: row.get(0)?,
+                codigo: row.get(1)?,
+                nombre: row.get(2)?,
+                descripcion: row.get(3)?,
+                categoria: row.get(4)?,
+                unidad_medida: row.get(5)?,
+                stock_actual: row.get(6)?,
+                stock_minimo: row.get(7)?,
+                valor_stock_micro: row.get(8)?,
+                ultimo_costo_micro: row.get(9)?,
+                precio_venta_cent: row.get(10)?,
+                activo: row.get(11)?,
+            };
+            Ok(ProductoAdminDto::desde_entity(entity))
+        })?;
+
+        let mut productos = Vec::new();
+        for i in iter {
+            productos.push(i?);
+        }
+
+        Ok(ProductosPaginadosDto {
+            productos,
+            total_registros,
+        })
     }
 
     pub fn listar_productos_admin(

@@ -1,5 +1,6 @@
 pub mod ajustes;
 pub mod compras;
+pub mod idempotencia;
 pub mod kardex;
 pub mod productos;
 pub mod proveedores;
