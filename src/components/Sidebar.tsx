@@ -97,7 +97,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       label: 'Punto de Venta / POS',
       icon: ShoppingCart,
       siempreVisible: false,
-      enDesarrollo: true,
+      enDesarrollo: false,
     },
     {
       id: 'caja',

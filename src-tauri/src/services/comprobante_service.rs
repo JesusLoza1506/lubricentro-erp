@@ -1,8 +1,7 @@
 use crate::dto::comprobante_dto::{ComprobanteDto, EmitirComprobanteDto};
 use crate::entities::comprobante::ComprobanteEntity;
 use crate::errors::AppError;
-use rusqlite::{params, Connection};
-use uuid::Uuid;
+use rusqlite::Connection;
 
 pub struct ComprobanteService;
 
@@ -13,125 +12,14 @@ impl ComprobanteService {
         conn: &Connection,
         req: EmitirComprobanteDto,
     ) -> Result<ComprobanteDto, AppError> {
-        if req.monto_total != req.monto_subtotal + req.monto_igv {
-            return Err(AppError::Validation(
-                "El monto total debe ser exactamente la suma del subtotal y el IGV.".to_string(),
-            ));
+        let propio: bool = conn.query_row("SELECT EXISTS(SELECT 1 FROM caja_chica WHERE id_caja=?1 AND id_usuario=?2 AND estado='ABIERTA')", rusqlite::params![req.id_caja,req.id_cajero], |r| r.get(0))?;
+        if !propio {
+            return Err(AppError::AccessDenied("No tiene un turno de caja propio abierto. Debe abrir su propia caja para registrar cobros.".into()));
         }
-
-        let (estado_caja, id_usuario_caja): (String, i64) = conn
-            .query_row(
-                "SELECT estado, id_usuario FROM caja_chica WHERE id_caja = ?1",
-                [req.id_caja],
-                |r| Ok((r.get(0)?, r.get(1)?)),
-            )
-            .map_err(|_| AppError::NotFound("La caja chica especificada no existe.".to_string()))?;
-
-        if estado_caja != "ABIERTA" {
-            return Err(AppError::Validation(
-                "No se pueden procesar cobros ni emitir comprobantes en una caja chica cerrada."
-                    .to_string(),
-            ));
-        }
-
-        // VALIDACIÓN ESTRICUTA DE TURNO PROPIO: Tanto Cajero como Administrador requieren ser titulares de la caja abierta
-        if id_usuario_caja != req.id_cajero {
-            return Err(AppError::AccessDenied(
-                "No tiene un turno de caja propio abierto. Debe abrir su propia caja para registrar cobros.".to_string(),
-            ));
-        }
-
-        let id_venta_real = req.id_ot.ok_or_else(|| {
-            AppError::Validation("Se requiere el ID de la orden o venta asociada.".to_string())
-        })?;
-
-        let tipo = req.tipo_comprobante.trim().to_uppercase();
-        if tipo != "BOLETA" && tipo != "FACTURA" {
-            return Err(AppError::Validation(
-                "Tipo de comprobante inválido. Debe ser BOLETA o FACTURA.".to_string(),
-            ));
-        }
-
-        let correlativo_val: i64;
-        let serie_id_val = req.id_serie;
-
-        if let Some(id_s) = serie_id_val {
-            conn.execute(
-                "UPDATE series_comprobante SET correlativo_actual = correlativo_actual + 1 WHERE id_serie = ?1 AND activa = 1",
-                [id_s],
-            )?;
-
-            correlativo_val = conn.query_row(
-                "SELECT correlativo_actual FROM series_comprobante WHERE id_serie = ?1",
-                [id_s],
-                |row| row.get(0),
-            )?;
-        } else {
-            return Err(AppError::Validation(
-                "Se requiere especificar una serie activa para Boletas y Facturas.".to_string(),
-            ));
-        }
-
-        let id_op_mov = Uuid::new_v4().to_string();
-        let medio_pago = req.medio_pago.trim().to_uppercase();
-
-        let (recibido_cent, vuelto_cent) = if medio_pago == "EFECTIVO" {
-            (Some(req.monto_pago), Some(req.monto_pago - req.monto_total))
-        } else {
-            (None, None)
-        };
-
-        // 1. Registrar movimiento de cobro en caja usando el ID real de la orden/venta
-        conn.execute(
-            "INSERT INTO movimientos_caja (
-                id_operacion, id_caja, id_usuario, tipo, medio_pago, monto_cent, signo,
-                id_venta, recibido_cent, vuelto_cent, concepto, fecha_operacion
-            ) VALUES (?1, ?2, ?3, 'COBRO', ?4, ?5, 1, ?6, ?7, ?8, ?9, datetime('now', '-5 hours'))",
-            params![
-                id_op_mov,
-                req.id_caja,
-                req.id_cajero,
-                medio_pago,
-                req.monto_total,
-                id_venta_real,
-                recibido_cent,
-                vuelto_cent,
-                format!("Cobro de venta ID {}", id_venta_real),
-            ],
-        )?;
-
-        // 2. Confirmar la venta
-        conn.execute(
-            "UPDATE ventas SET estado_registro = 'CONFIRMADA' WHERE id_venta = ?1",
-            [id_venta_real],
-        )?;
-
-        // 3. Insertar el comprobante
-        let id_operacion = Uuid::new_v4().to_string();
-        let payload_sha256 = "0000000000000000000000000000000000000000000000000000000000000000";
-
-        conn.execute(
-            "INSERT INTO comprobantes (
-                id_operacion, id_venta, relacion, tipo_comprobante, ambiente,
-                id_serie, correlativo, empresa_snapshot, receptor_snapshot,
-                payload_json, payload_sha256, base_cent, igv_cent, total_cent, fecha_emision
-            ) VALUES (?1, ?2, 'ORIGINAL', ?3, 'PRODUCCION', ?4, ?5, '{}', '{}', '{}', ?6, ?7, ?8, ?9, datetime('now', '-5 hours'))",
-            params![
-                id_operacion,
-                id_venta_real,
-                tipo,
-                serie_id_val,
-                correlativo_val,
-                payload_sha256,
-                req.monto_subtotal,
-                req.monto_igv,
-                req.monto_total,
-            ],
-        )?;
-
-        let id_comprobante = conn.last_insert_rowid();
-
-        Self::obtener_comprobante_por_id(conn, id_comprobante)
+        Err(AppError::Validation(
+            "La emisión aislada anterior fue sustituida por la confirmación atómica del POS."
+                .into(),
+        ))
     }
 
     pub fn obtener_comprobante_por_id(

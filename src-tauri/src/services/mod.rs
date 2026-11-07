@@ -13,3 +13,5 @@ pub use inventario_service::{
     calcular_promedio_ponderado_micro, InventarioService, ProductosPaginadosDto,
     ResumenSaldosKardexDto,
 };
+
+pub mod pos_service;

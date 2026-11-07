@@ -42,7 +42,7 @@ impl InventarioService {
         } else if let Some(id) = vinculos.2 {
             ("VENTA", id,
              "SELECT 'Venta #' || id_venta, fecha_venta, estado_registro, tipo_original, motivo_descuento FROM ventas WHERE id_venta = ?1",
-             "SELECT nombre_snapshot, unidad_medida, cantidad, costo_total_micro FROM detalle_venta WHERE id_venta = ?1 ORDER BY id_detalle")
+             "SELECT nombre_snapshot, unidad_medida, cantidad, COALESCE(costo_total_micro,0) FROM detalle_venta WHERE id_venta = ?1 ORDER BY id_detalle")
         } else {
             return Err(AppError::Validation("El ajuste manual no tiene un documento de origen; consulte su motivo y usuario en el Kardex.".into()));
         };

@@ -137,6 +137,7 @@ export const ModalDetalleOTContainer: React.FC<ModalDetalleOTProps> = (props) =>
           <strong style={{ fontSize: '16px', color: '#10B981' }}>
             Total de la orden: S/ {(state.ordenActual.total_general_soles ?? 0).toFixed(2)}
           </strong>
+          {state.ordenActual.estado==='FINALIZADO' && state.rol!=='MECANICO' && props.onCobrar && <button className="ot-btn" data-tone="primary" onClick={()=>props.onCobrar?.(state.ordenActual.id_ot)}>Cobrar en POS</button>}
           <button
             onClick={onClose}
             style={{

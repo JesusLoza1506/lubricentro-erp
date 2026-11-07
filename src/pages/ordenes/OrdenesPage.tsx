@@ -17,10 +17,11 @@ import { ModalCrearOT } from './components/ModalCrearOT';
 import { ModalDetalleOT } from './components/ModalDetalleOT';
 
 interface OrdenesPageProps {
+  onNavegarAPos?: (id:number)=>void;
   onNavegarAFichaVehicular?: (placa?: string) => void;
 }
 
-export const OrdenesPage: React.FC<OrdenesPageProps> = () => {
+export const OrdenesPage: React.FC<OrdenesPageProps> = ({onNavegarAPos}) => {
   const { usuario, tienePermiso } = useAuth();
   const { aviso, notificar, cerrar } = useAvisosOT();
   const [errorTablero, setErrorTablero] = useState('');
@@ -281,6 +282,7 @@ export const OrdenesPage: React.FC<OrdenesPageProps> = () => {
       {otSeleccionada && (
         <ModalDetalleOT
           ot={otSeleccionada}
+          onCobrar={onNavegarAPos}
           onClose={() => setOtSeleccionada(null)}
           onIniciarZanja={handleIniciarEnZanja}
           onFinalizarOT={handleFinalizarOT}

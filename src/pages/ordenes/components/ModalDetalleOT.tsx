@@ -4,6 +4,7 @@ import { OrdenTrabajoHistorialDTO, TipoAceiteOT } from '../../../types/ordenTrab
 import { OrdenTrabajoHistorialDTO as VehiculoOTDTO } from '../../../types/vehiculo';
 
 export interface ModalDetalleOTProps {
+  onCobrar?: (id:number)=>void;
   ordenTrabajo?: OrdenTrabajoHistorialDTO | VehiculoOTDTO;
   ot?: OrdenTrabajoHistorialDTO | VehiculoOTDTO;
   modalAbierto?: boolean;

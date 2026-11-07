@@ -48,7 +48,7 @@ impl CajaService {
             "INSERT INTO caja_chica (
                 id_operacion, codigo_caja, id_usuario, ambiente, monto_apertura_cent, 
                 estado, fecha_apertura
-            ) VALUES (?1, ?2, ?3, 'PRODUCCION', ?4, 'ABIERTA', datetime('now', '-5 hours'))",
+            ) VALUES (?1, ?2, ?3, (SELECT ambiente_actual FROM configuracion WHERE id_config=1), ?4, 'ABIERTA', datetime('now', '-5 hours'))",
             params![
                 id_operacion,
                 codigo_caja,

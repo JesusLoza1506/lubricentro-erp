@@ -10,3 +10,5 @@ pub mod producto_dto;
 pub mod proveedor_dto;
 pub mod usuario_dto;
 pub mod vehiculo_dto;
+
+pub mod pos_dto;

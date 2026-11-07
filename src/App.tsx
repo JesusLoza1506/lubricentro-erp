@@ -8,8 +8,11 @@ import { FichaVehicularPage } from './pages/vehiculo/FichaVehicularPage';
 import { OrdenesPage } from './pages/ordenes/OrdenesPage';
 import { CambioClaveModal } from './components/CambioClaveModal';
 
+const PosPage = React.lazy(() => import('./pages/pos/PosPage').then(m=>({default:m.PosPage})));
+
 const MainApp: React.FC = () => {
   const { usuario, estadoSesion, cargando, tienePermiso, setHayCambiosSinGuardar } = useAuth();
+  const [otParaCobrar,setOtParaCobrar]=useState<number|null>(null);
   const [moduloActual, setModuloActual] = useState<string>('dashboard');
   const [placaSeleccionada, setPlacaSeleccionada] = useState<string>('');
   const [mostrarCambioClaveModal, setMostrarCambioClaveModal] = useState<boolean>(false);
@@ -18,6 +21,7 @@ const MainApp: React.FC = () => {
     if (!usuario || estadoSesion === 'SIN_SESION') {
       setModuloActual('dashboard');
       setPlacaSeleccionada('');
+      setOtParaCobrar(null);
       setMostrarCambioClaveModal(false);
       setHayCambiosSinGuardar(false);
     }
@@ -61,11 +65,13 @@ const MainApp: React.FC = () => {
       case 'taller':
       case 'ot':
         return tienePermiso('OT', 'ver') || tienePermiso('ORDENES', 'ver') ? (
-          <OrdenesPage onNavegarAFichaVehicular={navegarAFichaVehicular} />
+          <OrdenesPage onNavegarAFichaVehicular={navegarAFichaVehicular} onNavegarAPos={id=>{setOtParaCobrar(id);setModuloActual('pos');}} />
         ) : (
           <DashboardPage setModuloActual={setModuloActual} />
         );
 
+      case 'pos':
+        return tienePermiso('POS', 'ver') ? <React.Suspense fallback={<p style={{padding:24,color:'#9bacbf'}}>Cargando Punto de Venta…</p>}><PosPage otInicial={otParaCobrar} onConsumirOt={()=>setOtParaCobrar(null)} /></React.Suspense> : <DashboardPage setModuloActual={setModuloActual} />;
       case 'inventario':
         return tienePermiso('INVENTARIO', 'ver') ? (
           <InventarioPage />

@@ -5,3 +5,5 @@ pub mod comprobante_commands;
 pub mod dashboard_commands;
 pub mod inventario_commands;
 pub mod ordenes_commands;
+
+pub mod pos_commands;

@@ -3,11 +3,12 @@ pub mod db;
 pub mod dto;
 pub mod entities;
 pub mod errors;
+pub mod nubefact;
 pub mod services;
 
 use commands::{
     auth_commands::*, caja_commands::*, cliente_commands::*, comprobante_commands::*,
-    dashboard_commands::*, inventario_commands::*, ordenes_commands::*,
+    dashboard_commands::*, inventario_commands::*, ordenes_commands::*, pos_commands::*,
 };
 use services::session_manager::SessionState;
 use std::sync::Mutex;
@@ -46,6 +47,8 @@ pub fn run() {
         })
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![
+            pos_operacion_cmd,
+            crate::nubefact::pos_documento_cmd,
             // Auth & Sesión V7.0
             obtener_ambiente_inicial,
             requiere_instalacion,

@@ -1,356 +1,270 @@
-use serde::{Deserialize, Serialize};
-use std::path::PathBuf;
-use std::time::Duration;
-use tracing::{error, info};
+//! Adaptador POS: sin worker, calendario ni cola paralela. HTTP siempre fuera de SQLite.
+use crate::{
+    errors::AppError,
+    services::{
+        pos_service::{self as pos, consultas, documentos},
+        session_manager::SessionState,
+    },
+};
+use rusqlite::{params, Connection};
+use serde_json::{json, Value};
+use std::{
+    collections::HashSet,
+    sync::{Mutex, OnceLock},
+    time::Duration,
+};
+use tauri::State;
 
-/// Representa los estados posibles de un envío a NubeFact según la respuesta de SUNAT
-#[derive(Debug, PartialEq, Clone)]
-pub enum EstadoEnvio {
-    Pendiente,
-    EnCola,
+#[derive(Debug, PartialEq)]
+pub enum ResultadoDocumento {
     Aceptado,
     Rechazado,
-    Observado,
-    Error(String),
+    Ausente,
+    Incierto,
 }
-
-/// Estructura de ítem según el manual oficial de NubeFact
-#[derive(Debug, Serialize, Deserialize)]
-pub struct ItemPayload {
-    pub unidad_de_medida: String,
-    pub codigo: String,
-    pub codigo_producto_sunat: String,
-    pub descripcion: String,
-    pub cantidad: f64,
-    pub valor_unitario: f64,
-    pub precio_unitario: f64,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub descuento: Option<f64>,
-    pub subtotal: f64,
-    pub tipo_de_igv: i32,
-    pub igv: f64,
-    pub total: f64,
-    pub anticipo_regularizacion: bool,
-    pub anticipo_documento_serie: String,
-    pub anticipo_documento_numero: String,
-}
-
-/// Estructura de payload principal para la Operación 1 (Generar Comprobante)
-#[derive(Debug, Serialize, Deserialize)]
-pub struct ComprobantePayload {
-    pub operacion: String,
-    pub tipo_de_comprobante: i32,
-    pub serie: String,
-    pub numero: i32,
-    pub sunat_transaction: i32,
-    pub cliente_tipo_de_documento: i32,
-    pub cliente_numero_de_documento: String,
-    pub cliente_denominacion: String,
-    pub cliente_direccion: String,
-    pub cliente_email: String,
-    pub fecha_de_emision: String,
-    pub moneda: i32,
-    pub porcentaje_de_igv: f64,
-    pub total_gravada: f64,
-    pub total_igv: f64,
-    pub total: f64,
-    pub detraccion: bool,
-    pub enviar_automaticamente_a_la_sunat: bool,
-    pub enviar_automaticamente_al_cliente: bool,
-    pub cancelado: bool,
-    pub items: Vec<ItemPayload>,
-}
-
-/// Estructura para capturar la respuesta JSON oficial de NubeFact
-#[derive(Debug, Serialize, Deserialize)]
-pub struct NubeFactResponse {
-    pub tipo_de_comprobante: Option<i32>,
-    pub serie: Option<String>,
-    pub numero: Option<i32>,
-    pub enlace: Option<String>,
-    pub aceptada_por_sunat: Option<bool>,
-    pub sunat_description: Option<String>,
-    pub sunat_note: Option<String>,
-    pub sunat_responsecode: Option<String>,
-    pub sunat_soap_error: Option<String>,
-    pub codigo_hash: Option<String>,
-}
-
-/// Función que realiza la petición HTTP REAL con reqwest a la API de NubeFact
-#[cfg(not(tarpaulin_include))]
-pub async fn enviar_a_nubefact(
-    payload: &ComprobantePayload,
-) -> Result<EstadoEnvio, reqwest::Error> {
-    let url = std::env::var("NUBEFACT_URL")
-        .unwrap_or_else(|_| "https://api.nubefact.com/api/v1/sandbox".to_string());
-
-    let token =
-        std::env::var("NUBEFACT_TOKEN").unwrap_or_else(|_| "token_sandbox_default".to_string());
-
-    info!(
-        "🚀 Enviando comprobante {} - {} a NubeFact...",
-        payload.serie, payload.numero
-    );
-
-    let client = reqwest::Client::new();
-    let res = client
-        .post(&url)
-        .header("Authorization", format!("Bearer {}", token))
-        .header("Content-Type", "application/json")
-        .json(&payload)
-        .send()
-        .await?;
-
-    let status = res.status();
-    let body_text = res.text().await.unwrap_or_default();
-
-    if status.is_success() {
-        match serde_json::from_str::<NubeFactResponse>(&body_text) {
-            Ok(parsed) => {
-                let aceptada = parsed.aceptada_por_sunat.unwrap_or(false);
-                let desc = parsed.sunat_description.unwrap_or_default();
-                let code = parsed.sunat_responsecode.unwrap_or_default();
-
-                if aceptada {
-                    info!("✅ NubeFact / SUNAT: ACEPTADO -> {}", desc);
-                    Ok(EstadoEnvio::Aceptado)
-                } else if code == "0" || desc.to_lowercase().contains("observ") {
-                    info!("⚠️ NubeFact / SUNAT: OBSERVADO -> {}", desc);
-                    Ok(EstadoEnvio::Observado)
-                } else {
-                    error!(
-                        "❌ NubeFact / SUNAT: RECHAZADO [Code: {}] -> {}",
-                        code, desc
-                    );
-                    Ok(EstadoEnvio::Rechazado)
-                }
-            }
-            Err(e) => {
-                error!(
-                    "⚠️ Respuesta exitosa pero no se pudo parsear el JSON: {:?}. Body: {}",
-                    e, body_text
-                );
-                Ok(EstadoEnvio::Error(body_text))
-            }
-        }
+pub fn interpretar(v: &Value, consulta: bool) -> ResultadoDocumento {
+    let (estado, _) = documentos::clasificar_respuesta(v);
+    if estado == "ACEPTADO" {
+        ResultadoDocumento::Aceptado
+    } else if estado == "RECHAZADO" {
+        ResultadoDocumento::Rechazado
+    } else if consulta && (v["codigo"].as_i64() == Some(24) || v["codigo"].as_str() == Some("24")) {
+        ResultadoDocumento::Ausente
     } else {
-        error!(
-            "❌ Error HTTP en la petición a NubeFact [{}]: {}",
-            status, body_text
-        );
-        if body_text.contains("ya existe") {
-            Ok(EstadoEnvio::Aceptado)
-        } else {
-            Ok(EstadoEnvio::Rechazado)
-        }
+        ResultadoDocumento::Incierto
     }
 }
 
-/// Inicia el worker asíncrono que corre en segundo plano.
-/// Revisa la base de datos, extrae el comprobante pendiente y lo envía a NubeFact.
-#[cfg(not(tarpaulin_include))]
-pub async fn iniciar_worker_nubefact(app_data_dir: PathBuf) {
-    info!("🔄 Iniciando worker de NubeFact en segundo plano...");
-    let mut intentos_fallidos: u32 = 0;
-
-    loop {
-        let delay_segundos = if intentos_fallidos > 0 {
-            let backoff = 5 * (2_u64.pow(intentos_fallidos - 1));
-            std::cmp::min(backoff, 300)
-        } else {
-            5
-        };
-
-        tokio::time::sleep(Duration::from_secs(delay_segundos)).await;
-        info!("🔍 Worker revisando la base de datos para envío a NubeFact...");
-
-        let tarea_pendiente = match crate::db::init_db(app_data_dir.clone()) {
-            Ok(conn) => {
-                let mut stmt = conn.prepare(
-                    "SELECT c.id_comprobante, c.tipo_comprobante, s.serie, c.correlativo, c.monto_subtotal, c.monto_igv, c.monto_total, 
-                            cl.tipo_documento, cl.numero_documento, cl.nombre_razon_social, cola.id_cola 
-                     FROM cola_envio_sunat cola
-                     JOIN comprobantes c ON cola.id_comprobante = c.id_comprobante
-                     JOIN clientes cl ON c.id_cliente = cl.id_cliente
-                     LEFT JOIN series_comprobante s ON c.id_serie = s.id_serie
-                     WHERE cola.estado_envio = 'PENDIENTE'
-                     LIMIT 1"
-                ).ok();
-
-                stmt.as_mut().and_then(|s| {
-                    s.query_row([], |row| {
-                        Ok((
-                            row.get::<_, i32>(0)?,
-                            row.get::<_, String>(1)?,
-                            row.get::<_, Option<String>>(2)?
-                                .unwrap_or_else(|| "F001".to_string()),
-                            row.get::<_, i32>(3)?,
-                            row.get::<_, f64>(4)?,
-                            row.get::<_, f64>(5)?,
-                            row.get::<_, f64>(6)?,
-                            row.get::<_, String>(7)?,
-                            row.get::<_, String>(8)?,
-                            row.get::<_, String>(9)?,
-                            row.get::<_, i32>(10)?,
-                        ))
-                    })
-                    .ok()
-                })
-            }
-            Err(e) => {
-                error!("❌ Error de acceso a BD en worker: {:?}", e);
-                None
-            }
-        };
-
-        match tarea_pendiente {
-            Some((
-                comp_id,
-                _tipo_comp,
-                serie,
-                correlativo,
-                subtotal,
-                igv,
-                total,
-                cli_tipo_doc,
-                cli_num_doc,
-                cli_razon,
-                cola_id,
-            )) => {
-                info!(
-                    "📦 Comprobante encontrado en cola: {} - {}",
-                    serie, correlativo
-                );
-
-                let payload = ComprobantePayload {
-                    operacion: "generar_comprobante".to_string(),
-                    tipo_de_comprobante: 1,
-                    serie,
-                    numero: correlativo,
-                    sunat_transaction: 1,
-                    cliente_tipo_de_documento: match cli_tipo_doc.as_str() {
-                        "RUC" => 6,
-                        "DNI" => 1,
-                        _ => 1,
-                    },
-                    cliente_numero_de_documento: cli_num_doc,
-                    cliente_denominacion: cli_razon,
-                    cliente_direccion: "AV. LIBERTAD 123 - LIMA".to_string(),
-                    cliente_email: "tucliente@gmail.com".to_string(),
-                    fecha_de_emision: chrono::Local::now().format("%d-%m-%Y").to_string(),
-                    moneda: 1,
-                    porcentaje_de_igv: 18.0,
-                    total_gravada: subtotal,
-                    total_igv: igv,
-                    total,
-                    detraccion: false,
-                    enviar_automaticamente_a_la_sunat: true,
-                    enviar_automaticamente_al_cliente: false,
-                    cancelado: true,
-                    items: vec![ItemPayload {
-                        unidad_de_medida: "NIU".to_string(),
-                        codigo: "001".to_string(),
-                        codigo_producto_sunat: "10000000".to_string(),
-                        descripcion: "Servicio de Lubricentro y Mantenimiento".to_string(),
-                        cantidad: 1.0,
-                        valor_unitario: subtotal,
-                        precio_unitario: total,
-                        descuento: None,
-                        subtotal,
-                        tipo_de_igv: 1,
-                        igv,
-                        total,
-                        anticipo_regularizacion: false,
-                        anticipo_documento_serie: "".to_string(),
-                        anticipo_documento_numero: "".to_string(),
-                    }],
-                };
-
-                match enviar_a_nubefact(&payload).await {
-                    Ok(EstadoEnvio::Aceptado) => {
-                        if let Ok(conn) = crate::db::init_db(app_data_dir.clone()) {
-                            let _ = conn.execute("UPDATE cola_envio_sunat SET estado_envio = 'ENVIADO' WHERE id_cola = ?1", [&cola_id]);
-                            let _ = conn.execute("UPDATE comprobantes SET estado_sunat = 'ACEPTADO' WHERE id_comprobante = ?1", [&comp_id]);
-                            info!("✅ Base de datos actualizada: Comprobante ACEPTADO por SUNAT.");
-                        }
-                        intentos_fallidos = 0;
-                    }
-                    Ok(EstadoEnvio::Observado) => {
-                        if let Ok(conn) = crate::db::init_db(app_data_dir.clone()) {
-                            let _ = conn.execute("UPDATE cola_envio_sunat SET estado_envio = 'ENVIADO' WHERE id_cola = ?1", [&cola_id]);
-                            let _ = conn.execute("UPDATE comprobantes SET estado_sunat = 'OBSERVADO' WHERE id_comprobante = ?1", [&comp_id]);
-                            info!("⚠️ Base de datos actualizada: Comprobante OBSERVADO.");
-                        }
-                        intentos_fallidos = 0;
-                    }
-                    Ok(EstadoEnvio::Rechazado) => {
-                        intentos_fallidos += 1;
-                        if let Ok(conn) = crate::db::init_db(app_data_dir.clone()) {
-                            let _ = conn.execute("UPDATE cola_envio_sunat SET estado_envio = 'ERROR', intentos = ?1 WHERE id_cola = ?2", (intentos_fallidos, cola_id));
-                            let _ = conn.execute("UPDATE comprobantes SET estado_sunat = 'RECHAZADO' WHERE id_comprobante = ?1", [&comp_id]);
-                            info!("❌ Base de datos actualizada: Comprobante RECHAZADO.");
-                        }
-                    }
-                    _ => {
-                        intentos_fallidos += 1;
-                    }
-                }
-            }
-            None => {
-                info!("ℹ Cola vacía, sin comprobantes pendientes.");
-                intentos_fallidos = 0;
+static EN_CURSO: OnceLock<Mutex<HashSet<i64>>> = OnceLock::new();
+struct GuardiaDocumento(i64);
+impl GuardiaDocumento {
+    fn nueva(id: i64) -> Result<Self, AppError> {
+        let mut ids = EN_CURSO
+            .get_or_init(|| Mutex::new(HashSet::new()))
+            .lock()
+            .map_err(|_| AppError::DbLock)?;
+        if !ids.insert(id) {
+            return Err(pos::error("Este documento ya está siendo procesado."));
+        }
+        Ok(Self(id))
+    }
+}
+impl Drop for GuardiaDocumento {
+    fn drop(&mut self) {
+        if let Some(m) = EN_CURSO.get() {
+            if let Ok(mut ids) = m.lock() {
+                ids.remove(&self.0);
             }
         }
     }
+}
+fn numero(v: &Value) -> Option<i64> {
+    v.as_i64()
+        .or_else(|| v.as_str().and_then(|s| s.parse().ok()))
+}
+
+#[tauri::command]
+pub async fn pos_documento_cmd(
+    db_state: State<'_, Mutex<Connection>>,
+    session_state: State<'_, Mutex<SessionState>>,
+    id_documento: i64,
+    consultar: bool,
+    automatico: bool,
+    token_envio: Option<String>,
+) -> Result<Value, AppError> {
+    let _guardia = GuardiaDocumento::nueva(id_documento)?;
+    // Scope explícito: ningún MutexGuard atraviesa el await.
+    let (actor, ruta, token, request, identidad, es_consulta) = {
+        let mut session = session_state.lock().map_err(|_| AppError::DbLock)?;
+        let mut conn = db_state.lock().map_err(|_| AppError::DbLock)?;
+        let actor = session.validar_sesion_operativa(&conn)?;
+        let rol = pos::validar_rol(&conn, actor)?;
+        let (venta,payload,sha,estado,intento,consulta,version):(i64,String,String,String,i64,i64,i64)=conn.query_row("SELECT id_venta,payload_json,payload_sha256,estado_envio,intento_iniciado,requiere_consulta,version FROM comprobantes WHERE id_comprobante=?1",[id_documento],|r|Ok((r.get(0)?,r.get(1)?,r.get(2)?,r.get(3)?,r.get(4)?,r.get(5)?,r.get(6)?)))?;
+        consultas::visible(&conn, actor, venta)?;
+        if rol != "ADMINISTRADOR"
+            && (!automatico || consultar || estado != "PENDIENTE" || intento != 0 || consulta != 0)
+        {
+            return Err(AppError::PermisoDenegado);
+        }
+        if rol != "ADMINISTRADOR" {
+            session.consumir_autorizacion(
+                token_envio.as_deref().ok_or(AppError::PermisoDenegado)?,
+                actor,
+                "POS_ENVIO_INICIAL",
+                &id_documento.to_string(),
+            )?;
+        }
+        if ["ACEPTADO", "RECHAZADO"].contains(&estado.as_str()) {
+            return Err(pos::error("El documento ya tiene resultado definitivo."));
+        }
+        // Estado ENVIANDO puede ser un envío vivo o un intento interrumpido: solo consultar.
+        let es_consulta = consultar || intento != 0 || consulta != 0 || estado == "ENVIANDO";
+        let payload: Value = serde_json::from_str(&payload).map_err(pos::json_error)?;
+        documentos::validar_huella(&payload, &sha)?;
+        let cfg = pos::configuracion(&conn)?;
+        pos::validar_config(&cfg)?;
+        let ruta = cfg["ruta"].as_str().unwrap_or("").to_string();
+        let url = reqwest::Url::parse(&ruta).map_err(|_| pos::error("Ruta NubeFact inválida."))?;
+        if url.scheme() != "https" || !url.username().is_empty() || url.password().is_some() {
+            return Err(pos::error(
+                "La integración requiere una ruta HTTPS sin credenciales en la URL.",
+            ));
+        }
+        let servicio = format!(
+            "lubricentro_erp_nubefact_{}",
+            cfg["ambiente"].as_str().unwrap_or("")
+        );
+        let token=keyring::Entry::new(&servicio,cfg["token_ref"].as_str().unwrap_or("")).map_err(|_|pos::error("No se pudo acceder al almacén de credenciales."))?.get_password().map_err(|_|pos::error("No se encontró el token protegido de este ambiente. Configúralo en Administración."))?;
+        let request = if es_consulta {
+            json!({"operacion":"consultar_comprobante","tipo_de_comprobante":payload["tipo_de_comprobante"],"serie":payload["serie"],"numero":payload["numero"]})
+        } else {
+            payload.clone()
+        };
+        let tx = conn.transaction()?;
+        let cambios=tx.execute("UPDATE comprobantes SET estado_envio='ENVIANDO',intento_iniciado=1,requiere_consulta=1,fecha_ultimo_intento=datetime('now','-5 hours'),version=version+1 WHERE id_comprobante=?1 AND version=?2",params![id_documento,version])?;
+        if cambios != 1 {
+            return Err(pos::error("El documento cambió. Actualiza su detalle."));
+        }
+        pos::auditar(
+            &tx,
+            actor,
+            &uuid::Uuid::new_v4().to_string(),
+            if es_consulta {
+                "CONSULTA_INICIADA"
+            } else {
+                "ENVIO_INICIADO"
+            },
+            "comprobantes",
+            id_documento,
+            &json!({"serie":payload["serie"],"numero":payload["numero"]}),
+            "",
+            None,
+        )?;
+        tx.commit()?;
+        (actor, ruta, token, request, payload, es_consulta)
+    };
+    let respuesta = async {
+        let client = reqwest::Client::builder()
+            .timeout(Duration::from_secs(25))
+            .redirect(reqwest::redirect::Policy::none())
+            .build()
+            .map_err(|_| ())?;
+        let res = client
+            .post(ruta)
+            .header("Authorization", format!("Token token={token}"))
+            .json(&request)
+            .send()
+            .await
+            .map_err(|_| ())?;
+        let codigo = res.status();
+        let body = res.json::<Value>().await.map_err(|_| ())?;
+        Ok::<_, ()>((codigo, body))
+    }
+    .await;
+    let (resultado, respuesta) = match respuesta {
+        Ok((http, v)) => {
+            let coincide = v["serie"] == identidad["serie"]
+                && numero(&v["numero"]) == numero(&identidad["numero"])
+                && numero(&v["tipo_de_comprobante"]) == numero(&identidad["tipo_de_comprobante"]);
+            let resultado = interpretar(&v, es_consulta);
+            if (!http.is_success() || !coincide) && resultado != ResultadoDocumento::Ausente {
+                (ResultadoDocumento::Incierto, v)
+            } else {
+                (resultado, v)
+            }
+        }
+        Err(_) => (
+            ResultadoDocumento::Incierto,
+            json!({"sunat_description":"No se obtuvo una respuesta definitiva. Consulta el estado antes de reenviar."}),
+        ),
+    };
+    let estado = match resultado {
+        ResultadoDocumento::Aceptado => "ACEPTADO",
+        ResultadoDocumento::Rechazado => "RECHAZADO",
+        ResultadoDocumento::Ausente => "PENDIENTE",
+        ResultadoDocumento::Incierto => "ERROR",
+    };
+    let incierto = resultado == ResultadoDocumento::Incierto;
+    let mensaje = respuesta["sunat_description"]
+        .as_str()
+        .or(respuesta["errors"].as_str())
+        .unwrap_or(if resultado == ResultadoDocumento::Ausente {
+            "El proveedor confirmó ausencia. Puedes enviar el mismo documento."
+        } else {
+            "Respuesta pendiente de validación. Consulta nuevamente."
+        });
+    let mensaje: String = mensaje.chars().take(500).collect();
+    let codigo = respuesta["sunat_responsecode"]
+        .as_str()
+        .map(str::to_string)
+        .or_else(|| respuesta.get("codigo").map(Value::to_string));
+    let link = |k: &str| {
+        respuesta[k]
+            .as_str()
+            .filter(|s| s.starts_with("https://"))
+            .map(str::to_string)
+    };
+    let mut conn = db_state.lock().map_err(|_| AppError::DbLock)?;
+    let tx = conn.transaction()?;
+    // Un intento posterior no puede degradar una respuesta definitiva ya guardada.
+    tx.execute("UPDATE comprobantes SET estado_envio=?1,intento_iniciado=0,requiere_consulta=?2,resultado_incierto=?2,fecha_ultima_consulta=CASE WHEN ?3 THEN datetime('now','-5 hours') ELSE fecha_ultima_consulta END,fecha_confirmacion=CASE WHEN ?1 IN ('ACEPTADO','RECHAZADO') THEN datetime('now','-5 hours') ELSE NULL END,codigo_respuesta=?4,respuesta_resumida=?5,advertencias_json=?6,ruta_pdf=coalesce(?7,ruta_pdf),ruta_xml=coalesce(?8,ruta_xml),ruta_cdr=coalesce(?9,ruta_cdr),version=version+1 WHERE id_comprobante=?10 AND estado_envio NOT IN ('ACEPTADO','RECHAZADO')",params![estado,incierto,es_consulta,codigo,mensaje,serde_json::to_string(&respuesta["sunat_note"]).map_err(pos::json_error)?,link("enlace_del_pdf"),link("enlace_del_xml"),link("enlace_del_cdr"),id_documento])?;
+    pos::auditar(
+        &tx,
+        actor,
+        &uuid::Uuid::new_v4().to_string(),
+        "RESULTADO_DOCUMENTAL",
+        "comprobantes",
+        id_documento,
+        &json!({"estado":estado,"incierto":incierto}),
+        "",
+        None,
+    )?;
+    tx.commit()?;
+    Ok(
+        json!({"id_documento":id_documento,"estado":estado,"mensaje":mensaje,"requiere_consulta":incierto}),
+    )
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-
     #[test]
-    fn test_estructura_payload_comprobante() {
-        let payload = ComprobantePayload {
-            operacion: "generar_comprobante".to_string(),
-            tipo_de_comprobante: 1,
-            serie: "FFF1".to_string(),
-            numero: 1,
-            sunat_transaction: 1,
-            cliente_tipo_de_documento: 6,
-            cliente_numero_de_documento: "20600695771".to_string(),
-            cliente_denominacion: "NUBEFACT SA".to_string(),
-            cliente_direccion: "AV. LIBERTAD 123".to_string(),
-            cliente_email: "test@gmail.com".to_string(),
-            fecha_de_emision: "29-09-2026".to_string(),
-            moneda: 1,
-            porcentaje_de_igv: 18.0,
-            total_gravada: 100.0,
-            total_igv: 18.0,
-            total: 118.0,
-            detraccion: false,
-            enviar_automaticamente_a_la_sunat: true,
-            enviar_automaticamente_al_cliente: false,
-            cancelado: true,
-            items: vec![],
-        };
-
-        assert_eq!(payload.serie, "FFF1");
-        assert_eq!(payload.total, 118.0);
+    fn timeout_o_duplicado_no_equivale_aceptado() {
+        assert_eq!(
+            interpretar(
+                &json!({"errors":"El comprobante ya existe","codigo":23}),
+                false
+            ),
+            ResultadoDocumento::Incierto
+        );
+        assert_eq!(
+            interpretar(&json!({"aceptada_por_sunat":false}), true),
+            ResultadoDocumento::Incierto
+        );
     }
-
     #[test]
-    fn test_parseo_respuesta_nubefact() {
-        let json_data = r#"{
-            "tipo_de_comprobante": 1,
-            "serie": "FFF1",
-            "numero": 66,
-            "aceptada_por_sunat": true,
-            "sunat_description": "ACEPTADA"
-        }"#;
-
-        let res: Result<NubeFactResponse, _> = serde_json::from_str(json_data);
-        assert!(res.is_ok());
-        let parsed = res.unwrap();
-        assert_eq!(parsed.aceptada_por_sunat, Some(true));
+    fn ausencia_solo_consulta_confirmada() {
+        assert_eq!(
+            interpretar(&json!({"codigo":24}), true),
+            ResultadoDocumento::Ausente
+        );
+        assert_eq!(
+            interpretar(&json!({"codigo":24}), false),
+            ResultadoDocumento::Incierto
+        );
+    }
+    #[test]
+    fn aceptacion_y_rechazo_formal() {
+        assert_eq!(
+            interpretar(&json!({"aceptada_por_sunat":true}), false),
+            ResultadoDocumento::Aceptado
+        );
+        assert_eq!(
+            interpretar(
+                &json!({"aceptada_por_sunat":false,"sunat_responsecode":"2335"}),
+                true
+            ),
+            ResultadoDocumento::Rechazado
+        );
     }
 }
