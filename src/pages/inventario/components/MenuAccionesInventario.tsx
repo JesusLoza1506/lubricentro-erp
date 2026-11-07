@@ -71,7 +71,7 @@ export function MenuAccionesInventario({
             ref={menu}
             role="menu"
             aria-label={`Acciones de ${nombre}`}
-            className="inv-action-menu"
+            className="gloria-theme inv-action-menu"
             style={posicion}
             onKeyDown={(e) => {
               if (e.key === 'Escape') {

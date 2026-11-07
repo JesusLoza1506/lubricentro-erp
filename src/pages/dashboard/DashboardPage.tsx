@@ -1,27 +1,62 @@
 import React, { useEffect, useState } from 'react';
-import { useAuth } from '../../context/AuthContext';
-import { obtenerDatosDashboard, DashboardDTO } from '../../services/dashboardService';
 import {
-  Wrench,
-  ShoppingCart,
-  Package,
-  BarChart3,
-  CheckCircle2,
-  Users,
-  Clock,
+  ArrowRight,
   Car,
+  ClipboardList,
+  Clock,
+  Package,
+  Receipt,
+  ShoppingCart,
+  Wallet,
+  Wrench,
 } from 'lucide-react';
+import { useAuth } from '../../context/AuthContext';
+import { obtenerDatosDashboard } from '../../services/dashboardService';
+import type { DashboardDTO } from '../../services/dashboardService';
+import '../../styles/gloriaTaller.css';
+import './dashboardVisual.css';
 
 interface DashboardPageProps {
   setModuloActual: (modulo: string) => void;
 }
 
+const accesos = [
+  { permiso: 'OT', destino: 'taller', icono: Wrench, titulo: 'Órdenes de Trabajo',
+    descripcion: 'Revisa las zanjas y las órdenes del taller.' },
+  { permiso: 'POS', destino: 'pos', icono: ShoppingCart, titulo: 'Punto de Venta',
+    descripcion: 'Registra ventas y consulta comprobantes.' },
+  { permiso: 'FICHA_VEHICULAR', destino: 'ficha_vehicular', icono: Car, titulo: 'Ficha Vehicular',
+    descripcion: 'Busca por placa y consulta el historial del vehículo.' },
+  { permiso: 'INVENTARIO', destino: 'inventario', icono: Package, titulo: 'Inventario y Stock',
+    descripcion: 'Consulta productos y existencias.' },
+] as const;
+
+interface IndicadorProps {
+  titulo: string;
+  icono: typeof Wallet;
+  valor: string;
+  detalle: string;
+  tono?: 'aviso' | 'exito';
+}
+
+function Indicador({ titulo, icono: Icono, valor, detalle, tono }: IndicadorProps) {
+  return (
+    <div className="inicio-indicador" data-tono={tono}>
+      <dt className="inicio-indicador-label">
+        {titulo}
+        <Icono size={17} aria-hidden="true" />
+      </dt>
+      <dd className="inicio-indicador-valor">{valor}</dd>
+      <dd className="inicio-indicador-detalle">{detalle}</dd>
+    </div>
+  );
+}
+
 export const DashboardPage: React.FC<DashboardPageProps> = ({ setModuloActual }) => {
   const { usuario, tienePermiso } = useAuth();
   const [metrics, setMetrics] = useState<DashboardDTO | null>(null);
-  const [cargandoMetrics, setCargandoMetrics] = useState<boolean>(false);
+  const [cargandoMetrics, setCargandoMetrics] = useState(false);
 
-  // Evaluaciones basadas estrictamente en la matriz de permisos_rol
   const puedeVerKPIsGlobales = tienePermiso('BACKUP', 'ver') && tienePermiso('COLA_SUNAT', 'ver');
   const esOperativoTallerOnly = tienePermiso('OT', 'ver') && !tienePermiso('POS', 'ver');
 
@@ -30,289 +65,106 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ setModuloActual })
       setCargandoMetrics(true);
       obtenerDatosDashboard(usuario.id_usuario)
         .then((data) => setMetrics(data))
-        .catch((err) => console.error('Error al cargar métricas del dashboard:', err))
+        .catch((err) => {
+          setMetrics(null);
+          console.error('Error al cargar métricas del dashboard:', err);
+        })
         .finally(() => setCargandoMetrics(false));
     }
   }, [usuario]);
 
+  const visibles = accesos.filter(({ permiso }) => tienePermiso(permiso, 'ver'));
+  const nombre = usuario?.nombre_completo.trim().split(/\s+/)[0];
+  const estadoCaja = metrics?.estado_caja?.trim();
+  const cajaNormalizada = estadoCaja?.toLowerCase();
+  const ots = metrics?.ots_activas ?? 0;
+  const stockCritico = metrics?.productos_stock_critico ?? 0;
+  const valor = (texto: string) => (cargandoMetrics || !metrics ? '—' : texto);
+  const detalle = (texto: string) =>
+    cargandoMetrics ? 'Cargando…' : metrics ? texto : 'Dato no disponible';
+
   return (
-    <div
-      style={{
-        flex: 1,
-        backgroundColor: 'rgba(30, 41, 59, 0.4)',
-        backdropFilter: 'blur(16px)',
-        padding: '36px',
-        borderRadius: '20px',
-        border: '1px solid rgba(51, 65, 85, 0.5)',
-        boxShadow: '0 20px 40px rgba(0, 0, 0, 0.4)',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '28px',
-        overflowY: 'auto',
-      }}
-    >
-      {/* BANNER DE BIENVENIDA */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '4px' }}>
-            <h2
-              style={{
-                fontSize: '26px',
-                fontWeight: '800',
-                color: '#F8FAFC',
-                margin: 0,
-                letterSpacing: '-0.5px',
-              }}
-            >
-              Hola, {usuario?.nombre_completo.split(' ')[0]} 👋
-            </h2>
-            <span
-              style={{
-                fontSize: '11px',
-                fontWeight: '700',
-                padding: '4px 10px',
-                borderRadius: '12px',
-                backgroundColor: 'rgba(37, 99, 235, 0.2)',
-                color: '#38BDF8',
-                border: '1px solid rgba(37, 99, 235, 0.4)',
-              }}
-            >
-              {usuario?.rol}
-            </span>
+    <div className="gloria-theme inicio-page">
+      <div className="inicio-content gt-stage">
+        <header className="inicio-bienvenida">
+          <div className="inicio-bienvenida-texto">
+            <p className="inicio-kicker">Resumen del taller</p>
+            <h2>{nombre ? `Hola, ${nombre}` : 'Inicio'}</h2>
+            <p className="inicio-descripcion">
+              {puedeVerKPIsGlobales
+                ? 'Consulta la actividad del día y entra a tus módulos de trabajo.'
+                : esOperativoTallerOnly
+                  ? 'Consulta tus órdenes activas y entra al taller.'
+                  : 'Entra a tus módulos de trabajo desde aquí.'}
+            </p>
           </div>
-          <p style={{ color: '#94A3B8', fontSize: '14px', margin: 0 }}>
-            {puedeVerKPIsGlobales
-              ? 'Resumen general de operaciones, ventas y estado del taller.'
-              : esOperativoTallerOnly
-                ? 'Listado de tus órdenes de trabajo asignadas y estado de zanjas.'
-                : 'Estado de turno de caja y acceso rápido a ventas en mostrador.'}
-          </p>
-        </div>
+          {usuario?.rol && <span className="inicio-rol">{usuario.rol}</span>}
+        </header>
 
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            padding: '8px 16px',
-            backgroundColor: 'rgba(52, 211, 153, 0.1)',
-            border: '1px solid rgba(52, 211, 153, 0.3)',
-            borderRadius: '20px',
-          }}
-        >
-          <CheckCircle2 size={16} color="#34D399" />
-          <span style={{ fontSize: '13px', color: '#34D399', fontWeight: '600' }}>
-            Sistema Operativo
-          </span>
-        </div>
+        {puedeVerKPIsGlobales && (
+          <section className="inicio-seccion" aria-labelledby="inicio-hoy-titulo">
+            <h3 id="inicio-hoy-titulo">Resumen de hoy</h3>
+            <dl className="inicio-indicadores" aria-busy={cargandoMetrics}>
+              <Indicador titulo="Ventas del día" icono={Receipt}
+                valor={valor(`S/ ${(metrics?.ventas_del_dia ?? 0).toFixed(2)}`)}
+                detalle={detalle(metrics?.comprobantes_emitidos === 1
+                  ? '1 comprobante emitido'
+                  : `${metrics?.comprobantes_emitidos ?? 0} comprobantes emitidos`)} />
+              <Indicador titulo="Órdenes activas" icono={ClipboardList}
+                valor={valor(String(ots))} detalle={detalle('Órdenes en taller')} />
+              <Indicador titulo="Stock crítico" icono={Package}
+                valor={valor(String(stockCritico))}
+                detalle={detalle(stockCritico === 1 ? '1 producto en umbral mínimo' : 'Productos en umbral mínimo')}
+                tono={!cargandoMetrics && stockCritico > 0 ? 'aviso' : undefined} />
+              <Indicador titulo="Estado de caja" icono={Wallet} valor={valor(estadoCaja || '—')}
+                detalle={detalle(cajaNormalizada === 'abierta' ? 'Turno en curso'
+                  : cajaNormalizada === 'cerrada' ? 'Sin turno abierto'
+                    : estadoCaja ? 'Estado registrado' : 'Dato no disponible')}
+                tono={!cargandoMetrics && cajaNormalizada === 'abierta' ? 'exito' : undefined} />
+            </dl>
+          </section>
+        )}
+
+        {esOperativoTallerOnly && (
+          <section className="inicio-seccion" aria-labelledby="inicio-ordenes-titulo">
+            <h3 id="inicio-ordenes-titulo">Mis órdenes activas</h3>
+            <div className="inicio-ordenes" aria-busy={cargandoMetrics}>
+              <span className="inicio-icono"><Clock size={20} aria-hidden="true" /></span>
+              <div>
+                <p className="inicio-ordenes-cifra">{valor(String(ots))}</p>
+                <p className="inicio-ordenes-texto">
+                  {detalle(ots > 0 ? 'Órdenes activas asignadas' : 'No tienes órdenes activas asignadas.')}
+                </p>
+              </div>
+            </div>
+          </section>
+        )}
+
+        <nav className="inicio-seccion" aria-labelledby="inicio-accesos-titulo">
+          <h3 id="inicio-accesos-titulo">Accesos rápidos</h3>
+          {visibles.length > 0 ? (
+            <div className="inicio-accesos">
+              {visibles.map(({ destino, icono: Icono, titulo, descripcion }) => (
+                <button key={destino} type="button" className="inicio-acceso"
+                  aria-labelledby={`inicio-acceso-${destino}`}
+                  aria-describedby={`inicio-descripcion-${destino}`}
+                  onClick={() => setModuloActual(destino)}>
+                  <span className="inicio-icono"><Icono size={20} aria-hidden="true" /></span>
+                  <span className="inicio-acceso-texto">
+                    <span id={`inicio-acceso-${destino}`} className="inicio-acceso-titulo">{titulo}</span>
+                    <span id={`inicio-descripcion-${destino}`} className="inicio-acceso-descripcion">
+                      {destino === 'taller' && esOperativoTallerOnly ? 'Revisa tus servicios asignados y tu zanja.' : descripcion}
+                    </span>
+                  </span>
+                  <ArrowRight className="inicio-acceso-flecha" size={19} aria-hidden="true" />
+                </button>
+              ))}
+            </div>
+          ) : (
+            <p className="inicio-sin-accesos">No hay accesos rápidos disponibles para tu cuenta.</p>
+          )}
+        </nav>
       </div>
-
-      {/* METRICAS GLOBALES REALES */}
-      {puedeVerKPIsGlobales && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px' }}>
-          <div style={kpiCardStyle}>
-            <span style={{ fontSize: '12px', color: '#94A3B8', fontWeight: '600' }}>
-              Ventas del Día
-            </span>
-            <h3 style={{ fontSize: '24px', fontWeight: '800', color: '#F8FAFC', margin: '4px 0' }}>
-              {cargandoMetrics ? '...' : `S/ ${(metrics?.ventas_del_dia || 0).toFixed(2)}`}
-            </h3>
-            <span style={{ fontSize: '11px', color: '#34D399' }}>
-              {metrics?.comprobantes_emitidos || 0} comprobantes emitidos
-            </span>
-          </div>
-
-          <div style={kpiCardStyle}>
-            <span style={{ fontSize: '12px', color: '#94A3B8', fontWeight: '600' }}>
-              OTs Activas
-            </span>
-            <h3 style={{ fontSize: '24px', fontWeight: '800', color: '#F8FAFC', margin: '4px 0' }}>
-              {cargandoMetrics ? '...' : `${metrics?.ots_activas || 0} en taller`}
-            </h3>
-            <span style={{ fontSize: '11px', color: '#38BDF8' }}>Zanjas 1 y 2 en proceso</span>
-          </div>
-
-          <div style={kpiCardStyle}>
-            <span style={{ fontSize: '12px', color: '#94A3B8', fontWeight: '600' }}>
-              Stock Crítico
-            </span>
-            <h3 style={{ fontSize: '24px', fontWeight: '800', color: '#FBBF24', margin: '4px 0' }}>
-              {cargandoMetrics ? '...' : `${metrics?.productos_stock_critico || 0} productos`}
-            </h3>
-            <span style={{ fontSize: '11px', color: '#94A3B8' }}>En umbral mínimo</span>
-          </div>
-
-          <div style={kpiCardStyle}>
-            <span style={{ fontSize: '12px', color: '#94A3B8', fontWeight: '600' }}>
-              Caja Chica
-            </span>
-            <h3 style={{ fontSize: '24px', fontWeight: '800', color: '#34D399', margin: '4px 0' }}>
-              {cargandoMetrics ? '...' : metrics?.estado_caja || 'Cerrada'}
-            </h3>
-            <span style={{ fontSize: '11px', color: '#94A3B8' }}>Turno activo</span>
-          </div>
-        </div>
-      )}
-
-      {/* TARJETAS DE ACCESOS RÁPIDOS ADAPTATIVAS */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '20px' }}>
-        {tienePermiso('OT', 'ver') && (
-          <div style={moduleCardStyle} onClick={() => setModuloActual('taller')}>
-            <div style={iconBoxStyle('#2563EB')}>
-              <Wrench size={24} color="#38BDF8" />
-            </div>
-            <h3 style={cardTitleStyle}>Órdenes de Trabajo</h3>
-            <p style={cardDescStyle}>
-              {esOperativoTallerOnly
-                ? 'Revisa tus servicios asignados y actualiza el estado de tu zanja.'
-                : 'Gestiona servicios de mantenimiento, cambios de aceite y diagnósticos.'}
-            </p>
-            <span style={cardLinkStyle('#38BDF8')}>Ver módulo de Taller →</span>
-          </div>
-        )}
-
-        {tienePermiso('POS', 'ver') && (
-          <div style={moduleCardStyle} onClick={() => setModuloActual('pos')}>
-            <div style={iconBoxStyle('#059669')}>
-              <ShoppingCart size={24} color="#34D399" />
-            </div>
-            <h3 style={cardTitleStyle}>Punto de Venta / POS</h3>
-            <p style={cardDescStyle}>
-              Emisión de boletas, facturas y cobros rápidos para la atención en mostrador.
-            </p>
-            <span style={cardLinkStyle('#34D399')}>Abrir caja y POS →</span>
-          </div>
-        )}
-
-        {tienePermiso('FICHA_VEHICULAR', 'ver') && (
-          <div style={moduleCardStyle} onClick={() => setModuloActual('ficha_vehicular')}>
-            <div style={iconBoxStyle('#7C3AED')}>
-              <Car size={24} color="#C084FC" />
-            </div>
-            <h3 style={cardTitleStyle}>Ficha Vehicular</h3>
-            <p style={cardDescStyle}>
-              Consulta el historial cronológico de cambios de aceite por número de placa.
-            </p>
-            <span style={cardLinkStyle('#C084FC')}>Buscar vehículo →</span>
-          </div>
-        )}
-
-        {tienePermiso('INVENTARIO', 'ver') && (
-          <div style={moduleCardStyle} onClick={() => setModuloActual('inventario')}>
-            <div style={iconBoxStyle('#D97706')}>
-              <Package size={24} color="#FBBF24" />
-            </div>
-            <h3 style={cardTitleStyle}>Inventario & Stock</h3>
-            <p style={cardDescStyle}>
-              Consulta disponibilidad de lubricantes, repuestos y aceites a granel.
-            </p>
-            <span style={cardLinkStyle('#FBBF24')}>Ver catálogo de stock →</span>
-          </div>
-        )}
-
-        {tienePermiso('FIDELIZACION', 'ver') && (
-          <div style={moduleCardStyle} onClick={() => setModuloActual('fidelizacion')}>
-            <div style={iconBoxStyle('#2563EB')}>
-              <Users size={24} color="#38BDF8" />
-            </div>
-            <h3 style={cardTitleStyle}>Fidelización</h3>
-            <p style={cardDescStyle}>
-              Recordatorios preventivos de mantenimiento por kilometraje proyectado.
-            </p>
-            <span style={cardLinkStyle('#38BDF8')}>Ver clientes candidatos →</span>
-          </div>
-        )}
-
-        {tienePermiso('CAJA', 'ver') && (
-          <div style={moduleCardStyle} onClick={() => setModuloActual('caja')}>
-            <div style={iconBoxStyle('#059669')}>
-              <BarChart3 size={24} color="#34D399" />
-            </div>
-            <h3 style={cardTitleStyle}>Caja Chica</h3>
-            <p style={cardDescStyle}>
-              Apertura de turno, arqueo y reporte de cierre de caja diaria.
-            </p>
-            <span style={cardLinkStyle('#34D399')}>Gestionar mi caja →</span>
-          </div>
-        )}
-      </div>
-
-      {/* SECCIÓN OPERATIVA DE TALLER */}
-      {esOperativoTallerOnly && (
-        <div
-          style={{
-            padding: '24px',
-            backgroundColor: 'rgba(15, 23, 42, 0.5)',
-            border: '1px solid #334155',
-            borderRadius: '16px',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '16px',
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <Clock size={20} color="#FBBF24" />
-            <h4 style={{ fontSize: '16px', fontWeight: '700', color: '#F8FAFC', margin: 0 }}>
-              Mis Órdenes de Trabajo Pendientes ({metrics?.ots_activas || 0})
-            </h4>
-          </div>
-          <p style={{ fontSize: '13px', color: '#94A3B8', margin: 0 }}>
-            {metrics?.ots_activas && metrics.ots_activas > 0
-              ? `Tienes ${metrics.ots_activas} orden(es) de trabajo activas en taller.`
-              : 'No tienes vehículos asignados en este momento. Ingresa al módulo de Órdenes de Trabajo para revisar el tablero de Zanjas.'}
-          </p>
-        </div>
-      )}
     </div>
   );
 };
-
-// ESTILOS DE COMPONENTES REUTILIZABLES
-const kpiCardStyle: React.CSSProperties = {
-  padding: '20px',
-  backgroundColor: 'rgba(15, 23, 42, 0.6)',
-  border: '1px solid #334155',
-  borderRadius: '14px',
-  display: 'flex',
-  flexDirection: 'column',
-};
-
-const moduleCardStyle: React.CSSProperties = {
-  padding: '28px',
-  backgroundColor: 'rgba(15, 23, 42, 0.6)',
-  border: '1px solid #334155',
-  borderRadius: '16px',
-  cursor: 'pointer',
-  transition: 'all 0.2s ease',
-};
-
-const iconBoxStyle = (bgColor: string): React.CSSProperties => ({
-  padding: '12px',
-  backgroundColor: `${bgColor}25`,
-  borderRadius: '12px',
-  width: 'fit-content',
-  marginBottom: '16px',
-});
-
-const cardTitleStyle: React.CSSProperties = {
-  fontSize: '18px',
-  fontWeight: '700',
-  color: '#F8FAFC',
-  margin: '0 0 8px 0',
-};
-
-const cardDescStyle: React.CSSProperties = {
-  fontSize: '13px',
-  color: '#94A3B8',
-  margin: '0 0 20px 0',
-  lineHeight: '1.5',
-};
-
-const cardLinkStyle = (color: string): React.CSSProperties => ({
-  fontSize: '13px',
-  color: color,
-  fontWeight: '600',
-  display: 'flex',
-  alignItems: 'center',
-  gap: '6px',
-});

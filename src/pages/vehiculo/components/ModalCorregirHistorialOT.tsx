@@ -119,7 +119,7 @@ export const ModalCorregirHistorialOT: React.FC<Props> = ({
                 <strong>{ordenTrabajo.codigo_ot}</strong>
                 <span className="fv-detail-muted">Atención finalizada</span>
               </div>
-              <p className="fv-form-intro">Ajusta los datos registrados e indica el motivo de la corrección.</p>
+              <p className="fv-form-intro">Corrige el resumen público, el kilometraje o el aceite de esta atención. El motivo quedará en la auditoría.</p>
               {errorModal && <div className="fv-form-error" role="alert"><AlertCircle size={17} /><span>{errorModal}</span></div>}
               <div className="fv-field">
                 <label htmlFor="fv-correction-summary">Resumen del trabajo <span>*</span></label>
@@ -158,7 +158,7 @@ export const ModalCorregirHistorialOT: React.FC<Props> = ({
             </div>
             <footer className="fv-dialog-footer">
               <span className="fv-detail-muted"><ShieldCheck size={14} />Corrección administrativa</span>
-              <div className="fv-footer-actions"><button type="button" disabled={cargando} onClick={handleCerrar} className="fv-button">Cancelar</button><button type="submit" disabled={cargando} className="fv-button fv-primary">{cargando ? 'Guardando...' : 'Revisar corrección'}</button></div>
+              <div className="fv-footer-actions"><button type="button" disabled={cargando} onClick={handleCerrar} className="fv-button">Cancelar</button><button type="submit" disabled={cargando} aria-busy={cargando} className="fv-button fv-primary">{cargando ? 'Guardando...' : 'Revisar corrección'}</button></div>
             </footer>
           </form>
         </div>
@@ -168,7 +168,7 @@ export const ModalCorregirHistorialOT: React.FC<Props> = ({
           <div className="fv-dialog fv-confirm-dialog" role="dialog" aria-modal="true" aria-labelledby="fv-confirm-correction-title">
             <header className="fv-dialog-header"><div className="fv-dialog-title-group"><span className="fv-dialog-icon"><Pencil size={20} /></span><div><span className="fv-eyebrow">{ordenTrabajo.codigo_ot}</span><h3 id="fv-confirm-correction-title">Confirmar corrección</h3></div></div></header>
             <div className="fv-dialog-body"><p className="fv-form-intro">Se actualizarán los datos de esta atención y se registrará el motivo en la auditoría.</p><div className="fv-work-note"><h4>Motivo indicado</h4><p>{motivo}</p></div></div>
-            <footer className="fv-dialog-footer"><button type="button" disabled={cargando} onClick={() => setConfirmModalOpen(false)} className="fv-button">Volver</button><button type="button" disabled={cargando} onClick={ejecutarGuardado} className="fv-button fv-primary">{cargando ? 'Guardando...' : 'Sí, guardar corrección'}</button></footer>
+            <footer className="fv-dialog-footer"><button type="button" disabled={cargando} onClick={() => setConfirmModalOpen(false)} className="fv-button">Volver</button><button type="button" disabled={cargando} aria-busy={cargando} onClick={ejecutarGuardado} className="fv-button fv-primary">{cargando ? 'Guardando...' : 'Sí, guardar corrección'}</button></footer>
           </div>
         </div>
       )}

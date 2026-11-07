@@ -1,6 +1,6 @@
 import React from 'react';
 import { LogOut } from 'lucide-react';
-import { loginStyles as s } from '../../../styles/loginStyles';
+import { AccessField, AccessHeading, AccessSubmit } from './AccessUi';
 
 interface LoginPasswordChangeProps {
   nuevaClaveOblig: string;
@@ -30,77 +30,20 @@ export const LoginPasswordChange: React.FC<LoginPasswordChangeProps> = ({
 
   return (
     <>
-      <div style={{ marginBottom: '24px' }}>
-        <h2
-          style={{
-            fontSize: '22px',
-            fontWeight: '800',
-            color: '#F8FAFC',
-            marginBottom: '6px',
-          }}
-        >
-          Cambio Obligatorio de Contraseña
-        </h2>
-        <p style={{ fontSize: '13px', color: '#94A3B8', margin: 0 }}>
-          Has ingresado con una clave temporal. Por seguridad, debes definir una nueva contraseña.
-        </p>
-      </div>
-
-      <form onSubmit={onSubmit}>
-        <div style={{ marginBottom: '14px' }}>
-          <label htmlFor="oblig-nueva-password" style={s.label}>
-            Nueva Contraseña
-          </label>
-          <input
-            id="oblig-nueva-password"
-            type="password"
-            disabled={procesando}
-            value={nuevaClaveOblig}
-            onChange={(e) => setNuevaClaveOblig(e.target.value)}
-            placeholder="8 a 128 caracteres (letras y números)"
-            maxLength={256}
-            style={s.inputBox}
-            autoComplete="new-password"
-          />
+      <AccessHeading label="Seguridad de la cuenta" title="Actualiza tu contraseña" focus
+        description="Ingresaste con una contraseña temporal. Elige una nueva para continuar." />
+      <form className="gloria-form" onSubmit={onSubmit}>
+          <AccessField id="oblig-nueva-password" label="Nueva contraseña" type="password" disabled={procesando}
+            value={nuevaClaveOblig} onChange={(e) => setNuevaClaveOblig(e.target.value)} autoComplete="new-password" maxLength={256} hint="De 8 a 128 caracteres, con al menos una letra y un número." />
+          <AccessField id="oblig-confirm-password" label="Confirmar nueva contraseña" type="password" disabled={procesando}
+            value={confirmClaveOblig} onChange={(e) => setConfirmClaveOblig(e.target.value)} autoComplete="new-password" maxLength={256} />
+        <div className="gloria-form-actions">
+          <AccessSubmit busy={procesando} busyLabel="Guardando…">Guardar contraseña y continuar</AccessSubmit>
+          <button type="button" className="gt-button gt-button--quiet" disabled={procesando}
+            onClick={handleCerrarSesionLimpio}>
+            <LogOut size={16} aria-hidden="true" /> Cerrar sesión
+          </button>
         </div>
-
-        <div style={{ marginBottom: '20px' }}>
-          <label htmlFor="oblig-confirm-password" style={s.label}>
-            Confirmar Nueva Contraseña
-          </label>
-          <input
-            id="oblig-confirm-password"
-            type="password"
-            disabled={procesando}
-            value={confirmClaveOblig}
-            onChange={(e) => setConfirmClaveOblig(e.target.value)}
-            placeholder="Repite la nueva contraseña"
-            maxLength={256}
-            style={s.inputBox}
-            autoComplete="new-password"
-          />
-        </div>
-
-        <button type="submit" disabled={procesando} style={s.submitButton}>
-          {procesando ? 'Guardando...' : 'Guardar Contraseña y Continuar'}
-        </button>
-
-        <button
-          type="button"
-          disabled={procesando}
-          onClick={handleCerrarSesionLimpio}
-          style={{
-            ...s.secondaryButton,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '8px',
-            marginTop: '12px',
-          }}
-        >
-          <LogOut size={16} />
-          <span>Cerrar Sesión</span>
-        </button>
       </form>
     </>
   );

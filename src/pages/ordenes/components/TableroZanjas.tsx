@@ -18,10 +18,17 @@ export const TableroZanjas: React.FC<TableroZanjasProps> = ({
   // Conservar únicamente las zanjas habilitadas por la configuración existente.
   const zanjasHabilitadas = tablero.zanjas.filter((z: ZanjaItemDTO) => z.activa === 1);
 
+  const ocupadas = zanjasHabilitadas.filter((z) => z.ocupada || Boolean(z.ot_actual)).length;
+  const disponibles = zanjasHabilitadas.length - ocupadas;
+
   return (
-    <div className="ot-workshop">
+    <div className="ot-workshop gt-stage">
       <section className="ot-bays" aria-labelledby="ot-bays-title">
-        <div className="ot-section-heading"><div><h2 id="ot-bays-title"><Wrench size={18} />Zanjas de trabajo <span>({zanjasHabilitadas.length})</span></h2><p>Consulta las atenciones en ejecución y los espacios disponibles.</p></div><span className="ot-muted">{zanjasHabilitadas.length} habilitadas</span></div>
+        <div className="ot-section-heading"><div><h2 id="ot-bays-title"><Wrench size={18} />Zanjas de trabajo</h2><p>Consulta las atenciones en ejecución y los espacios disponibles.</p></div>
+          <div className="ot-bay-totals">
+            <span className="ot-status" data-state="LIBRE">{disponibles} {disponibles === 1 ? 'disponible' : 'disponibles'}</span>
+            <span className="ot-status" data-state="EN_PROCESO">{ocupadas} {ocupadas === 1 ? 'ocupada' : 'ocupadas'}</span>
+          </div></div>
         <div className="ot-bays-grid">
           {zanjasHabilitadas.map((z: ZanjaItemDTO) => {
             const ot = z.ot_actual;
@@ -36,8 +43,11 @@ export const TableroZanjas: React.FC<TableroZanjasProps> = ({
                     <button className="ot-button ot-open ot-bay-open" onClick={() => onVerDetalle(ot)}>Abrir atención<ArrowRight size={15} /></button>
                   </div>
                 ) : (
-                  <div className="ot-bay-empty"><span className="ot-free-icon"><Car size={23} /></span><strong>Zanja disponible</strong><p>Lista para iniciar una atención.</p>
-                    {tablero.cola_espera.length > 0 && <label className="ot-field"><span>Iniciar con un vehículo de la cola</span><select onChange={(e) => {
+                  <div className="ot-bay-empty">
+                    <span className="ot-free-icon"><Car size={23} aria-hidden="true" /></span>
+                    <strong>{estaOcupada ? 'Atención en curso' : 'Zanja disponible'}</strong>
+                    <p>{estaOcupada ? 'El detalle de esta atención no está disponible.' : 'Lista para iniciar una atención.'}</p>
+                    {!estaOcupada && tablero.cola_espera.length > 0 && <label className="ot-field"><span>Iniciar con un vehículo de la cola</span><select onChange={(e) => {
                       const val = Number(e.target.value);
                       if (val > 0) onIniciarEnZanja(val, z.id_zanja);
                     }} defaultValue={0}><option value={0}>Seleccionar vehículo…</option>{tablero.cola_espera.map((colaOt: OrdenTrabajoHistorialDTO) => <option key={colaOt.id_ot} value={colaOt.id_ot}>{colaOt.placa} ({colaOt.codigo_ot})</option>)}</select></label>}
@@ -50,7 +60,7 @@ export const TableroZanjas: React.FC<TableroZanjasProps> = ({
         {zanjasHabilitadas.length === 0 && <div className="ot-empty">No hay zanjas habilitadas.</div>}
       </section>
       <section className="ot-queue" aria-labelledby="ot-queue-title">
-        <div className="ot-section-heading"><div><h2 id="ot-queue-title"><Clock3 size={18} />Cola de espera <span>({tablero.cola_espera.length})</span></h2><p>Vehículos pendientes de iniciar su atención.</p></div></div>
+        <div className="ot-section-heading"><div><h2 id="ot-queue-title"><Clock3 size={18} />Cola de espera <span className="ot-count">{tablero.cola_espera.length}</span></h2><p>Vehículos pendientes de iniciar su atención.</p></div></div>
         {tablero.cola_espera.length === 0 ? <div className="ot-empty">No hay vehículos esperando atención en cola.</div> : (
           <div className="ot-table-scroll" tabIndex={0} role="region" aria-label="Vehículos en espera">
             <table className="ot-table ot-queue-table">

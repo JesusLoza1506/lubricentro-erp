@@ -35,7 +35,7 @@ export function InventarioModal({
         : 'Detalles del Producto';
   return (
     <div
-      className="inv-overlay"
+      className="gloria-theme inv-overlay"
       style={{
         position: 'fixed',
         inset: 0,
@@ -53,6 +53,7 @@ export function InventarioModal({
       >
         <header className="inv-dialog-header">
           <div>
+            <span className="inv-dialog-kicker">Catálogo de productos</span>
             <h3 id="inv-product-title">{titulo}</h3>
             <p>
               {lectura

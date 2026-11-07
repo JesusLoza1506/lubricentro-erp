@@ -18,9 +18,13 @@ export function ServiciosTabla({
   onToggleEstado,
 }: ServiciosTablaProps) {
   return (
-    <section className="inv-table-section" aria-label="Catálogo de servicios">
-      <div className="inv-table-scroll">
-        <table className="inv-table">
+    <section className="inv-table-section gt-stage" aria-label="Catálogo de servicios">
+      <header className="inv-list-heading">
+        <h3>Catálogo de servicios</h3>
+        <p>Consulta precios y disponibilidad de los servicios del taller.</p>
+      </header>
+      <div className="inv-table-scroll" tabIndex={0} role="region" aria-label="Resultados del catálogo de servicios" aria-busy={cargando}>
+        <table className="inv-table inv-services-table">
           <thead>
             <tr>
               <th>Código</th>

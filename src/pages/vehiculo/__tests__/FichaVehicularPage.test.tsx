@@ -1,4 +1,4 @@
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { act, render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { FichaVehicularPage } from '../FichaVehicularPage';
 import { vehiculoService } from '../../../services/vehiculoService';
@@ -93,15 +93,24 @@ describe('FichaVehicularPage - Pruebas de Integración Frontend (Punto 15)', () 
       },
     };
 
-    vi.mocked(vehiculoService.obtenerFichaVehicularCompleta).mockResolvedValue(mockFicha);
+    let resolverFicha!: (ficha: FichaVehicularCompletaDTO) => void;
+    vi.mocked(vehiculoService.obtenerFichaVehicularCompleta).mockReturnValueOnce(
+      new Promise((resolve) => { resolverFicha = resolve; })
+    );
 
     render(<FichaVehicularPage />);
 
     const input = screen.getByPlaceholderText(/Ej\. ABC123/i);
-    fireEvent.change(input, { target: { value: 'ABC123' } });
+    fireEvent.change(input, { target: { value: 'abc-123' } });
 
     const botonBuscar = screen.getByRole('button', { name: /buscar/i });
     fireEvent.click(botonBuscar);
+    expect(screen.getByRole('status').textContent).toMatch(/consultando la ficha/i);
+    expect(vehiculoService.obtenerFichaVehicularCompleta).toHaveBeenCalledWith('ABC123', 1, 20);
+    expect(screen.queryByText('Juan Pérez (Propietario Actual)')).toBeNull();
+    await act(async () => resolverFicha(mockFicha));
+    expect(screen.queryByRole('status')).toBeNull();
+
 
     await waitFor(() => {
       expect(screen.getByText('Juan Pérez (Propietario Actual)')).toBeDefined();
@@ -112,6 +121,14 @@ describe('FichaVehicularPage - Pruebas de Integración Frontend (Punto 15)', () 
         0
       );
     });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Ver atención' }));
+    const detalle = screen.getByRole('dialog', { name: 'Atención OT-0001' });
+    expect(within(detalle).getByText('Cliente Antiguo S.A.C.')).toBeDefined();
+    expect(within(detalle).getByText('Cambio general de aceite y filtro realizado.')).toBeDefined();
+    fireEvent.click(within(detalle).getByRole('button', { name: 'Cerrar detalle de atención' }));
+    expect(screen.queryByRole('dialog', { name: 'Atención OT-0001' })).toBeNull();
+    expect(screen.getByText('OT-0001')).toBeDefined();
   });
 
   it('3. Captura y muestra el mensaje de error cuando el vehículo no existe', async () => {
@@ -212,5 +229,42 @@ describe('FichaVehicularPage - Pruebas de Integración Frontend (Punto 15)', () 
       );
       expect(screen.getAllByText(/Mostrando 21–25 de 25/i).length).toBeGreaterThan(0);
     });
+  });
+
+  it('5. Permite reintentar la consulta de próximos cambios y abrir la ficha desde el resultado', async () => {
+    vi.mocked(vehiculoService.obtenerProximosCambiosAceite)
+      .mockRejectedValueOnce(new Error('Consulta interrumpida'))
+      .mockResolvedValueOnce({
+        items: [{
+          id_vehiculo: 1,
+          placa: 'ABC123',
+          kilometraje_actual: 49000,
+          id_cliente: 1,
+          nombre_razon_social: 'Juan Pérez',
+          id_ot: 1,
+          fecha_servicio: '2026-06-01T11:30:00Z',
+          km_proximo: 50000,
+          causa: 'POR_KM',
+        }],
+        total_registros: 1,
+        pagina_actual: 1,
+        total_paginas: 1,
+      });
+    vi.mocked(vehiculoService.obtenerFichaVehicularCompleta).mockResolvedValueOnce({
+      vehiculo: {
+        id_vehiculo: 1, id_cliente: 1, placa: 'ABC123', marca: 'Toyota', modelo: 'Yaris',
+        kilometraje_actual: 49000, activo: 1,
+      },
+      historial: { items: [], total_registros: 0, pagina_actual: 1, total_paginas: 1 },
+    });
+
+    render(<FichaVehicularPage />);
+    fireEvent.click(screen.getByRole('button', { name: 'Próximos cambios de aceite' }));
+    expect(within(await screen.findByRole('alert')).getByText('Consulta interrumpida')).toBeDefined();
+    fireEvent.click(screen.getByRole('button', { name: 'Reintentar' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Ver ficha vehicular' }));
+    expect(screen.getByRole('button', { name: 'Ficha del vehículo', pressed: true })).toBeDefined();
+    await waitFor(() => expect(vehiculoService.obtenerFichaVehicularCompleta).toHaveBeenCalledWith('ABC123', 1, 20));
+    expect(await screen.findByText('Toyota Yaris')).toBeDefined();
   });
 });

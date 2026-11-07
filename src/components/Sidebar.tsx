@@ -12,10 +12,14 @@ import {
   LogOut,
   KeyRound,
   Lock,
+  UserRound,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { ConfirmModal } from './ConfirmModal';
 import { ToastNotification } from './ToastNotification';
+import logo from '../assets/logo-gloria-login.png';
+import '../styles/gloriaTaller.css';
+import './sidebarVisual.css';
 
 interface SidebarProps {
   moduloActual: string;
@@ -174,6 +178,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
     }
   };
 
+  const confirmacionSesion = destinoPendiente === 'LOGOUT' || destinoPendiente === 'MODAL_CAMBIO_CLAVE';
+
   const confirmarAccionNavegacion = () => {
     setHayCambiosSinGuardar(false);
     setMostrarConfirmacion(false);
@@ -198,212 +204,79 @@ export const Sidebar: React.FC<SidebarProps> = ({
         />
       )}
 
-      <aside
-        style={{
-          width: '260px',
-          backgroundColor: 'rgba(15, 23, 42, 0.8)',
-          backdropFilter: 'blur(16px)',
-          borderRight: '1px solid #334155',
-          display: 'flex',
-          flexDirection: 'column',
-          justifyContent: 'space-between',
-          padding: '24px 16px',
-          boxSizing: 'border-box',
-        }}
-      >
-        <div>
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '12px',
-              padding: '0 12px 24px 12px',
-              borderBottom: '1px solid #334155',
-              marginBottom: '20px',
-            }}
-          >
-            <div
-              style={{
-                backgroundColor: '#2563EB',
-                padding: '8px',
-                borderRadius: '10px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-            >
-              <Shield size={20} color="#FFFFFF" />
-            </div>
-            <div style={{ flex: 1 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <h1 style={{ fontSize: '15px', fontWeight: '800', color: '#F8FAFC', margin: 0 }}>
-                  Lubricentro Gloria
-                </h1>
-                <span
-                  style={{
-                    fontSize: '9px',
-                    fontWeight: '800',
-                    padding: '2px 5px',
-                    borderRadius: '4px',
-                    backgroundColor: !esProdBD
-                      ? 'rgba(234, 179, 8, 0.2)'
-                      : 'rgba(34, 197, 94, 0.2)',
-                    color: !esProdBD ? '#FDE047' : '#86EFAC',
-                    border: `1px solid ${!esProdBD ? 'rgba(234, 179, 8, 0.4)' : 'rgba(34, 197, 94, 0.4)'}`,
-                  }}
-                >
-                  {ambienteActual.toUpperCase()}
-                </span>
-              </div>
-              <span style={{ fontSize: '11px', color: '#38BDF8', fontWeight: '600' }}>
-                ERP Desktop v7.0
-              </span>
-            </div>
+      <aside className="gloria-theme gloria-sidebar" aria-label="Panel lateral">
+        <header className="sidebar-marca">
+          <img className="sidebar-logo" src={logo} alt="Lubricentro Gloria" />
+          <div className="sidebar-marca-meta">
+            <span className="sidebar-marca-caption">ERP Desktop v7.0</span>
+            <span className="sidebar-entorno" data-prueba={!esProdBD}>
+              {ambienteActual.toUpperCase()}
+            </span>
           </div>
+        </header>
 
-          <nav style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-            {opcionesPermitidas.map((item) => {
-              const Icon = item.icon;
-              const esActivo = moduloActual === item.id;
-              return (
-                <button
-                  key={item.id}
-                  onClick={() => handleNavegarModulo(item)}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    padding: '12px 16px',
-                    borderRadius: '10px',
-                    border: 'none',
-                    backgroundColor: esActivo ? '#2563EB' : 'transparent',
-                    color: esActivo ? '#FFFFFF' : item.enDesarrollo ? '#64748B' : '#94A3B8',
-                    fontSize: '14px',
-                    fontWeight: esActivo ? '700' : '500',
-                    cursor: 'pointer',
-                    textAlign: 'left',
-                    transition: 'all 0.2s ease',
-                    opacity: item.enDesarrollo ? 0.75 : 1,
-                  }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                    <Icon
-                      size={18}
-                      color={esActivo ? '#FFFFFF' : item.enDesarrollo ? '#64748B' : '#94A3B8'}
-                    />
-                    <span>{item.label}</span>
-                  </div>
-                  {item.enDesarrollo && (
-                    <span
-                      style={{
-                        fontSize: '9px',
-                        fontWeight: '700',
-                        color: '#94A3B8',
-                        backgroundColor: 'rgba(51, 65, 85, 0.6)',
-                        padding: '2px 6px',
-                        borderRadius: '4px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '3px',
-                      }}
-                    >
-                      <Lock size={10} /> Próx.
-                    </span>
-                  )}
-                </button>
-              );
-            })}
-          </nav>
-        </div>
-
-        <div
-          style={{
-            borderTop: '1px solid #334155',
-            paddingTop: '16px',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '12px',
-          }}
-        >
-          <div
-            style={{
-              padding: '10px 12px',
-              backgroundColor: 'rgba(30, 41, 59, 0.5)',
-              borderRadius: '8px',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '6px',
-            }}
-          >
-            <div>
-              <div
-                style={{
-                  fontSize: '13px',
-                  fontWeight: '700',
-                  color: '#F8FAFC',
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  whiteSpace: 'nowrap',
-                }}
-              >
-                {usuario?.nombre_completo}
-              </div>
-              <div style={{ fontSize: '11px', color: '#38BDF8', fontWeight: '600' }}>
-                {usuario?.rol}
-              </div>
-            </div>
-
-            {onAbrirCambioClave && (
+        <nav className="sidebar-nav" aria-label="Módulos">
+          <p className="sidebar-etiqueta">Módulos</p>
+          {opcionesPermitidas.map((item) => {
+            const Icon = item.icon;
+            const esActivo = moduloActual === item.id;
+            return (
               <button
-                onClick={handleAbrirCambioClaveModal}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  padding: '6px 8px',
-                  marginTop: '4px',
-                  backgroundColor: 'rgba(37, 99, 235, 0.15)',
-                  color: '#38BDF8',
-                  border: '1px solid rgba(56, 189, 248, 0.3)',
-                  borderRadius: '6px',
-                  cursor: 'pointer',
-                  fontSize: '11px',
-                  fontWeight: '600',
-                  transition: 'all 0.2s ease',
-                }}
+                key={item.id}
+                type="button"
+                className="sidebar-nav-item"
+                aria-current={esActivo ? 'page' : undefined}
+                data-pendiente={item.enDesarrollo}
+                onClick={() => handleNavegarModulo(item)}
               >
-                <KeyRound size={13} />
-                <span>Cambiar Contraseña</span>
+                <Icon size={17} aria-hidden="true" />
+                <span className="sidebar-nav-texto">{item.label}</span>
+                {item.enDesarrollo && (
+                  <span className="sidebar-proximo" title="Próximamente">
+                    <Lock size={10} aria-hidden="true" />
+                    <span aria-hidden="true">Próx.</span>
+                    <span className="gt-sr-only">Próximamente</span>
+                  </span>
+                )}
               </button>
-            )}
+            );
+          })}
+        </nav>
+
+        <section className="sidebar-sesion" aria-label="Cuenta y sesión">
+          <div className="sidebar-cuenta">
+            <span className="sidebar-avatar"><UserRound size={17} aria-hidden="true" /></span>
+            <div className="sidebar-identidad">
+              <p className="sidebar-nombre" title={usuario.nombre_completo}>{usuario.nombre_completo}</p>
+              <p className="sidebar-rol">{usuario.rol}</p>
+            </div>
           </div>
 
-          <button
-            onClick={handleIntentarCerrarSesion}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              padding: '10px 12px',
-              backgroundColor: 'rgba(220, 38, 38, 0.15)',
-              color: '#FCA5A5',
-              border: '1px solid rgba(239, 68, 68, 0.3)',
-              borderRadius: '8px',
-              cursor: 'pointer',
-              fontSize: '13px',
-              fontWeight: '600',
-            }}
-          >
-            <LogOut size={16} />
-            <span>Cerrar Sesión</span>
+          {onAbrirCambioClave && (
+            <button type="button" className="sidebar-accion" onClick={handleAbrirCambioClaveModal}>
+              <KeyRound size={16} aria-hidden="true" />
+              Cambiar contraseña
+            </button>
+          )}
+
+          <button type="button" className="sidebar-accion sidebar-accion-salir"
+            onClick={handleIntentarCerrarSesion}>
+            <LogOut size={16} aria-hidden="true" />
+            Cerrar sesión
           </button>
-        </div>
+        </section>
       </aside>
 
       <ConfirmModal
         abierto={mostrarConfirmacion}
-        titulo="Cambios Sin Guardar"
-        mensaje="Tienes información o un formulario editado sin guardar. Si navegas fuera o cierras sesión, perderás todos los datos ingresados."
+        varianteVisual={confirmacionSesion ? 'gloria' : undefined}
+        textoCancelar={confirmacionSesion ? 'Seguir editando' : undefined}
+        titulo={confirmacionSesion ? "Cambios sin guardar" : "Cambios Sin Guardar"}
+        mensaje={destinoPendiente === 'LOGOUT'
+          ? 'Si cierras sesión, se perderán los cambios que aún no has guardado.'
+          : destinoPendiente === 'MODAL_CAMBIO_CLAVE'
+            ? 'Si abres el cambio de contraseña, se perderán los cambios del formulario actual.'
+            : 'Tienes información o un formulario editado sin guardar. Si navegas fuera o cierras sesión, perderás todos los datos ingresados.'}
         textoConfirmar="Sí, Descartar Cambios"
         onConfirmar={confirmarAccionNavegacion}
         onCancelar={() => {

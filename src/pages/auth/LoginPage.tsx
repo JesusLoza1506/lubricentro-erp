@@ -1,8 +1,8 @@
+import '../../styles/gloriaTaller.css';
 import './loginVisual.css';
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../../context/AuthContext';
-import { ShieldAlert } from 'lucide-react';
-import { loginStyles as s } from '../../styles/loginStyles';
+import { AccessNotice } from './components/AccessUi';
 import {
   apiCambiarClaveObligatoria,
   apiInstalacionInicial,
@@ -33,6 +33,13 @@ export const LoginPage: React.FC = () => {
   } = useAuth();
 
   const usuarioInputRef = useRef<HTMLInputElement>(null);
+  const copiaTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const copiaIntentoRef = useRef(0);
+
+  useEffect(() => () => {
+    copiaIntentoRef.current += 1;
+    if (copiaTimerRef.current !== null) clearTimeout(copiaTimerRef.current);
+  }, []);
 
   const [modo, setModo] = useState<ModoPantalla>('LOGIN');
   const [mostrarPassword, setMostrarPassword] = useState(false);
@@ -73,6 +80,9 @@ export const LoginPage: React.FC = () => {
     setErrorMsg(null);
     setExitoMsg(null);
     setMostrarPassword(false);
+    setCopiado(false);
+    copiaIntentoRef.current += 1;
+    if (copiaTimerRef.current !== null) clearTimeout(copiaTimerRef.current);
 
     setUsuarioInput('');
     setPasswordInput('');
@@ -249,10 +259,21 @@ export const LoginPage: React.FC = () => {
     }
   };
 
-  const copiarCodigo = (codigo: string) => {
-    navigator.clipboard.writeText(codigo);
-    setCopiado(true);
-    setTimeout(() => setCopiado(false), 3000);
+  const copiarCodigo = async (codigo: string) => {
+    const intento = ++copiaIntentoRef.current;
+    if (copiaTimerRef.current !== null) clearTimeout(copiaTimerRef.current);
+    setCopiado(false);
+    setErrorMsg(null);
+    try {
+      await navigator.clipboard.writeText(codigo);
+      if (intento !== copiaIntentoRef.current) return;
+      setCopiado(true);
+      copiaTimerRef.current = setTimeout(() => setCopiado(false), 3000);
+    } catch {
+      if (intento === copiaIntentoRef.current) {
+        setErrorMsg('No se pudo copiar el código. Puedes seleccionarlo y copiarlo manualmente.');
+      }
+    }
   };
 
   const handleRecuperarSubmit = async (e: React.FormEvent) => {
@@ -310,160 +331,90 @@ export const LoginPage: React.FC = () => {
     }
   };
 
+  const vista = codigoGenerado || nuevoCodigoTrasRecuperar ? `${modo}-resultado` : modo;
+
   return (
-    <div className="gloria-login" style={s.container}>
+    <div className="gloria-theme gloria-login">
       <LoginBrandPanel appVersion={appVersion} />
 
-      <div className="gloria-access" style={s.rightPanel}>
-        <div className="gloria-access-card" style={s.card}>
-          {!esProdBD && (
-          <div
-            style={{
-              display: 'flex',
-              justifyContent: 'flex-end',
-              marginBottom: '10px',
-            }}
-          >
-            <span
-              style={{
-                fontSize: '10px',
-                fontWeight: '700',
-                padding: '2px 8px',
-                borderRadius: '6px',
-                backgroundColor: !esProdBD ? 'rgba(234, 179, 8, 0.15)' : 'rgba(34, 197, 94, 0.15)',
-                color: !esProdBD ? '#FDE047' : '#86EFAC',
-                border: `1px solid ${!esProdBD ? 'rgba(234, 179, 8, 0.3)' : 'rgba(34, 197, 94, 0.3)'}`,
-              }}
-            >
-              ENTORNO: {ambienteActual.toUpperCase()}
-            </span>
+      <main className="gloria-access" aria-label="Acceso al ERP">
+        <div className="gloria-access-card">
+          <div className="gloria-access-body">
+            {!esProdBD && <span className="gloria-environment">Entorno: {ambienteActual.toUpperCase()}</span>}
+            {mensajeInactividad && <AccessNotice tone="warning">{mensajeInactividad}</AccessNotice>}
+            {errorMsg && <AccessNotice tone="error">{errorMsg}</AccessNotice>}
+            {exitoMsg && modo !== 'LOGIN' && <AccessNotice tone="success">{exitoMsg}</AccessNotice>}
+            <div className="gt-stage" key={vista}>
+              {modo === 'LOGIN' && (
+                <LoginForm
+                  usuarioInput={usuarioInput}
+                  setUsuarioInput={setUsuarioInput}
+                  passwordInput={passwordInput}
+                  setPasswordInput={setPasswordInput}
+                  isLoggingIn={isLoggingIn}
+                  mostrarPassword={mostrarPassword}
+                  setMostrarPassword={setMostrarPassword}
+                  usuarioInputRef={usuarioInputRef}
+                  onSubmit={handleLoginSubmit}
+                  onIrARecuperacion={() => cambiarModo('RECUPERACION')}
+                />
+              )}
+
+              {modo === 'CAMBIO_OBLIGATORIO' && (
+                <LoginPasswordChange
+                  nuevaClaveOblig={nuevaClaveOblig}
+                  setNuevaClaveOblig={setNuevaClaveOblig}
+                  confirmClaveOblig={confirmClaveOblig}
+                  setConfirmClaveOblig={setConfirmClaveOblig}
+                  procesando={procesando}
+                  onSubmit={handleCambioObligatorioSubmit}
+                  onCerrarSesion={cerrarSesion}
+                />
+              )}
+
+              {modo === 'INSTALACION' && (
+                <LoginInstallForm
+                  instNombre={instNombre}
+                  setInstNombre={setInstNombre}
+                  instUsername={instUsername}
+                  setInstUsername={setInstUsername}
+                  instPassword={instPassword}
+                  setInstPassword={setInstPassword}
+                  instConfirmPassword={instConfirmPassword}
+                  setInstConfirmPassword={setInstConfirmPassword}
+                  procesando={procesando}
+                  codigoGenerado={codigoGenerado}
+                  codigoGuardadoConfirmado={codigoGuardadoConfirmado}
+                  setCodigoGuardadoConfirmado={setCodigoGuardadoConfirmado}
+                  copiado={copiado}
+                  onCopiarCodigo={copiarCodigo}
+                  onSubmit={handleInstalacionSubmit}
+                  onVolverLogin={() => cambiarModo('LOGIN')}
+                />
+              )}
+
+              {modo === 'RECUPERACION' && (
+                <LoginRecoverForm
+                  recUsername={recUsername}
+                  setRecUsername={setRecUsername}
+                  recCodigo={recCodigo}
+                  setRecCodigo={setRecCodigo}
+                  recNuevaPassword={recNuevaPassword}
+                  setRecNuevaPassword={setRecNuevaPassword}
+                  recConfirmNuevaPassword={recConfirmNuevaPassword}
+                  setRecConfirmNuevaPassword={setRecConfirmNuevaPassword}
+                  procesando={procesando}
+                  nuevoCodigoTrasRecuperar={nuevoCodigoTrasRecuperar}
+                  copiado={copiado}
+                  onCopiarCodigo={copiarCodigo}
+                  onSubmit={handleRecuperarSubmit}
+                  onVolverLogin={() => cambiarModo('LOGIN')}
+                />
+              )}
+            </div>
           </div>
-          )}
-
-          {mensajeInactividad && (
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '12px',
-                padding: '12px 14px',
-                backgroundColor: 'rgba(234, 179, 8, 0.15)',
-                border: '1px solid rgba(234, 179, 8, 0.4)',
-                color: '#FDE047',
-                borderRadius: '12px',
-                fontSize: '13px',
-                marginBottom: '20px',
-                fontWeight: '600',
-              }}
-            >
-              <ShieldAlert size={18} style={{ flexShrink: 0 }} />
-              <span>{mensajeInactividad}</span>
-            </div>
-          )}
-
-          {errorMsg && (
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '12px',
-                padding: '12px 14px',
-                backgroundColor: 'rgba(220, 38, 38, 0.15)',
-                border: '1px solid rgba(239, 68, 68, 0.4)',
-                color: '#FCA5A5',
-                borderRadius: '12px',
-                fontSize: '13px',
-                marginBottom: '20px',
-                fontWeight: '600',
-              }}
-            >
-              <ShieldAlert size={18} style={{ flexShrink: 0 }} />
-              <span>{errorMsg}</span>
-            </div>
-          )}
-
-          {exitoMsg && modo !== 'LOGIN' && (
-            <div
-              style={{
-                ...s.warningCard,
-                backgroundColor: 'rgba(34, 197, 94, 0.15)',
-                borderColor: 'rgba(34, 197, 94, 0.4)',
-                color: '#86EFAC',
-                marginBottom: '20px',
-              }}
-            >
-              {exitoMsg}
-            </div>
-          )}
-
-          {modo === 'LOGIN' && (
-            <LoginForm
-              usuarioInput={usuarioInput}
-              setUsuarioInput={setUsuarioInput}
-              passwordInput={passwordInput}
-              setPasswordInput={setPasswordInput}
-              isLoggingIn={isLoggingIn}
-              mostrarPassword={mostrarPassword}
-              setMostrarPassword={setMostrarPassword}
-              usuarioInputRef={usuarioInputRef}
-              onSubmit={handleLoginSubmit}
-              onIrARecuperacion={() => cambiarModo('RECUPERACION')}
-            />
-          )}
-
-          {modo === 'CAMBIO_OBLIGATORIO' && (
-            <LoginPasswordChange
-              nuevaClaveOblig={nuevaClaveOblig}
-              setNuevaClaveOblig={setNuevaClaveOblig}
-              confirmClaveOblig={confirmClaveOblig}
-              setConfirmClaveOblig={setConfirmClaveOblig}
-              procesando={procesando}
-              onSubmit={handleCambioObligatorioSubmit}
-              onCerrarSesion={cerrarSesion}
-            />
-          )}
-
-          {modo === 'INSTALACION' && (
-            <LoginInstallForm
-              instNombre={instNombre}
-              setInstNombre={setInstNombre}
-              instUsername={instUsername}
-              setInstUsername={setInstUsername}
-              instPassword={instPassword}
-              setInstPassword={setInstPassword}
-              instConfirmPassword={instConfirmPassword}
-              setInstConfirmPassword={setInstConfirmPassword}
-              procesando={procesando}
-              codigoGenerado={codigoGenerado}
-              codigoGuardadoConfirmado={codigoGuardadoConfirmado}
-              setCodigoGuardadoConfirmado={setCodigoGuardadoConfirmado}
-              copiado={copiado}
-              onCopiarCodigo={copiarCodigo}
-              onSubmit={handleInstalacionSubmit}
-              onVolverLogin={() => cambiarModo('LOGIN')}
-            />
-          )}
-
-          {modo === 'RECUPERACION' && (
-            <LoginRecoverForm
-              recUsername={recUsername}
-              setRecUsername={setRecUsername}
-              recCodigo={recCodigo}
-              setRecCodigo={setRecCodigo}
-              recNuevaPassword={recNuevaPassword}
-              setRecNuevaPassword={setRecNuevaPassword}
-              recConfirmNuevaPassword={recConfirmNuevaPassword}
-              setRecConfirmNuevaPassword={setRecConfirmNuevaPassword}
-              procesando={procesando}
-              nuevoCodigoTrasRecuperar={nuevoCodigoTrasRecuperar}
-              copiado={copiado}
-              onCopiarCodigo={copiarCodigo}
-              onSubmit={handleRecuperarSubmit}
-              onVolverLogin={() => cambiarModo('LOGIN')}
-            />
-          )}
         </div>
-      </div>
+      </main>
     </div>
   );
 };

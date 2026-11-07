@@ -25,7 +25,7 @@ export function ModalPos({
   }, []);
   return (
     <div
-      className="pos-overlay"
+      className="gloria-theme pos-overlay"
       onChangeCapture={() => {
         if (captura) marcar(true);
       }}
@@ -74,7 +74,7 @@ export function ModalPos({
             <X size={20} />
           </button>
         </header>
-        {children}
+        <div className="pos-modal-body">{children}</div>
       </div>
     </div>
   );

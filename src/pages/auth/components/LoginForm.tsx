@@ -1,6 +1,6 @@
 import React from 'react';
 import { User, Lock, Eye, EyeOff } from 'lucide-react';
-import { loginStyles as s } from '../../../styles/loginStyles';
+import { AccessField, AccessHeading, AccessSubmit } from './AccessUi';
 
 interface LoginFormProps {
   usuarioInput: string;
@@ -29,115 +29,28 @@ export const LoginForm: React.FC<LoginFormProps> = ({
 }) => {
   return (
     <>
-      <div style={{ marginBottom: '24px' }}>
-        <h2
-          style={{
-            fontSize: '24px',
-            fontWeight: '600',
-            color: '#F8FAFC',
-            marginBottom: '6px',
-            letterSpacing: '-0.5px',
-          }}
-        >
-          Iniciar sesión
-        </h2>
-        <p style={{ fontSize: '14px', color: '#94A3B8', margin: 0 }}>
-          Ingresa tu usuario y contraseña.
-        </p>
-      </div>
-
-      <form onSubmit={onSubmit}>
-        <div style={{ marginBottom: '18px' }}>
-          <label htmlFor="login-username" style={s.label}>
-            Usuario
-          </label>
-          <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-            <User
-              size={18}
-              color="#64748B"
-              style={{ position: 'absolute', left: '14px', pointerEvents: 'none' }}
-            />
-            <input
-              id="login-username"
-              ref={usuarioInputRef}
-              type="text"
-              disabled={isLoggingIn}
-              value={usuarioInput}
-              onChange={(e) => setUsuarioInput(e.target.value)}
-              placeholder="Ej. admin"
-              style={s.inputWithIcon}
-              autoComplete="username"
-            />
-          </div>
-        </div>
-
-        <div style={{ marginBottom: '22px' }}>
-          <label htmlFor="login-password" style={s.label}>
-            Contraseña
-          </label>
-          <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-            <Lock
-              size={18}
-              color="#64748B"
-              style={{ position: 'absolute', left: '14px', pointerEvents: 'none' }}
-            />
-            <input
-              id="login-password"
-              type={mostrarPassword ? 'text' : 'password'}
-              disabled={isLoggingIn}
-              value={passwordInput}
-              onChange={(e) => setPasswordInput(e.target.value)}
-              placeholder="••••••••"
-              maxLength={256}
-              style={s.inputWithIcon}
-              autoComplete="current-password"
-            />
-            <button
-              type="button"
-              disabled={isLoggingIn}
+      <AccessHeading label="Acceso al sistema" title="Iniciar sesión" description="Ingresa con tu cuenta del taller." />
+      <form className="gloria-form" onSubmit={onSubmit}>
+        <AccessField id="login-username" label="Usuario" type="text" disabled={isLoggingIn}
+          inputRef={usuarioInputRef} value={usuarioInput} onChange={(e) => setUsuarioInput(e.target.value)}
+          placeholder="Ej. admin" autoComplete="username" icon={<User size={16} />} />
+        <AccessField id="login-password" label="Contraseña" type={mostrarPassword ? 'text' : 'password'}
+          disabled={isLoggingIn} value={passwordInput} onChange={(e) => setPasswordInput(e.target.value)}
+          placeholder="••••••••" maxLength={256} autoComplete="current-password" icon={<Lock size={16} />}
+          action={
+            <button type="button" className="gt-button gt-button--icon gt-field-action" disabled={isLoggingIn}
               onClick={() => setMostrarPassword(!mostrarPassword)}
-              style={s.toggleEyeBtn}
               title={mostrarPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
-              aria-label={mostrarPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
-            >
-              {mostrarPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+              aria-label={mostrarPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}>
+              {mostrarPassword ? <EyeOff size={16} aria-hidden="true" /> : <Eye size={16} aria-hidden="true" />}
             </button>
-          </div>
+          } />
+        <div className="gloria-form-actions">
+          <AccessSubmit busy={isLoggingIn} busyLabel="Iniciando sesión…">Ingresar</AccessSubmit>
+          <button type="button" className="gt-button gt-button--quiet" disabled={isLoggingIn}
+            onClick={onIrARecuperacion}>¿No puedes ingresar?</button>
         </div>
-
-        <button type="submit" disabled={isLoggingIn} style={s.submitButton}>
-          <span>{isLoggingIn ? 'Iniciando sesión...' : 'Ingresar'}</span>
-        </button>
       </form>
-
-      <div
-        style={{
-          marginTop: '12px',
-          textAlign: 'center',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '8px',
-        }}
-      >
-        <button
-          type="button"
-          disabled={isLoggingIn}
-          onClick={onIrARecuperacion}
-          title="Recuperar acceso de administrador con el código de recuperación"
-          style={{
-            background: 'none',
-            border: 'none',
-            color: '#B5C4D8',
-            fontSize: '13px',
-            cursor: isLoggingIn ? 'not-allowed' : 'pointer',
-            fontWeight: '500',
-            outline: '2px solid transparent',
-            outlineOffset: '2px',
-          }}
-        >
-          ¿No puedes ingresar?
-        </button>
-      </div>
     </>
   );
 };

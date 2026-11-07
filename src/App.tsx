@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { LoaderCircle } from 'lucide-react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { LoginPage } from './pages/auth/LoginPage';
 import { Sidebar } from './components/Sidebar';
@@ -29,21 +30,9 @@ const MainApp: React.FC = () => {
 
   if (cargando) {
     return (
-      <div
-        style={{
-          width: '100vw',
-          height: '100vh',
-          backgroundColor: '#0B1120',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          color: '#38BDF8',
-          fontFamily: 'Inter, system-ui, sans-serif',
-          fontSize: '16px',
-          fontWeight: '600',
-        }}
-      >
-        Cargando sistema ERP V7.0...
+      <div className="gloria-theme gt-boot" role="status">
+        <LoaderCircle className="gt-boot-spinner" size={18} aria-hidden="true" />
+        Comprobando sesión…
       </div>
     );
   }

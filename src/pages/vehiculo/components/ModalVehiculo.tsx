@@ -273,8 +273,9 @@ export const ModalVehiculo: React.FC<ModalVehiculoProps> = ({
   return (
     <>
       <div className="fv-modal-overlay fv-existing-overlay" style={overlayStyle}>
-        <div className="fv-existing-form" style={modalBoxStyle}>
+        <div className="fv-existing-form" role="dialog" aria-modal={!confirmModalOpen} aria-labelledby="fv-vehicle-title" style={modalBoxStyle}>
           <div
+            className="fv-existing-title"
             style={{
               display: 'flex',
               justifyContent: 'space-between',
@@ -282,17 +283,18 @@ export const ModalVehiculo: React.FC<ModalVehiculoProps> = ({
               marginBottom: '20px',
             }}
           >
-            <h3 style={{ fontSize: '20px', fontWeight: '800', color: '#F8FAFC', margin: 0 }}>
+            <h3 id="fv-vehicle-title" style={{ fontSize: '20px', fontWeight: '800', color: 'var(--gt-text)', margin: 0 }}>
               {modo === 'CREAR' ? 'Registrar Nuevo Vehículo / Cliente' : 'Editar Ficha Vehicular'}
             </h3>
             <button
               type="button"
               disabled={guardando}
               onClick={handleCerrar}
+              aria-label="Cerrar formulario"
               style={{
                 background: 'none',
                 border: 'none',
-                color: '#94A3B8',
+                color: 'var(--gt-muted)',
                 fontSize: '18px',
                 cursor: guardando ? 'not-allowed' : 'pointer',
               }}
@@ -301,13 +303,13 @@ export const ModalVehiculo: React.FC<ModalVehiculoProps> = ({
             </button>
           </div>
 
-          {errorModal && <div style={errorBoxStyle}>⚠️ {errorModal}</div>}
+          {errorModal && <div className="fv-existing-error" role="alert" style={errorBoxStyle}>⚠️ {errorModal}</div>}
 
           <form
             onSubmit={onSubmit}
             style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}
           >
-            <div style={sectionBoxStyle}>
+            <div className="fv-existing-section" style={sectionBoxStyle}>
               <span style={sectionTitleStyle}>Datos del Propietario / Cliente</span>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                 <div style={{ position: 'relative' }}>
@@ -334,15 +336,15 @@ export const ModalVehiculo: React.FC<ModalVehiculoProps> = ({
                           key={c.id_cliente}
                           onClick={() => seleccionarClienteExistente(c)}
                           style={dropdownItemStyle}
-                          onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#334155')}
+                          onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'var(--gt-border)')}
                           onMouseLeave={(e) =>
                             (e.currentTarget.style.backgroundColor = 'transparent')
                           }
                         >
-                          <div style={{ fontWeight: '700', color: '#F8FAFC', fontSize: '13px' }}>
+                          <div style={{ fontWeight: '700', color: 'var(--gt-text)', fontSize: '13px' }}>
                             {c.nombre_razon_social}
                           </div>
-                          <div style={{ fontSize: '11px', color: '#38BDF8' }}>
+                          <div style={{ fontSize: '11px', color: 'var(--gt-focus)' }}>
                             {c.tipo_documento}: {c.numero_documento}{' '}
                             {c.telefono ? `| Tel: ${c.telefono}` : ''}
                           </div>
@@ -352,7 +354,7 @@ export const ModalVehiculo: React.FC<ModalVehiculoProps> = ({
                   )}
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.5fr 1fr', gap: '10px' }}>
+                <div className="fv-existing-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1.5fr 1fr', gap: '10px' }}>
                   <div>
                     <label style={labelStyle}>Tipo Doc. *</label>
                     <select
@@ -365,7 +367,7 @@ export const ModalVehiculo: React.FC<ModalVehiculoProps> = ({
                       }}
                       style={{
                         ...inputStyle,
-                        backgroundColor: '#1E293B',
+                        backgroundColor: 'var(--gt-surface)',
                         cursor: guardando ? 'not-allowed' : 'pointer',
                       }}
                     >
@@ -401,7 +403,7 @@ export const ModalVehiculo: React.FC<ModalVehiculoProps> = ({
                   </div>
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                <div className="fv-existing-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
                   <div>
                     <label style={labelStyle}>Correo Electrónico</label>
                     <input
@@ -434,10 +436,10 @@ export const ModalVehiculo: React.FC<ModalVehiculoProps> = ({
               </div>
             </div>
 
-            <div style={sectionBoxStyle}>
-              <span style={{ ...sectionTitleStyle, color: '#C084FC' }}>Datos del Vehículo</span>
+            <div className="fv-existing-section" style={sectionBoxStyle}>
+              <span style={sectionTitleStyle}>Datos del Vehículo</span>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px' }}>
+                <div className="fv-existing-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px' }}>
                   <div>
                     <label style={labelStyle}>Placa * (6 Caracteres)</label>
                     <input
@@ -488,7 +490,7 @@ export const ModalVehiculo: React.FC<ModalVehiculoProps> = ({
                   </div>
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.2fr 1fr', gap: '10px' }}>
+                <div className="fv-existing-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1.2fr 1fr', gap: '10px' }}>
                   <div>
                     <label style={labelStyle}>Año</label>
                     <input
@@ -516,7 +518,7 @@ export const ModalVehiculo: React.FC<ModalVehiculoProps> = ({
                       }}
                       style={{
                         ...inputStyle,
-                        backgroundColor: '#1E293B',
+                        backgroundColor: 'var(--gt-surface)',
                         cursor: guardando ? 'not-allowed' : 'pointer',
                       }}
                     >
@@ -550,7 +552,7 @@ export const ModalVehiculo: React.FC<ModalVehiculoProps> = ({
 
                 {requiereMotivo && (
                   <div style={{ marginTop: '4px' }}>
-                    <label style={{ ...labelStyle, color: '#EF4444', fontWeight: '700' }}>
+                    <label style={{ ...labelStyle, color: 'var(--gt-red)', fontWeight: '700' }}>
                       ⚠️ Motivo Administrativo Obligatorio (5-250 chars) *
                     </label>
                     <input
@@ -563,7 +565,8 @@ export const ModalVehiculo: React.FC<ModalVehiculoProps> = ({
                         setIsDirty(true);
                         setMotivo(e.target.value);
                       }}
-                      style={{ ...inputStyle, borderColor: '#EF4444' }}
+                      data-sensitive
+                      style={{ ...inputStyle, borderColor: 'var(--gt-red)' }}
                     />
                   </div>
                 )}
@@ -571,6 +574,7 @@ export const ModalVehiculo: React.FC<ModalVehiculoProps> = ({
             </div>
 
             <div
+              className="fv-existing-actions"
               style={{
                 display: 'flex',
                 justifyContent: 'flex-end',
@@ -608,12 +612,13 @@ export const ModalVehiculo: React.FC<ModalVehiculoProps> = ({
 
       {confirmModalOpen && (
         <div className="fv-modal-overlay fv-existing-overlay" style={overlayStyle}>
-          <div className="fv-existing-form" style={{ ...modalBoxStyle, width: '420px', textAlign: 'center' }}>
+          <div className="fv-existing-form" role="dialog" aria-modal="true" aria-labelledby="fv-sensitive-title" style={{ ...modalBoxStyle, width: '420px', textAlign: 'center' }}>
             <h3
+              id="fv-sensitive-title"
               style={{
                 fontSize: '18px',
                 fontWeight: '800',
-                color: '#F8FAFC',
+                color: 'var(--gt-text)',
                 marginBottom: '12px',
               }}
             >
@@ -622,7 +627,7 @@ export const ModalVehiculo: React.FC<ModalVehiculoProps> = ({
             <p
               style={{
                 fontSize: '13px',
-                color: '#94A3B8',
+                color: 'var(--gt-muted)',
                 marginBottom: '20px',
                 lineHeight: '1.5',
               }}
@@ -656,7 +661,7 @@ export const ModalVehiculo: React.FC<ModalVehiculoProps> = ({
                 onClick={ejecutarGuardado}
                 style={{
                   ...btnPrimaryStyle,
-                  backgroundColor: '#D97706',
+                  backgroundColor: 'var(--gt-blue)',
                   opacity: guardando ? 0.6 : 1,
                   cursor: guardando ? 'not-allowed' : 'pointer',
                 }}
@@ -688,7 +693,7 @@ const overlayStyle: React.CSSProperties = {
 const modalBoxStyle: React.CSSProperties = {
   width: '580px',
   backgroundColor: '#0F172A',
-  border: '1px solid #334155',
+  border: '1px solid var(--gt-border)',
   borderRadius: '16px',
   padding: '28px',
   boxShadow: '0 20px 40px rgba(0,0,0,0.5)',
@@ -700,13 +705,13 @@ const sectionBoxStyle: React.CSSProperties = {
   padding: '12px',
   backgroundColor: 'rgba(30, 41, 59, 0.5)',
   borderRadius: '10px',
-  border: '1px solid #334155',
+  border: '1px solid var(--gt-border)',
 };
 
 const sectionTitleStyle: React.CSSProperties = {
   fontSize: '11px',
   fontWeight: '700',
-  color: '#38BDF8',
+  color: 'var(--gt-focus)',
   letterSpacing: '0.5px',
   textTransform: 'uppercase',
   display: 'block',
@@ -726,7 +731,7 @@ const errorBoxStyle: React.CSSProperties = {
 const labelStyle: React.CSSProperties = {
   display: 'block',
   fontSize: '11px',
-  color: '#94A3B8',
+  color: 'var(--gt-muted)',
   marginBottom: '4px',
 };
 
@@ -734,9 +739,9 @@ const inputStyle: React.CSSProperties = {
   width: '100%',
   padding: '8px 12px',
   backgroundColor: '#0F172A',
-  border: '1px solid #334155',
+  border: '1px solid var(--gt-border)',
   borderRadius: '8px',
-  color: '#F8FAFC',
+  color: 'var(--gt-text)',
   fontSize: '13px',
   outline: 'none',
   boxSizing: 'border-box',
@@ -755,7 +760,7 @@ const btnPrimaryStyle: React.CSSProperties = {
 const btnSecondaryStyle: React.CSSProperties = {
   padding: '10px 16px',
   backgroundColor: 'transparent',
-  border: '1px solid #334155',
+  border: '1px solid var(--gt-border)',
   color: '#CBD5E1',
   borderRadius: '8px',
   cursor: 'pointer',
@@ -766,8 +771,8 @@ const dropdownContainerStyle: React.CSSProperties = {
   top: '100%',
   left: 0,
   right: 0,
-  backgroundColor: '#1E293B',
-  border: '1px solid #334155',
+  backgroundColor: 'var(--gt-surface)',
+  border: '1px solid var(--gt-border)',
   borderRadius: '8px',
   marginTop: '4px',
   maxHeight: '180px',
@@ -779,6 +784,6 @@ const dropdownContainerStyle: React.CSSProperties = {
 const dropdownItemStyle: React.CSSProperties = {
   padding: '8px 12px',
   cursor: 'pointer',
-  borderBottom: '1px solid #334155',
+  borderBottom: '1px solid var(--gt-border)',
   transition: 'background-color 0.15s ease',
 };

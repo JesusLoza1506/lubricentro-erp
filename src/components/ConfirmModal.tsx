@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { AlertTriangle, LogOut, Trash2, X } from 'lucide-react';
+import '../styles/gloriaTaller.css';
 
 interface ConfirmModalProps {
   abierto: boolean;
@@ -14,6 +15,7 @@ interface ConfirmModalProps {
   onConfirmar: () => void;
   onCancelar: () => void;
   cargando?: boolean;
+  varianteVisual?: 'gloria';
 }
 
 export const ConfirmModal: React.FC<ConfirmModalProps> = ({
@@ -29,6 +31,7 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
   onConfirmar,
   onCancelar,
   cargando = false,
+  varianteVisual,
 }) => {
   const modalRef = useRef<HTMLDivElement>(null);
   const previousFocusRef = useRef<HTMLElement | null>(null);
@@ -107,6 +110,33 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
     setErrorMotivo(null);
     onConfirmar();
   };
+
+  if (varianteVisual === 'gloria' && !requiereMotivo) {
+    return (
+      <div className="gloria-theme gt-overlay gt-overlay--confirm" role="dialog"
+        aria-modal="true" aria-labelledby="modal-confirm-title" aria-describedby="modal-confirm-message">
+        <div className="gt-dialog" ref={modalRef}>
+          <header className="gt-dialog-header gt-dialog-header--warning">
+            <AlertTriangle size={21} aria-hidden="true" />
+            <div>
+              <h3 className="gt-dialog-title" id="modal-confirm-title">{titulo}</h3>
+              <p className="gt-dialog-description" id="modal-confirm-message">{mensaje}</p>
+            </div>
+          </header>
+          <div className="gt-actions">
+            <button type="button" className="gt-button" disabled={cargando} onClick={onCancelar}>
+              {textoCancelar}
+            </button>
+            <button type="button" className="gt-button gt-button--danger" disabled={cargando}
+              aria-busy={cargando} onClick={handleConfirmarSubmit}>
+              {cargando && <span className="gt-spinner" aria-hidden="true" />}
+              {cargando ? 'Procesando…' : textoConfirmar}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div

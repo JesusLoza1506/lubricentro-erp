@@ -259,7 +259,7 @@ export const ModalRegistroCompra: React.FC<ModalRegistroCompraProps> = ({
 
   return (
     <div
-      className="inv-overlay"
+      className="gloria-theme inv-overlay"
       style={{
         position: 'fixed',
         inset: 0,
@@ -277,6 +277,7 @@ export const ModalRegistroCompra: React.FC<ModalRegistroCompraProps> = ({
       >
         <header className="inv-dialog-header">
           <div>
+            <span className="inv-dialog-kicker">Entrada al almacén</span>
             <h3 id="inv-purchase-title">Ingreso por Compra a Proveedor</h3>
             <p>Registra el documento y los productos que ingresan al almacén.</p>
           </div>
@@ -285,7 +286,7 @@ export const ModalRegistroCompra: React.FC<ModalRegistroCompraProps> = ({
           <fieldset disabled={guardando || incierta} className="inv-form-section">
             <section className="inv-form-section">
               <h4 className="inv-section-label">Proveedor y documento</h4>
-              <div style={{ display: 'flex', gap: 10, alignItems: 'end' }}>
+              <div className="inv-supplier-field">
                 <label className="inv-field" style={{ flex: 1 }}>
                   Proveedor *
                   <select
@@ -316,7 +317,7 @@ export const ModalRegistroCompra: React.FC<ModalRegistroCompraProps> = ({
                   <button
                     type="button"
                     className="inv-icon-button"
-                    title="Editar proveedor seleccionado"
+                    title="Editar proveedor seleccionado" aria-label="Editar proveedor seleccionado"
                     onClick={handleEditarProveedorSeleccionado}
                   >
                     <Edit size={16} />
@@ -415,7 +416,7 @@ export const ModalRegistroCompra: React.FC<ModalRegistroCompraProps> = ({
                 </button>
               </div>
             </section>
-            <div className="inv-purchase-lines inv-table-scroll">
+            <div className="inv-purchase-lines inv-table-scroll" tabIndex={0} role="region" aria-label="Productos de la compra">
               <table className="inv-table">
                 <thead>
                   <tr>

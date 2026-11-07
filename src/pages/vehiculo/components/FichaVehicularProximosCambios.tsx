@@ -9,6 +9,7 @@ import {
   Search,
   RefreshCw,
   Filter,
+  AlertCircle,
 } from 'lucide-react';
 
 export type TipoFiltroCausa = 'TODOS' | 'POR_KM' | 'POR_FECHA' | 'AMBOS';
@@ -90,171 +91,66 @@ export const FichaVehicularProximosCambios: React.FC<Props> = ({
 
   if (cargando) {
     return (
-      <div style={{ padding: '40px', textAlign: 'center', color: '#94A3B8' }}>
-        Cargando vehículos candidatos a cambio de aceite...
+      <div className="fv-list-empty fv-loading" role="status">
+        <span className="gt-spinner" aria-hidden="true" /> Cargando vehículos candidatos a cambio de aceite…
       </div>
     );
   }
 
   if (error) {
     return (
-      <div
-        style={{
-          padding: '16px',
-          backgroundColor: 'rgba(239, 68, 68, 0.1)',
-          border: '1px solid rgba(239, 68, 68, 0.3)',
-          borderRadius: '12px',
-          color: '#FCA5A5',
-          fontSize: '14px',
-        }}
-      >
-        {error}
+      <div className="gt-notice gt-notice--error fv-lookup-error" role="alert">
+        <AlertCircle size={17} aria-hidden="true" />
+        <div><strong>No se pudieron consultar los próximos cambios</strong><p>{error}</p></div>
+        <button type="button" className="fv-button fv-small" onClick={cargarProximosCambios}>
+          <RefreshCw size={14} aria-hidden="true" /> Reintentar
+        </button>
       </div>
     );
   }
 
   return (
-    <section
-      className="fv-upcoming"
-      style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}
-    >
-      <div
-        style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          flexWrap: 'wrap',
-          gap: '12px',
-        }}
-      >
+    <section className="fv-upcoming" aria-labelledby="fv-upcoming-title">
+      <div className="fv-section-title fv-upcoming-heading">
         <div>
-          <h3 style={{ fontSize: '18px', fontWeight: '700', color: '#F8FAFC', margin: 0 }}>
-            Próximos Cambios de Aceite ({totalRegistros})
-          </h3>
-          <p style={{ color: '#94A3B8', fontSize: '13px', margin: '4px 0 0 0' }}>
-            Vehículos próximos a cumplir o vencidos en su intervalo de mantenimiento preventivo.
-          </p>
+          <h3 id="fv-upcoming-title">Próximos cambios de aceite <span className="fv-count">{totalRegistros}</span></h3>
+          <p>Vehículos que se acercan al próximo mantenimiento o que ya superaron el intervalo.</p>
         </div>
-        <button
-          onClick={cargarProximosCambios}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '6px',
-            padding: '8px 14px',
-            backgroundColor: 'rgba(30, 41, 59, 0.8)',
-            border: '1px solid #334155',
-            borderRadius: '8px',
-            color: '#38BDF8',
-            fontSize: '13px',
-            fontWeight: '600',
-            cursor: 'pointer',
-          }}
-        >
-          <RefreshCw size={14} /> Actualizar Lista
+        <button type="button" onClick={cargarProximosCambios} className="fv-button">
+          <RefreshCw size={15} aria-hidden="true" /> Actualizar lista
         </button>
       </div>
 
-      <div
-        className="fv-upcoming-filters"
-        style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          gap: '12px',
-          padding: '12px',
-          backgroundColor: 'rgba(15, 23, 42, 0.6)',
-          border: '1px solid #334155',
-          borderRadius: '12px',
-          flexWrap: 'wrap',
-        }}
-      >
-        <div style={{ position: 'relative', flex: '1', minWidth: '220px' }}>
-          <Search
-            size={16}
-            color="#94A3B8"
-            style={{
-              position: 'absolute',
-              left: '12px',
-              top: '50%',
-              transform: 'translateY(-50%)',
-            }}
-          />
+      <div className="fv-upcoming-filters">
+        <div className="fv-search-input">
+          <Search size={16} aria-hidden="true" />
           <input
             type="text"
+            className="gt-input gt-input--leading"
+            aria-label="Buscar por placa o cliente"
             placeholder="Buscar por placa o cliente..."
             value={busqueda}
             onChange={(e) => handleBusquedaChange(e.target.value)}
-            style={{
-              width: '100%',
-              padding: '8px 12px 8px 36px',
-              backgroundColor: '#0F172A',
-              border: '1px solid #334155',
-              borderRadius: '8px',
-              color: '#F8FAFC',
-              fontSize: '13px',
-              outline: 'none',
-              boxSizing: 'border-box',
-            }}
           />
         </div>
 
-        <div
-          className="fv-filter-buttons"
-          style={{ display: 'flex', gap: '6px', alignItems: 'center' }}
-        >
-          <Filter size={14} color="#94A3B8" />
+        <div className="fv-filter-buttons" role="group" aria-label="Motivo del cambio">
+          <Filter size={15} aria-hidden="true" />
           {(['TODOS', 'POR_KM', 'POR_FECHA', 'AMBOS'] as TipoFiltroCausa[]).map((causa) => (
-            <button
-              key={causa}
-              onClick={() => handleCausaChange(causa)}
-              style={{
-                padding: '6px 12px',
-                borderRadius: '6px',
-                fontSize: '11px',
-                fontWeight: '700',
-                border: '1px solid',
-                cursor: 'pointer',
-                backgroundColor:
-                  filtroCausa === causa ? 'rgba(37, 99, 235, 0.2)' : 'rgba(30, 41, 59, 0.5)',
-                color: filtroCausa === causa ? '#38BDF8' : '#94A3B8',
-                borderColor: filtroCausa === causa ? '#2563EB' : '#334155',
-              }}
-            >
-              {causa === 'TODOS'
-                ? 'Todos'
-                : causa === 'POR_KM'
-                  ? 'Por Km'
-                  : causa === 'POR_FECHA'
-                    ? 'Por Fecha'
-                    : 'Km y Fecha'}
+            <button type="button" key={causa} className="fv-button fv-small"
+              aria-pressed={filtroCausa === causa} onClick={() => handleCausaChange(causa)}>
+              {causa === 'TODOS' ? 'Todos' : causa === 'POR_KM' ? 'Por km' : causa === 'POR_FECHA' ? 'Por fecha' : 'Km y fecha'}
             </button>
           ))}
         </div>
       </div>
 
       {lista.length === 0 ? (
-        <div
-          style={{
-            padding: '32px',
-            textAlign: 'center',
-            backgroundColor: 'rgba(15, 23, 42, 0.4)',
-            border: '1px solid #334155',
-            borderRadius: '16px',
-            color: '#94A3B8',
-            fontSize: '14px',
-          }}
-        >
+        <div className="fv-list-empty" role="status">
           No se encontraron vehículos que coincidan con los criterios de búsqueda.
         </div>
       ) : (
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 340px), 1fr))',
-            gap: '16px',
-          }}
-        >
+        <div className="fv-upcoming-grid">
           {lista.map((item) => (
             <article className="fv-upcoming-card" key={`${item.id_vehiculo}-${item.id_ot}`}>
               <div className="fv-upcoming-card-heading">
@@ -278,46 +174,14 @@ export const FichaVehicularProximosCambios: React.FC<Props> = ({
       )}
 
       {totalPaginas > 1 && (
-        <div
-          style={{
-            display: 'flex',
-            justifyContent: 'center',
-            alignItems: 'center',
-            gap: '12px',
-            marginTop: '12px',
-          }}
-        >
-          <button
-            disabled={paginaActual === 1}
-            onClick={() => setPaginaActual((p) => Math.max(1, p - 1))}
-            style={{
-              padding: '6px 14px',
-              backgroundColor: 'rgba(30, 41, 59, 0.6)',
-              border: '1px solid #334155',
-              borderRadius: '6px',
-              color: paginaActual === 1 ? '#64748B' : '#F8FAFC',
-              cursor: paginaActual === 1 ? 'not-allowed' : 'pointer',
-            }}
-          >
-            Anterior
-          </button>
-          <span style={{ fontSize: '13px', color: '#94A3B8' }}>
-            Página <strong>{paginaActual}</strong> de <strong>{totalPaginas}</strong>
-          </span>
-          <button
-            disabled={paginaActual === totalPaginas}
-            onClick={() => setPaginaActual((p) => Math.min(totalPaginas, p + 1))}
-            style={{
-              padding: '6px 14px',
-              backgroundColor: 'rgba(30, 41, 59, 0.6)',
-              border: '1px solid #334155',
-              borderRadius: '6px',
-              color: paginaActual === totalPaginas ? '#64748B' : '#F8FAFC',
-              cursor: paginaActual === totalPaginas ? 'not-allowed' : 'pointer',
-            }}
-          >
-            Siguiente
-          </button>
+        <div className="fv-pagination fv-upcoming-pagination">
+          <span>Página <strong>{paginaActual}</strong> de <strong>{totalPaginas}</strong></span>
+          <div className="fv-pagination-controls">
+            <button type="button" className="fv-button fv-small" disabled={paginaActual === 1}
+              onClick={() => setPaginaActual((p) => Math.max(1, p - 1))}>Anterior</button>
+            <button type="button" className="fv-button fv-small" disabled={paginaActual === totalPaginas}
+              onClick={() => setPaginaActual((p) => Math.min(totalPaginas, p + 1))}>Siguiente</button>
+          </div>
         </div>
       )}
     </section>

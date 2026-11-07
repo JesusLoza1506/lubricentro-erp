@@ -44,7 +44,7 @@ export const ModalMotivoEstadoServicio: React.FC<ModalMotivoEstadoServicioProps>
 
   return (
     <div
-      className="inv-overlay"
+      className="gloria-theme inv-overlay"
       style={{
         position: 'fixed',
         top: 0,
@@ -60,7 +60,7 @@ export const ModalMotivoEstadoServicio: React.FC<ModalMotivoEstadoServicioProps>
       }}
     >
       <div
-        className="inv-dialog"
+        className="inv-dialog inv-dialog-compact"
         role="dialog"
         aria-modal="true"
         aria-label="Estado del servicio"
@@ -73,26 +73,19 @@ export const ModalMotivoEstadoServicio: React.FC<ModalMotivoEstadoServicioProps>
           boxShadow: '0 20px 40px rgba(0,0,0,0.5)',
         }}
       >
-        <h3
-          style={{
-            fontSize: '18px',
-            fontWeight: '800',
-            color: '#F8FAFC',
-            margin: '0 0 12px 0',
-          }}
-        >
-          {servicio.activo ? 'Desactivar Servicio' : 'Reactivar Servicio'}
-        </h3>
-        <p style={{ fontSize: '13px', color: '#94A3B8', marginBottom: '16px' }}>
-          Servicio: <strong>{servicio.nombre}</strong>
-        </p>
+        <header className="inv-dialog-header">
+          <div><span className="inv-dialog-kicker">Estado del catálogo</span>
+            <h3>{servicio.activo ? 'Desactivar Servicio' : 'Reactivar Servicio'}</h3>
+            <p>Servicio: <strong>{servicio.nombre}</strong></p>
+          </div>
+        </header>
         {error && (
           <p role="alert" className="inv-form-error">
             {error}
           </p>
         )}
-        <form onSubmit={handleSubmit}>
-          <label
+        <form onSubmit={handleSubmit} className="inv-form">
+          <label htmlFor="inv-service-status-reason"
             style={{
               display: 'block',
               fontSize: '11px',
@@ -103,6 +96,7 @@ export const ModalMotivoEstadoServicio: React.FC<ModalMotivoEstadoServicioProps>
             Motivo Administrativo (5-250 caracteres) *
           </label>
           <textarea
+            id="inv-service-status-reason"
             required
             disabled={procesando}
             rows={3}
@@ -117,47 +111,13 @@ export const ModalMotivoEstadoServicio: React.FC<ModalMotivoEstadoServicioProps>
               opacity: procesando ? 0.6 : 1,
             }}
           />
-          <div
-            style={{
-              display: 'flex',
-              justifyContent: 'flex-end',
-              gap: '10px',
-              marginTop: '16px',
-            }}
-          >
-            <button
-              type="button"
-              disabled={procesando}
-              onClick={onClose}
-              style={{
-                padding: '8px 14px',
-                backgroundColor: 'transparent',
-                border: '1px solid #334155',
-                color: '#CBD5E1',
-                borderRadius: '8px',
-                cursor: procesando ? 'not-allowed' : 'pointer',
-                opacity: procesando ? 0.6 : 1,
-              }}
-            >
-              Cancelar
-            </button>
-            <button
-              type="submit"
-              disabled={procesando || motivo.trim().length < 5}
-              style={{
-                padding: '8px 18px',
-                backgroundColor: servicio.activo ? '#EF4444' : '#10B981',
-                color: '#FFFFFF',
-                border: 'none',
-                borderRadius: '8px',
-                fontWeight: '700',
-                cursor: procesando || motivo.trim().length < 5 ? 'not-allowed' : 'pointer',
-                opacity: procesando || motivo.trim().length < 5 ? 0.6 : 1,
-              }}
-            >
+          <footer className="inv-form-footer">
+            <button type="button" className="inv-button" disabled={procesando} onClick={onClose}>Cancelar</button>
+            <button type="submit" aria-busy={procesando} disabled={procesando || motivo.trim().length < 5}
+              className={`inv-button ${servicio.activo ? 'inv-danger' : 'inv-primary'}`}>
               {procesando ? 'Guardando...' : 'Confirmar'}
             </button>
-          </div>
+          </footer>
         </form>
       </div>
     </div>

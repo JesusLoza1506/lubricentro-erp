@@ -1,5 +1,6 @@
+import '@testing-library/jest-dom/vitest';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { invoke } from '@tauri-apps/api/core';
 import { PosPage } from '../PosPage';
 vi.mock('@tauri-apps/api/core', () => ({ invoke: vi.fn() }));
@@ -95,7 +96,10 @@ async function prepararCarrito() {
       (screen.getByRole('button', { name: 'Cobrar venta' }) as HTMLButtonElement).disabled
     ).toBe(false)
   );
-  fireEvent.click(screen.getByRole('button', { name: 'Cobrar venta' }));
+  const venta = within(screen.getByRole('complementary', { name: /Venta actual/ }));
+  const resumen = within(venta.getByText('Total a cobrar').parentElement!);
+  expect(resumen.getByText('S/ 20.00')).toBeInTheDocument();
+  fireEvent.click(venta.getByRole('button', { name: 'Cobrar venta' }));
 }
 it('integra catálogo, confirmación y aviso de venta guardada aunque falle NubeFact', async () => {
   await prepararCarrito();
@@ -142,4 +146,30 @@ it('permite retirar la captura cuando falla la cotización inicial', async () =>
   await waitFor(() =>
     expect(screen.queryByRole('button', { name: 'Quitar Filtro de aceite' })).toBeNull()
   );
+});
+
+
+it.each([
+  { configurada: false, cajaPropia: true, motivo: 'Cobro pendiente de configuración.' },
+  { configurada: true, cajaPropia: false, motivo: 'Necesitas un turno propio abierto para cobrar.' },
+])('permite cotizar sin habilitar el cobro: $motivo', async ({ configurada, cajaPropia, motivo }) => {
+  const original = vi.mocked(invoke).getMockImplementation()!;
+  vi.mocked(invoke).mockImplementation(async (comando, args) => {
+    if ((args as { accion?: string })?.accion === 'inicio') {
+      const datos = await original(comando, args) as Record<string, unknown>;
+      return { ...datos, configurada, caja_propia: Number(cajaPropia), caja: cajaPropia ? datos.caja : null };
+    }
+    return original(comando, args);
+  });
+  render(<PosPage />);
+  fireEvent.click(await screen.findByRole('button', { name: 'Agregar Filtro de aceite' }));
+  const venta = within(screen.getByRole('complementary', { name: /Venta actual/ }));
+  expect(await venta.findByText(motivo)).toBeInTheDocument();
+  const resumen = within(venta.getByText('Total a cobrar').parentElement!);
+  expect(await resumen.findByText('S/ 20.00')).toBeInTheDocument();
+  expect(venta.getByRole('button', { name: 'Cobrar venta' })).toBeDisabled();
+  expect(venta.getByRole('button', { name: 'Cobrar venta' })).toHaveAccessibleDescription(motivo);
+  const acciones = vi.mocked(invoke).mock.calls.map(([, args]) => (args as { accion?: string })?.accion);
+  expect(acciones).toContain('cotizar');
+  expect(acciones).not.toContain('confirmar');
 });

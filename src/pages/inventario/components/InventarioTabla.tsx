@@ -37,9 +37,13 @@ export function InventarioTabla({
 }: InventarioTablaProps) {
   const columnas = (esAdmin ? 9 : 8) + (esVistaCriticos ? 2 : 0);
   return (
-    <section className="inv-table-section" aria-label="Catálogo de productos">
-      <div className="inv-table-scroll">
-        <table className="inv-table">
+    <section className="inv-table-section gt-stage" aria-label="Catálogo de productos">
+      <header className="inv-list-heading">
+        <h3>{esVistaCriticos ? 'Productos con stock crítico' : 'Catálogo de productos'}</h3>
+        <p>{esVistaCriticos ? 'Revisa el mínimo y el faltante de cada producto.' : 'Consulta precios, existencias y estado de cada producto.'}</p>
+      </header>
+      <div className="inv-table-scroll" tabIndex={0} role="region" aria-label="Resultados del catálogo de productos" aria-busy={cargando}>
+        <table className="inv-table inv-catalog-table">
           <thead>
             <tr>
               <th>Código</th>
@@ -98,8 +102,9 @@ export function InventarioTabla({
                 const cantidad = (n: number) =>
                   p.unidad_medida === 'ML' ? `${(n / 1000).toFixed(3)} L` : `${n} UND`;
                 const activo = Boolean(p.activo);
+                const estadoStock = !activo ? 'inactive' : p.stock_actual === 0 ? 'empty' : esCritico ? 'critical' : 'available';
                 return (
-                  <tr key={p.id_producto} style={{ opacity: activo ? 1 : 0.65 }}>
+                  <tr key={p.id_producto} data-stock={estadoStock}>
                     <td className="inv-code">{p.codigo}</td>
                     <td className="inv-name">
                       {p.nombre}
@@ -114,7 +119,7 @@ export function InventarioTabla({
                     )}
                     <td className="inv-number">S/ {(p.precio_venta_cent / 100).toFixed(2)}</td>
                     <td className="inv-number">
-                      <strong>{cantidad(p.stock_actual)}</strong>
+                      <strong className="inv-stock-number">{cantidad(p.stock_actual)}</strong>
                     </td>
                     {esVistaCriticos && (
                       <>

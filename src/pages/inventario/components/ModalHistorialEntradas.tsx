@@ -151,7 +151,7 @@ export const ModalHistorialEntradas: React.FC<ModalHistorialEntradasProps> = ({
   };
   return (
     <div
-      className={integrado ? 'inv-entry-panel' : 'inv-overlay'}
+      className={integrado ? 'inv-entry-panel' : 'gloria-theme inv-overlay'}
       style={{
         position: integrado ? 'relative' : 'fixed',
         inset: integrado ? undefined : 0,
@@ -173,17 +173,15 @@ export const ModalHistorialEntradas: React.FC<ModalHistorialEntradasProps> = ({
           flex: integrado ? 1 : undefined,
         }}
       >
-        {!integrado && (
-          <header className="inv-dialog-header">
+        <header className={integrado ? 'inv-list-heading inv-entry-heading' : 'inv-dialog-header'}>
             <div>
               <h3>Entradas de inventario</h3>
               <p>Consulta ingresos y documentos del almacén.</p>
             </div>
-            <button className="inv-button" disabled={anulando} onClick={onClose}>
-              Cerrar
-            </button>
-          </header>
-        )}
+            {!integrado && (
+              <button className="inv-button" disabled={anulando} onClick={onClose}>Cerrar</button>
+            )}
+        </header>
         <div className="inv-entry-toolbar">
           <label>
             Desde
@@ -248,8 +246,8 @@ export const ModalHistorialEntradas: React.FC<ModalHistorialEntradasProps> = ({
           </p>
         )}
         <section className="inv-table-section" aria-label="Entradas de inventario">
-          <div className="inv-table-scroll">
-            <table className="inv-table">
+          <div className="inv-table-scroll" tabIndex={0} role="region" aria-label="Resultados de entradas" aria-busy={cargando}>
+            <table className="inv-table inv-entry-table">
               <thead>
                 <tr>
                   <th></th>
@@ -407,7 +405,7 @@ export const ModalHistorialEntradas: React.FC<ModalHistorialEntradasProps> = ({
       </div>
       {!!anularId && (
         <div
-          className="inv-overlay"
+          className="gloria-theme inv-overlay"
           style={{
             position: 'fixed',
             inset: 0,
@@ -418,8 +416,7 @@ export const ModalHistorialEntradas: React.FC<ModalHistorialEntradasProps> = ({
           }}
         >
           <div
-            className="inv-dialog"
-            style={{ maxWidth: 480 }}
+            className="inv-dialog inv-dialog-compact"
             role="dialog"
             aria-modal="true"
             aria-labelledby="inv-annul-title"

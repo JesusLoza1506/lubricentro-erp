@@ -1,6 +1,6 @@
 import { AvisosOTContext, AvisoOTVisible, useAvisosOT, mensajeErrorOT } from './AvisosOT';
 import './ordenesVisual.css';
-import { LayoutGrid, ClipboardList, ArrowRight, Filter, ChevronLeft, ChevronRight } from 'lucide-react';
+import { LayoutGrid, ClipboardList, ArrowRight, Filter, ChevronLeft, ChevronRight, Search } from 'lucide-react';
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { ordenesService, MecanicoDTO } from '../../services/ordenesService';
@@ -11,7 +11,6 @@ import {
   TipoAceiteOT,
   EstadoOT,
 } from '../../types/ordenTrabajo';
-import { styles } from './ordenesStyles';
 import { TableroZanjas } from './components/TableroZanjas';
 import { ModalCrearOT } from './components/ModalCrearOT';
 import { ModalDetalleOT } from './components/ModalDetalleOT';
@@ -198,9 +197,9 @@ export const OrdenesPage: React.FC<OrdenesPageProps> = ({onNavegarAPos}) => {
 
   return (
     <AvisosOTContext.Provider value={notificar}>
-    <div className="ot-page" style={styles.container}>
+    <div className="gloria-theme ot-page">
       <AvisoOTVisible aviso={aviso} onCerrar={cerrar} />
-      <header className="ot-page-header">
+      <header className="ot-page-header gt-stage">
         <div><span className="ot-eyebrow">Gestión del taller</span><h1>Órdenes de trabajo / Taller</h1><p>Organiza las atenciones y consulta los trabajos del taller.</p></div>
         {puedeCrearOT && <button className="ot-button ot-primary" onClick={() => setModalCrearAbierto(true)}>+ Recepcionar vehículo</button>}
       </header>
@@ -211,7 +210,7 @@ export const OrdenesPage: React.FC<OrdenesPageProps> = ({onNavegarAPos}) => {
       {errorMecanicos && <div className="ot-feedback-error" role="alert"><span>{errorMecanicos}</span><button className="ot-button ot-small" onClick={() => void cargarMecanicos()}>Reintentar mecánicos</button></div>}
       {vistaActiva === 'TABLERO' && errorTablero && <div className="ot-feedback-error" role="alert"><span>{errorTablero}</span><button className="ot-button ot-small" onClick={() => void cargarTablero()}>Reintentar tablero</button></div>}
       {vistaActiva === 'TABLERO' ? (
-        loading ? <div className="ot-empty" role="status">Cargando tablero en tiempo real...</div> : !tablero ? <div className="ot-empty">{errorTablero ? 'El tablero no está disponible. Reintenta la consulta.' : 'Cargando tablero en tiempo real...'}</div> : (
+        loading ? <div className="ot-empty" role="status"><span className="gt-spinner" aria-hidden="true" /> Cargando tablero en tiempo real...</div> : !tablero ? <div className="ot-empty">{errorTablero ? 'El tablero no está disponible. Reintenta la consulta.' : 'Cargando tablero en tiempo real...'}</div> : (
           <TableroZanjas tablero={tablero} onVerDetalle={(ot) => setOtSeleccionada(ot)} onIniciarEnZanja={(idOt, idZanja) => {
               // Esta acción directa no tiene un formulario que capture el rechazo.
               void handleIniciarEnZanja(idOt, idZanja).catch((err: unknown) => {
@@ -220,16 +219,21 @@ export const OrdenesPage: React.FC<OrdenesPageProps> = ({onNavegarAPos}) => {
             }} />
         )
       ) : (
-        <section className="ot-history" aria-label="Historial de órdenes">
+        <section className="ot-history gt-stage" aria-labelledby="ot-history-title">
+          <div className="ot-section-heading ot-history-heading">
+            <div><h2 id="ot-history-title"><ClipboardList size={18} aria-hidden="true" /> Órdenes registradas</h2>
+              <p>Consulta por placa, código, estado o responsable.</p></div>
+            <span className="ot-count">20 registros por página</span>
+          </div>
           <div className="ot-history-toolbar">
-            <div className="ot-segments" aria-label="Grupo de órdenes">
+            <div className="ot-segments" role="group" aria-label="Grupo de órdenes">
               <button aria-pressed={subVistaHistorial === 'TODAS'} onClick={() => setSubVistaHistorial('TODAS')}>Todas las órdenes</button>
               <button aria-pressed={subVistaHistorial === 'PROPIAS'} onClick={() => setSubVistaHistorial('PROPIAS')}>Mis órdenes</button>
               <button aria-pressed={subVistaHistorial === 'LIBRES'} onClick={() => setSubVistaHistorial('LIBRES')}>Libres en espera</button>
             </div>
-            <span className="ot-muted">20 registros por página</span>
           </div>
           <div className="ot-filter-panel">
+            <h3><Search size={15} aria-hidden="true" /> Buscar órdenes</h3>
             <div className="ot-filter-main">
               <label className="ot-field"><span>Placa</span><input type="text" placeholder="Buscar por placa..." value={busquedaPlaca} onChange={(e) => setBusquedaPlaca(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && cargarTablaPaginada(1)} /></label>
               <label className="ot-field"><span>Código de orden</span><input type="text" placeholder="Código OT..." value={busquedaCodigoOT} onChange={(e) => setBusquedaCodigoOT(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && cargarTablaPaginada(1)} /></label>
@@ -243,7 +247,7 @@ export const OrdenesPage: React.FC<OrdenesPageProps> = ({onNavegarAPos}) => {
             </div>
           </div>
           {errorTabla && <div className="ot-feedback-error" role="alert"><span>{errorTabla}</span><button className="ot-button ot-small" onClick={() => void cargarTablaPaginada(paginaActual)}>Reintentar historial</button></div>}
-          {cargandoTabla ? <div className="ot-empty" role="status">Cargando historial de órdenes...</div> : (
+          {cargandoTabla ? <div className="ot-empty" role="status"><span className="gt-spinner" aria-hidden="true" /> Cargando historial de órdenes...</div> : (
             <>
               <div className="ot-table-scroll" tabIndex={0} role="region" aria-label="Resultados de órdenes">
                 <table className="ot-table ot-history-table">

@@ -107,7 +107,7 @@ export const ModalProveedor: React.FC<ModalProveedorProps> = ({
 
   return (
     <div
-      className="inv-overlay"
+      className="gloria-theme inv-overlay"
       style={{
         position: 'fixed',
         inset: 0,
@@ -120,6 +120,7 @@ export const ModalProveedor: React.FC<ModalProveedorProps> = ({
       <div className="inv-dialog" role="dialog" aria-modal="true" aria-label="Proveedor">
         <header className="inv-dialog-header">
           <div>
+            <span className="inv-dialog-kicker">Directorio de proveedores</span>
             <h3>{proveedorAEditar ? 'Editar Proveedor' : 'Nuevo Proveedor'}</h3>
             <p>Datos de identificación y contacto para las compras.</p>
           </div>

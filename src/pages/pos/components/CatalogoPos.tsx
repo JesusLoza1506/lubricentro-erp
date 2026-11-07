@@ -36,11 +36,11 @@ export function CatalogoPos({ onAgregar }: { onAgregar: (p: ProductoPos) => void
     };
   }, [buscar, tipo, pagina, revision]);
   return (
-    <section className="pos-panel">
+    <section className="pos-panel pos-catalog" aria-labelledby="pos-catalog-title">
       <div className="pos-panel-heading">
         <div>
-          <h2>Productos y servicios</h2>
-          <p>Agrega solo los adicionales de venta directa.</p>
+          <h2 id="pos-catalog-title">Productos y servicios</h2>
+          <p>Busca por código o nombre y agrega a la venta.</p>
         </div>
         <button
           className="pos-icon"
@@ -52,10 +52,10 @@ export function CatalogoPos({ onAgregar }: { onAgregar: (p: ProductoPos) => void
       </div>
       <div className="pos-toolbar">
         <div className="pos-search">
-          <Search size={18} />
+          <Search size={17} aria-hidden="true" />
           <input
             aria-label="Buscar catálogo"
-            placeholder="Código o nombre del producto…"
+            placeholder="Código o nombre…"
             value={buscar}
             onChange={(e) => {
               Sbuscar(e.target.value);
@@ -83,19 +83,19 @@ export function CatalogoPos({ onAgregar }: { onAgregar: (p: ProductoPos) => void
         </div>
       ) : (
         <>
-          <div className="pos-table-wrap" aria-busy={cargando}>
+          <div className="pos-table-wrap" role="region" tabIndex={0} aria-label="Resultados del catálogo" aria-busy={cargando}>
             <table>
               <thead>
                 <tr>
                   <th>Producto / servicio</th>
                   <th>Disponible</th>
-                  <th>Precio</th>
-                  <th />
+                  <th className="pos-money">Precio</th>
+                  <th scope="col"><span className="gt-sr-only">Agregar</span></th>
                 </tr>
               </thead>
               <tbody>
                 {datos.filas.map((p) => (
-                  <tr key={`${p.tipo}-${p.id}`}>
+                  <tr key={`${p.tipo}-${p.id}`} data-sold-out={p.stock === 0}>
                     <td>
                       <strong>{p.nombre}</strong>
                       <small>

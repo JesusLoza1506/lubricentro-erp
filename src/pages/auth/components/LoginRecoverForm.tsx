@@ -1,6 +1,6 @@
 import React from 'react';
-import { KeyRound, Copy, CheckCircle2 } from 'lucide-react';
-import { loginStyles as s } from '../../../styles/loginStyles';
+import { KeyRound } from 'lucide-react';
+import { AccessField, AccessHeading, AccessSubmit, RecoveryCode } from './AccessUi';
 
 interface LoginRecoverFormProps {
   recUsername: string;
@@ -36,150 +36,33 @@ export const LoginRecoverForm: React.FC<LoginRecoverFormProps> = ({
   onVolverLogin,
 }) => {
   return (
-    <>
-      <div style={{ marginBottom: '24px' }}>
-        <h2
-          style={{
-            fontSize: '22px',
-            fontWeight: '800',
-            color: '#F8FAFC',
-            marginBottom: '6px',
-          }}
-        >
-          Recuperar Administrador
-        </h2>
-        <p style={{ fontSize: '13px', color: '#94A3B8', margin: 0 }}>
-          Restaura el acceso del usuario Administrador utilizando tu código de recuperación.
-        </p>
-      </div>
-
-      {!nuevoCodigoTrasRecuperar ? (
-        <form onSubmit={onSubmit}>
-          <div style={{ marginBottom: '14px' }}>
-            <label htmlFor="rec-username" style={s.label}>
-              Usuario Administrador
-            </label>
-            <input
-              id="rec-username"
-              type="text"
-              disabled={procesando}
-              value={recUsername}
-              onChange={(e) => setRecUsername(e.target.value)}
-              placeholder="Ej. admin"
-              style={s.inputBox}
-              autoComplete="username"
-            />
+    nuevoCodigoTrasRecuperar ? (
+      <>
+        <AccessHeading label="Recuperación" title="Acceso restablecido" focus
+          description="El código anterior ya no es válido. Guarda este nuevo código en un lugar seguro." />
+        <RecoveryCode code={nuevoCodigoTrasRecuperar} copied={copiado} onCopy={onCopiarCodigo}
+          onContinue={onVolverLogin} />
+      </>
+    ) : (
+      <>
+        <AccessHeading label="Recuperación" title="Recuperar acceso" focus
+          description="Usa el código de recuperación de la cuenta de administrador." />
+        <form className="gloria-form" onSubmit={onSubmit}>
+          <AccessField id="rec-username" label="Usuario administrador" type="text" disabled={procesando}
+            value={recUsername} onChange={(e) => setRecUsername(e.target.value)} autoComplete="username" placeholder="Ej. admin" />
+          <AccessField id="rec-codigo" label="Código de recuperación" type="text" disabled={procesando}
+            value={recCodigo} onChange={(e) => setRecCodigo(e.target.value)} autoComplete="off" placeholder="Pega tu código completo" icon={<KeyRound size={16} />} />
+          <AccessField id="rec-nueva-password" label="Nueva contraseña" type="password" disabled={procesando}
+            value={recNuevaPassword} onChange={(e) => setRecNuevaPassword(e.target.value)} autoComplete="new-password" maxLength={256} hint="De 8 a 128 caracteres, con al menos una letra y un número." />
+          <AccessField id="rec-confirm-password" label="Confirmar nueva contraseña" type="password" disabled={procesando}
+            value={recConfirmNuevaPassword} onChange={(e) => setRecConfirmNuevaPassword(e.target.value)} autoComplete="new-password" maxLength={256} />
+          <div className="gloria-form-actions">
+            <AccessSubmit busy={procesando} busyLabel="Restableciendo…">Restablecer acceso</AccessSubmit>
+            <button type="button" className="gt-button gt-button--quiet" disabled={procesando}
+              onClick={onVolverLogin}>Volver al inicio de sesión</button>
           </div>
-
-          <div style={{ marginBottom: '14px' }}>
-            <label htmlFor="rec-codigo" style={s.label}>
-              Código de Recuperación
-            </label>
-            <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-              <KeyRound
-                size={18}
-                color="#64748B"
-                style={{ position: 'absolute', left: '14px', pointerEvents: 'none' }}
-              />
-              <input
-                id="rec-codigo"
-                type="text"
-                disabled={procesando}
-                value={recCodigo}
-                onChange={(e) => setRecCodigo(e.target.value)}
-                placeholder="XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX"
-                style={s.inputWithIcon}
-                autoComplete="off"
-              />
-            </div>
-          </div>
-
-          <div style={{ marginBottom: '14px' }}>
-            <label htmlFor="rec-nueva-password" style={s.label}>
-              Nueva Contraseña
-            </label>
-            <input
-              id="rec-nueva-password"
-              type="password"
-              disabled={procesando}
-              value={recNuevaPassword}
-              onChange={(e) => setRecNuevaPassword(e.target.value)}
-              placeholder="8 a 128 caracteres (letras y números)"
-              maxLength={256}
-              style={s.inputBox}
-              autoComplete="new-password"
-            />
-          </div>
-
-          <div style={{ marginBottom: '20px' }}>
-            <label htmlFor="rec-confirm-password" style={s.label}>
-              Confirmar Nueva Contraseña
-            </label>
-            <input
-              id="rec-confirm-password"
-              type="password"
-              disabled={procesando}
-              value={recConfirmNuevaPassword}
-              onChange={(e) => setRecConfirmNuevaPassword(e.target.value)}
-              placeholder="Repite la nueva contraseña"
-              maxLength={256}
-              style={s.inputBox}
-              autoComplete="new-password"
-            />
-          </div>
-
-          <button type="submit" disabled={procesando} style={s.submitButton}>
-            {procesando ? 'Restableciendo...' : 'Restablecer Clave de Admin'}
-          </button>
-
-          <button
-            type="button"
-            disabled={procesando}
-            onClick={onVolverLogin}
-            style={s.secondaryButton}
-          >
-            Volver al Login
-          </button>
         </form>
-      ) : (
-        <div>
-          <p style={{ fontSize: '13px', color: '#E2E8F0', marginBottom: '8px' }}>
-            <strong>NUEVO CÓDIGO DE RECUPERACIÓN GENERADO:</strong>
-          </p>
-          <p style={{ fontSize: '12px', color: '#94A3B8', marginBottom: '12px' }}>
-            Al restablecer el acceso, tu código anterior ha quedado invalidado. Guarda este nuevo
-            código:
-          </p>
-
-          <div style={s.codeBox} tabIndex={0} aria-label="Nuevo código de recuperación">
-            {nuevoCodigoTrasRecuperar}
-          </div>
-
-          <button
-            type="button"
-            onClick={() => onCopiarCodigo(nuevoCodigoTrasRecuperar)}
-            style={{
-              ...s.secondaryButton,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '8px',
-              color: copiado ? '#34D399' : '#94A3B8',
-            }}
-          >
-            {copiado ? <CheckCircle2 size={16} /> : <Copy size={16} />}
-            {copiado ? '¡Copiado al Portapapeles!' : 'Copiar Nuevo Código'}
-          </button>
-
-          <button
-            type="button"
-            onClick={onVolverLogin}
-            style={{ ...s.submitButton, marginTop: '20px' }}
-          >
-            Ir a Iniciar Sesión
-          </button>
-        </div>
-      )}
-    </>
+      </>
+    )
   );
 };

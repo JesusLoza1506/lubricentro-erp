@@ -113,7 +113,7 @@ export function ReceptorPos({
           {error}
         </p>
       )}
-      <div onChangeCapture={() => marcar(true)}>
+      <div className="pos-new-client" onChangeCapture={() => marcar(true)}>
         <ModalCliente
           modalAbierto={nuevo}
           setModalAbierto={(abierto) => {

@@ -1,54 +1,239 @@
-/* Diseño exclusivo del login; no modifica otros módulos. */
 .gloria-login {
-  font-family: "Segoe UI Variable", "Segoe UI", sans-serif !important;
-  -webkit-font-smoothing: antialiased;
+  display: grid;
+  grid-template-columns: 38% minmax(0, 1fr);
+  height: 100vh;
+  height: 100dvh;
+  background: var(--gt-bg);
 }
-.gloria-login > * { min-width: 0; }
-.gloria-login .gloria-brand {
-  flex: 1 !important;
-  background: linear-gradient(145deg, #17263a 0%, #111d2d 65%, #142238 100%) !important;
+.gloria-brand {
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  min-width: 0;
+  padding: clamp(28px, 4.2vw, 76px);
+  border-right: 1px solid var(--gt-border);
+  background: var(--gt-nav);
+  overflow: hidden;
 }
-.gloria-brand-header { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; }
-.gloria-brand-logo { display: block; width: 280px; max-width: 100%; height: auto; }
-.gloria-brand-caption { font-size: 12px; font-weight: 600; color: #a7b6c9; letter-spacing: 1.5px; text-transform: uppercase; }
-.gloria-brand-copy { margin-block: auto; padding-block: 48px; max-width: 580px; }
-.gloria-brand-rule { display: block; width: 42px; height: 3px; background: #e9b449; border-radius: 2px; margin-bottom: 26px; }
-.gloria-login .gloria-brand-copy h1 {
-  margin: 0 0 22px; font-size: clamp(34px, 3.25vw, 52px) !important;
-  font-weight: 700 !important; line-height: 1.12 !important;
-  letter-spacing: -1.5px !important; color: #f5f7fb;
+.gloria-brand::before {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  content: '';
+  pointer-events: none;
+  background-image: radial-gradient(circle, rgb(165 179 197 / 15%) 1px, transparent 1px);
+  background-size: 18px 18px;
+  mask-image: linear-gradient(145deg, transparent 48%, #000 94%);
 }
-.gloria-brand-copy h1 span { color: #86b8f2; }
-.gloria-login .gloria-brand-copy p { margin: 0; max-width: 390px; font-size: 16px; line-height: 1.7; color: #a7b6c9; }
-.gloria-brand-footer { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px; padding-top: 20px; border-top: 1px solid #2a394c; font-size: 11px; line-height: 1.5; color: #99a9be; }
-.gloria-login .gloria-access { flex: 1.05 !important; align-items: flex-start !important; }
-.gloria-login .gloria-access-card { margin-block: auto; flex-shrink: 0; border: 1px solid #2c3b50 !important; border-top: 2px solid #426b9f !important; padding: clamp(24px, 3vw, 40px) !important; background: #182436 !important; box-shadow: 0 16px 44px #050c1726 !important; }
-.gloria-login h2 { font-size: 26px !important; font-weight: 700 !important; line-height: 1.25; letter-spacing: -.7px !important; }
-.gloria-login p { line-height: 1.65; }
-.gloria-login label { font-size: 13px !important; font-weight: 600 !important; color: #c5cfdd !important; }
-.gloria-login input, .gloria-login button { font-family: inherit !important; }
-.gloria-login input { min-height: 48px; font-size: 14px !important; border-color: #36465c !important; }
-.gloria-login input::placeholder { color: #8394ab; opacity: 1; }
-.gloria-login button[type="submit"] { min-height: 48px; font-size: 15px !important; font-weight: 700 !important; box-shadow: 0 4px 12px #2563eb20; }
-.gloria-login button[type="submit"]:hover:not(:disabled) { background-color: #1d4ed8 !important; }
-.gloria-login button:disabled, .gloria-login input:disabled { opacity: .65; cursor: not-allowed !important; }
-.gloria-login button:focus-visible, .gloria-login input:focus-visible { outline: 2px solid #86b8f2 !important; outline-offset: 3px !important; box-shadow: none !important; }
-@media (max-width: 1000px) {
- .gloria-login .gloria-brand { padding: 32px !important; }
- .gloria-brand-logo { width: 240px; }
- .gloria-login .gloria-brand-copy h1 { font-size: 36px !important; }
- .gloria-brand-footer { flex-direction: column; }
+.gloria-brand::after {
+  position: absolute;
+  z-index: -1;
+  bottom: -220px;
+  right: -245px;
+  width: 475px;
+  aspect-ratio: 1;
+  content: '';
+  border: 1px solid rgb(145 188 255 / 13%);
+  border-radius: 50%;
+  box-shadow:
+    0 0 0 36px rgb(145 188 255 / 4%),
+    0 0 0 72px rgb(145 188 255 / 2%);
+  pointer-events: none;
 }
-@media (max-width: 720px) {
- .gloria-login { flex-direction: column !important; overflow-y: auto !important; }
- .gloria-login .gloria-brand { flex: none !important; overflow: visible !important; border-right: 0 !important; border-bottom: 1px solid #293548; padding: 28px 24px !important; }
- .gloria-brand-logo { width: 220px; }
- .gloria-brand-copy { padding-block: 32px; }
- .gloria-login .gloria-brand-copy h1 { font-size: clamp(28px, 6vw, 36px) !important; letter-spacing: -1px !important; }
- .gloria-brand-footer { flex-direction: row; }
- .gloria-login .gloria-access { flex: none !important; overflow: visible !important; padding: 28px 20px !important; }
- .gloria-login .gloria-access-card { margin-inline: auto; }
+.gloria-brand-logo {
+  display: block;
+  width: min(100%, 250px);
+  height: auto;
 }
-@media (prefers-reduced-motion: reduce) {
- .gloria-login input, .gloria-login button { transition: none !important; }
+.gloria-brand-caption {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-top: 18px;
+  font-size: 11px;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  font-weight: 700;
+  color: var(--gt-muted);
+}
+.gloria-brand-caption::before {
+  content: '';
+  width: 24px;
+  height: 2px;
+  background: var(--gt-amber);
+}
+.gloria-brand-copy {
+  padding-block: 28px;
+}
+.gloria-brand-copy h1 {
+  max-width: 10em;
+  font-size: clamp(28px, 3vw, 48px);
+  font-weight: 650;
+  line-height: 1.12;
+  letter-spacing: -0.045em;
+}
+.gloria-brand-copy p {
+  margin-top: 12px;
+  color: var(--gt-muted);
+  max-width: 32ch;
+}
+.gloria-brand-footer {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 6px 12px;
+  padding-top: 14px;
+  border-top: 1px solid var(--gt-border);
+  color: var(--gt-muted);
+  font-size: 12px;
+}
+.gloria-access {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: clamp(20px, 4vw, 52px);
+}
+.gloria-access-card {
+  width: min(100%, 456px);
+  flex-shrink: 0;
+  margin-block: auto;
+  padding: clamp(20px, 3vw, 36px);
+  border: 1px solid var(--gt-border);
+  border-radius: 12px;
+  background: var(--gt-surface);
+}
+.gloria-access-body {
+  display: grid;
+  gap: 12px;
+}
+.gloria-access-header {
+  margin-bottom: 18px;
+}
+.gloria-access-kicker {
+  margin-bottom: 6px;
+  color: var(--gt-focus);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.gloria-access-header h2 {
+  font-size: 28px;
+  line-height: 1.18;
+  letter-spacing: -0.025em;
+  font-weight: 650;
+}
+.gloria-access-header > p:last-child {
+  margin-top: 6px;
+  color: var(--gt-muted);
+}
+.gloria-environment {
+  justify-self: end;
+  border: 1px solid #786037;
+  border-radius: 6px;
+  color: #ffda8b;
+  background: #2d261c;
+  padding: 3px 8px;
+  font-size: 11px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.gloria-form {
+  display: grid;
+  gap: 11px;
+}
+.gloria-form-actions {
+  margin-top: 4px;
+  display: grid;
+  gap: 6px;
+}
+.gloria-code {
+  display: grid;
+  gap: 12px;
+}
+.gloria-code-value {
+  display: block;
+  padding: 13px;
+  border: 1px dashed var(--gt-control-border);
+  border-radius: 8px;
+  background: var(--gt-bg);
+  color: var(--gt-focus);
+  font:
+    600 14px/1.6 Consolas,
+    monospace;
+  text-align: center;
+  user-select: all;
+  overflow-wrap: anywhere;
+}
+.gloria-code-confirm {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  color: var(--gt-muted);
+  cursor: pointer;
+}
+.gloria-code-confirm input {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  margin: 2px 0 0;
+  accent-color: var(--gt-blue);
+}
+.gloria-code .gt-button[data-copied='true'] {
+  color: var(--gt-green);
+}
+
+@media (max-height: 640px) {
+  .gloria-brand {
+    padding-block: 22px;
+  }
+  .gloria-brand-copy {
+    padding-block: 14px;
+  }
+  .gloria-brand-logo {
+    width: min(100%, 208px);
+  }
+  .gloria-access {
+    padding-block: 16px;
+  }
+}
+@media (max-width: 760px) {
+  .gloria-login {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto 1fr;
+    overflow-y: auto;
+  }
+  .gloria-brand {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 14px;
+    padding: 14px 20px;
+    border: 0;
+    border-bottom: 1px solid var(--gt-border);
+  }
+  .gloria-brand-logo {
+    width: 138px;
+  }
+  .gloria-brand-caption,
+  .gloria-brand-copy {
+    display: none;
+  }
+  .gloria-brand-footer {
+    padding: 0;
+    border: 0;
+  }
+  .gloria-brand-footer > span:first-child {
+    display: none;
+  }
+  .gloria-access {
+    min-height: auto;
+    overflow: visible;
+    padding: 16px;
+  }
 }

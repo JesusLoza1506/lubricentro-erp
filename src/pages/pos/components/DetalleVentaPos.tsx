@@ -140,7 +140,7 @@ export function DetalleVentaPos({
           <>
             <div className="pos-detail-summary">
               <div>
-                <span className="pos-badge pos-ok">
+                <span className="pos-badge" data-state={v.devuelto_cent ? 'DEVUELTA' : 'VIGENTE'}>
                   {v.devuelto_cent === v.total_cent
                     ? 'Devuelta total'
                     : v.devuelto_cent
@@ -154,14 +154,14 @@ export function DetalleVentaPos({
               </div>
               <strong>{soles(v.total_cent)}</strong>
             </div>
-            <div className="pos-table-wrap">
+            <div className="pos-table-wrap" role="region" aria-label="Productos y servicios de la venta" tabIndex={0}>
               <table>
                 <thead>
                   <tr>
                     <th>Detalle</th>
                     <th>Origen</th>
                     <th>Cantidad</th>
-                    <th>Importe</th>
+                    <th className="pos-money">Importe</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -173,7 +173,7 @@ export function DetalleVentaPos({
                       </td>
                       <td>{l.origen}</td>
                       <td>{cantidad(l.cantidad, l.unidad)}</td>
-                      <td>{soles(l.total_cent)}</td>
+                      <td className="pos-money">{soles(l.total_cent)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -207,7 +207,7 @@ export function DetalleVentaPos({
               <article className="pos-document" key={d.id}>
                 <div>
                   <strong>
-                    {d.serie}-{d.numero} <span className="pos-badge">{d.estado}</span>
+                    {d.serie}-{d.numero} <span className="pos-badge" data-state={d.estado}>{d.estado}</span>
                   </strong>
                   <small>
                     {d.tipo} · {d.relacion}

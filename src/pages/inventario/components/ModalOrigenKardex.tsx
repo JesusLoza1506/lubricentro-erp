@@ -51,7 +51,7 @@ export const ModalOrigenKardex: React.FC<{ idMovimiento: number; onClose: () => 
   }, [idMovimiento, intento]);
   return (
     <div
-      className="inv-overlay"
+      className="gloria-theme inv-overlay"
       style={{
         position: 'fixed',
         inset: 0,
@@ -64,7 +64,7 @@ export const ModalOrigenKardex: React.FC<{ idMovimiento: number; onClose: () => 
       }}
     >
       <section
-        className="inv-dialog inv-dialog-wide"
+        className="inv-dialog inv-dialog-wide inv-origin-dialog"
         role="dialog"
         aria-modal="true"
         aria-label="Origen del movimiento"
@@ -80,12 +80,15 @@ export const ModalOrigenKardex: React.FC<{ idMovimiento: number; onClose: () => 
           overflow: 'auto',
         }}
       >
-        <h3 style={{ marginTop: 0 }}>Origen del movimiento{origen ? ` · ${origen.codigo}` : ''}</h3>
+        <header className="inv-dialog-header">
+          <div><span className="inv-dialog-kicker">Kardex · Consulta</span>
+            <h3>Origen del movimiento{origen ? ` · ${origen.codigo}` : ''}</h3></div>
+        </header>
         {cargando && <p role="status">Consultando origen…</p>}
         {error && (
-          <div role="alert">
+          <div role="alert" className="inv-form-error">
             <p style={{ color: '#F87171' }}>{error}</p>
-            <button onClick={() => setIntento((n) => n + 1)}>Reintentar</button>
+            <button className="inv-button" onClick={() => setIntento((n) => n + 1)}>Reintentar</button>
           </div>
         )}
         {origen && (
@@ -102,7 +105,8 @@ export const ModalOrigenKardex: React.FC<{ idMovimiento: number; onClose: () => 
             <p style={{ color: '#94A3B8', fontSize: 12 }}>
               Consulta del registro de origen y sus materiales históricos. No modifica la operación.
             </p>
-            <table style={{ width: '100%', fontSize: 13, borderCollapse: 'collapse' }}>
+            <div className="inv-table-scroll inv-origin-scroll" tabIndex={0} role="region" aria-label="Materiales del movimiento">
+            <table className="inv-table">
               <thead>
                 <tr>
                   <th style={{ textAlign: 'left' }}>Producto / servicio</th>
@@ -124,6 +128,7 @@ export const ModalOrigenKardex: React.FC<{ idMovimiento: number; onClose: () => 
                 ))}
               </tbody>
             </table>
+            </div>
             {origen.comprobantes.length > 0 && (
               <div>
                 <h4>Comprobantes vinculados</h4>
@@ -143,20 +148,11 @@ export const ModalOrigenKardex: React.FC<{ idMovimiento: number; onClose: () => 
             )}
           </>
         )}
-        <div style={{ textAlign: 'right', marginTop: 20 }}>
-          <button
-            onClick={onClose}
-            style={{
-              padding: '9px 16px',
-              background: '#334155',
-              color: 'white',
-              border: 0,
-              borderRadius: 6,
-            }}
-          >
+        <footer className="inv-form-footer">
+          <button className="inv-button" type="button" onClick={onClose}>
             Cerrar origen
           </button>
-        </div>
+        </footer>
       </section>
     </div>
   );

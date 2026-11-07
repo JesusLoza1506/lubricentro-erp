@@ -132,6 +132,28 @@ describe('InventarioPage - Pruebas de Integración Frontend FASE 7', () => {
     ).toBeInTheDocument();
   });
 
+  it('un cajero consulta stock y precios de venta sin acceso a costos ni edición', async () => {
+    (useAuth as ReturnType<typeof vi.fn>).mockReturnValue({
+      usuario: { id_usuario: 4, nombre_completo: 'Cajero Pruebas', rol: 'CAJERO' },
+    });
+    vi.mocked(inventarioService.listarProductosPublicosPaginado).mockResolvedValue({
+      productos: [{
+        id_producto: 1, codigo: 'ACE-5W30', nombre: 'Aceite Sintético 5W30 1L',
+        categoria: 'ACEITE', unidad_medida: 'UND', stock_actual: 15, stock_minimo: 5,
+        precio_venta_cent: 4500, activo: true, es_critico: false,
+      }],
+      total_registros: 1,
+    });
+    render(<InventarioPage />);
+    const catalogo = within(screen.getByRole('region', { name: 'Catálogo de productos' }));
+    expect(await catalogo.findByRole('cell', { name: '15 UND' })).toBeInTheDocument();
+    expect(catalogo.getByRole('cell', { name: 'S/ 45.00' })).toBeInTheDocument();
+    expect(catalogo.queryByRole('columnheader', { name: /costo/i })).not.toBeInTheDocument();
+    expect(catalogo.queryByRole('button', { name: /^editar/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Nuevo Producto' })).not.toBeInTheDocument();
+    expect(inventarioService.listarProductosAdminPaginado).not.toHaveBeenCalled();
+  });
+
   it('2. Permite filtrar productos por búsqueda de texto', async () => {
     render(<InventarioPage />);
 

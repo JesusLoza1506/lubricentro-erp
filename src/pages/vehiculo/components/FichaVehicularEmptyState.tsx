@@ -1,6 +1,5 @@
 import React from 'react';
 import { Car, SearchX } from 'lucide-react';
-import { btnPlacaPruebaStyle } from '../vehiculoStyles';
 
 interface Props {
   buscado: boolean;
@@ -20,14 +19,14 @@ export const FichaVehicularEmptyState: React.FC<Props> = ({
   if (!buscado) {
     return (
       <div className="fv-empty">
-        <div className="fv-empty-icon"><Car size={32} /></div>
+        <div className="fv-empty-icon"><Car size={25} aria-hidden="true" /></div>
         <h3>Busca un vehículo por placa</h3>
         <p>Consulta sus datos, propietario e historial de mantenimiento desde el buscador superior.</p>
         <details className="fv-examples">
           <summary>Ejemplos de búsqueda</summary>
           <div>
-            <button onClick={() => onEjecutarBusqueda('ABC-123')} style={btnPlacaPruebaStyle}>ABC-123</button>
-            <button onClick={() => onEjecutarBusqueda('XYZ-789')} style={btnPlacaPruebaStyle}>XYZ-789</button>
+            <button onClick={() => onEjecutarBusqueda('ABC-123')} className="fv-button fv-small">ABC-123</button>
+            <button onClick={() => onEjecutarBusqueda('XYZ-789')} className="fv-button fv-small">XYZ-789</button>
           </div>
         </details>
       </div>
@@ -35,7 +34,7 @@ export const FichaVehicularEmptyState: React.FC<Props> = ({
   }
   return (
     <div className="fv-empty fv-empty-not-found">
-      <div className="fv-empty-icon"><SearchX size={32} /></div>
+      <div className="fv-empty-icon"><SearchX size={25} aria-hidden="true" /></div>
       <h3>Vehículo no encontrado</h3>
       <p>No existe registro para la placa <strong>{placaBusqueda}</strong>.</p>
       {puedeCrear && (

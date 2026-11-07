@@ -1,3 +1,4 @@
+import '../../styles/gloriaTaller.css';
 import './vehiculoVisual.css';
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../../context/AuthContext';
@@ -30,8 +31,7 @@ import {
   FichaVehicularProximosCambios,
   FiltrosProximosCambiosState,
 } from './components/FichaVehicularProximosCambios';
-import { pageContainerStyle } from './vehiculoStyles';
-import { Car, Bell, RotateCcw } from 'lucide-react';
+import { Car, Bell, RotateCcw, AlertCircle, Plus } from 'lucide-react';
 
 interface FichaVehicularPageProps {
   placaInicial?: string;
@@ -411,153 +411,117 @@ export const FichaVehicularPage: React.FC<FichaVehicularPageProps> = ({
   };
 
   return (
-    <div className="fv-page" style={pageContainerStyle}>
+    <div className="gloria-theme fv-page">
       {notificacion && (
-        <ToastNotification
-          mensaje={notificacion.mensaje}
-          tipo={notificacion.tipo}
-          onCerrar={() => setNotificacion(null)}
-        />
+        <div className="fv-feedback" data-kind={notificacion.tipo}>
+          <ToastNotification
+            mensaje={notificacion.mensaje}
+            tipo={notificacion.tipo}
+            onCerrar={() => setNotificacion(null)}
+          />
+        </div>
       )}
 
-      <div
-        style={{
-          display: 'flex',
-          gap: '6px',
-          marginBottom: '0px',
-          borderBottom: '1px solid #334155',
-          paddingBottom: '0px',
-        }}
-      >
-        <button
-          onClick={() => setPestanaActiva('FICHA')}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            padding: '10px 18px',
-            backgroundColor: 'transparent',
-            borderBottom: pestanaActiva === 'FICHA' ? '2px solid #6DA5F0' : '2px solid transparent',
-            color: pestanaActiva === 'FICHA' ? '#FFFFFF' : '#94A3B8',
-            borderTop: 'none',
-            borderLeft: 'none',
-            borderRight: 'none',
-            borderRadius: '0px',
-            fontWeight: '700',
-            fontSize: '13px',
-            cursor: 'pointer',
-          }}
-        >
-          <Car size={16} /> Ficha del Vehículo
-        </button>
+      <header className="fv-hero gt-stage">
+        <div className="fv-hero-copy">
+          <span className="fv-kicker">Vehículos y mantenimiento</span>
+          <h2>Ficha vehicular</h2>
+          <p>Consulta vehículos y su historial de mantenimiento.</p>
+        </div>
+        <span className="fv-hero-icon" aria-hidden="true"><Car size={24} /></span>
+      </header>
 
+      <nav className="fv-tabs" aria-label="Vistas de Ficha Vehicular">
+        <button type="button" aria-pressed={pestanaActiva === 'FICHA'} onClick={() => setPestanaActiva('FICHA')}>
+          <Car size={17} aria-hidden="true" /> Ficha del vehículo
+        </button>
         {!esMecanico && (
-          <button
-            onClick={() => setPestanaActiva('PROXIMOS_CAMBIOS')}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              padding: '10px 18px',
-              backgroundColor: 'transparent',
-              borderBottom:
-                pestanaActiva === 'PROXIMOS_CAMBIOS'
-                  ? '2px solid #6DA5F0'
-                  : '2px solid transparent',
-              color: pestanaActiva === 'PROXIMOS_CAMBIOS' ? '#FFFFFF' : '#94A3B8',
-              borderTop: 'none',
-              borderLeft: 'none',
-              borderRight: 'none',
-              borderRadius: '0px',
-              fontWeight: '700',
-              fontSize: '13px',
-              cursor: 'pointer',
-            }}
-          >
-            <Bell size={16} /> Próximos Cambios de Aceite
+          <button type="button" aria-pressed={pestanaActiva === 'PROXIMOS_CAMBIOS'}
+            onClick={() => setPestanaActiva('PROXIMOS_CAMBIOS')}>
+            <Bell size={17} aria-hidden="true" /> Próximos cambios de aceite
           </button>
         )}
-      </div>
+      </nav>
 
-      {pestanaActiva === 'PROXIMOS_CAMBIOS' && !esMecanico ? (
-        <FichaVehicularProximosCambios
-          filtrosIniciales={filtrosProximos}
-          onFiltrosChange={setFiltrosProximos}
-          onSeleccionarPlaca={(placa: string) => {
-            setPlacaBusqueda(placa);
-            setPestanaActiva('FICHA');
-            ejecutarBusqueda(placa, 1);
-          }}
-        />
-      ) : (
-        <>
-          <FichaVehicularHeader
-            placaBusqueda={placaBusqueda}
-            setPlacaBusqueda={setPlacaBusqueda}
-            cargando={cargando}
-            puedeCrear={puedeCrear}
-            onBuscar={(e) => {
-              e.preventDefault();
-              ejecutarBusqueda(placaBusqueda, 1);
+      <div className="fv-pane gt-stage" key={pestanaActiva}>
+        {pestanaActiva === 'PROXIMOS_CAMBIOS' && !esMecanico ? (
+          <FichaVehicularProximosCambios
+            filtrosIniciales={filtrosProximos}
+            onFiltrosChange={setFiltrosProximos}
+            onSeleccionarPlaca={(placa: string) => {
+              setPlacaBusqueda(placa);
+              setPestanaActiva('FICHA');
+              ejecutarBusqueda(placa, 1);
             }}
-            onLimpiar={handleLimpiarBusqueda}
-            onAbrirCrear={() => {
-              setModoModalVehiculo('CREAR');
-              setHayCambiosSinGuardar(true);
-              setModalVehiculoAbierto(true);
-            }}
-            onAbrirCrearCliente={handleAbrirCrearCliente}
           />
-
-          {errorSistema && (
-            <div style={errorBannerStyle}>
-              <div style={{ flex: 1 }}>
-                <strong>⚠️ Error al consultar la base de datos:</strong>
-                <p style={{ margin: '4px 0 0 0', fontSize: '13px' }}>{errorSistema}</p>
-              </div>
-              <button
-                onClick={() => ejecutarBusqueda(placaBusqueda, paginaActualHistorial)}
-                style={btnReintentarStyle}
-              >
-                <RotateCcw size={14} /> Reintentar
-              </button>
-            </div>
-          )}
-
-          {!vehiculo && !cargando && !errorSistema && (
-            <FichaVehicularEmptyState
-              buscado={buscado}
+        ) : (
+          <>
+            <FichaVehicularHeader
               placaBusqueda={placaBusqueda}
+              setPlacaBusqueda={setPlacaBusqueda}
+              cargando={cargando}
               puedeCrear={puedeCrear}
-              onEjecutarBusqueda={(placa) => {
-                setPlacaBusqueda(placa);
-                ejecutarBusqueda(placa, 1);
+              onBuscar={(e) => {
+                e.preventDefault();
+                ejecutarBusqueda(placaBusqueda, 1);
               }}
+              onLimpiar={handleLimpiarBusqueda}
               onAbrirCrear={() => {
                 setModoModalVehiculo('CREAR');
                 setHayCambiosSinGuardar(true);
                 setModalVehiculoAbierto(true);
               }}
+              onAbrirCrearCliente={handleAbrirCrearCliente}
             />
-          )}
 
-          {vehiculo && (
-            <>
-              <div
-                style={{
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '16px',
-                  marginBottom: '16px',
+            {errorSistema && (
+              <div className="gt-notice gt-notice--error fv-lookup-error" role="alert">
+                <AlertCircle size={17} aria-hidden="true" />
+                <div>
+                  <strong>No se pudo consultar la ficha</strong>
+                  <p>{errorSistema}</p>
+                </div>
+                <button
+                  onClick={() => ejecutarBusqueda(placaBusqueda, paginaActualHistorial)}
+                  className="fv-button fv-small"
+                >
+                  <RotateCcw size={14} /> Reintentar
+                </button>
+              </div>
+            )}
+
+            {!vehiculo && cargando && !errorSistema && (
+              <div className="fv-list-empty fv-loading" role="status">
+                <span className="gt-spinner" aria-hidden="true" /> Consultando la ficha del vehículo…
+              </div>
+            )}
+
+            {!vehiculo && !cargando && !errorSistema && (
+              <FichaVehicularEmptyState
+                buscado={buscado}
+                placaBusqueda={placaBusqueda}
+                puedeCrear={puedeCrear}
+                onEjecutarBusqueda={(placa) => {
+                  setPlacaBusqueda(placa);
+                  ejecutarBusqueda(placa, 1);
                 }}
-              >
+                onAbrirCrear={() => {
+                  setModoModalVehiculo('CREAR');
+                  setHayCambiosSinGuardar(true);
+                  setModalVehiculoAbierto(true);
+                }}
+              />
+            )}
+
+            {vehiculo && (
+              <>
                 <FichaVehicularInfo
                   accionesVehiculo={
                     <>
                       {puedeCrearOT && (
                         <div className="fv-create-order">
-                          <button onClick={handleAbrirCrearOTDirecta} style={btnCrearOTStyle}>
-                            + Crear OT
+                          <button type="button" onClick={handleAbrirCrearOTDirecta} className="fv-button fv-primary">
+                            <Plus size={16} aria-hidden="true" /> Crear OT
                           </button>
                         </div>
                       )}
@@ -577,28 +541,28 @@ export const FichaVehicularPage: React.FC<FichaVehicularPageProps> = ({
                   onAbrirReactivar={() => setConfirmModalReactivar(true)}
                   onAbrirModalCliente={handleAbrirModalCliente}
                 />
-              </div>
 
-              <FichaVehicularHistorial
-                historial={historial as any}
-                totalRegistros={totalRegistrosHistorial}
-                paginaActual={paginaActualHistorial}
-                totalPaginas={totalPaginasHistorial}
-                cargando={cargando}
-                puedeCorregirOT={esAdmin}
-                onVerDetalleOT={(ot) => setOtSeleccionada(ot as any)}
-                onCorregirOT={(ot) => {
-                  setOtCorregirSeleccionada(ot as any);
-                  setHayCambiosSinGuardar(true);
-                }}
-                onCambiarPagina={(nuevaPagina) => {
-                  ejecutarBusqueda(vehiculo.placa, nuevaPagina);
-                }}
-              />
-            </>
-          )}
-        </>
-      )}
+                <FichaVehicularHistorial
+                  historial={historial as any}
+                  totalRegistros={totalRegistrosHistorial}
+                  paginaActual={paginaActualHistorial}
+                  totalPaginas={totalPaginasHistorial}
+                  cargando={cargando}
+                  puedeCorregirOT={esAdmin}
+                  onVerDetalleOT={(ot) => setOtSeleccionada(ot as any)}
+                  onCorregirOT={(ot) => {
+                    setOtCorregirSeleccionada(ot as any);
+                    setHayCambiosSinGuardar(true);
+                  }}
+                  onCambiarPagina={(nuevaPagina) => {
+                    ejecutarBusqueda(vehiculo.placa, nuevaPagina);
+                  }}
+                />
+              </>
+            )}
+          </>
+        )}
+      </div>
 
       {modalVehiculoAbierto && (
         <ModalVehiculo
@@ -664,73 +628,35 @@ export const FichaVehicularPage: React.FC<FichaVehicularPageProps> = ({
         />
       )}
 
-      <ConfirmModal
-        abierto={confirmModalEliminar}
-        titulo="⚠ ADVERTENCIA: DESACTIVAR VEHÍCULO"
-        mensaje={`¿Estás seguro de desactivar el vehículo con placa "${vehiculo?.placa}"? Ingrese un motivo obligatorio para proceder:`}
-        requiereMotivo={true}
-        motivoValue={motivoAccion}
-        onMotivoChange={setMotivoAccion}
-        onConfirmar={ejecutarDesactivacion}
-        onCancelar={() => {
-          setConfirmModalEliminar(false);
-          setMotivoAccion('');
-        }}
-      />
+      <div className="fv-state-dialogs">
+        <ConfirmModal
+          abierto={confirmModalEliminar}
+          titulo="Desactivar vehículo"
+          mensaje={`¿Estás seguro de desactivar el vehículo con placa "${vehiculo?.placa}"? Ingrese un motivo obligatorio para proceder:`}
+          requiereMotivo={true}
+          motivoValue={motivoAccion}
+          onMotivoChange={setMotivoAccion}
+          onConfirmar={ejecutarDesactivacion}
+          onCancelar={() => {
+            setConfirmModalEliminar(false);
+            setMotivoAccion('');
+          }}
+        />
 
-      <ConfirmModal
-        abierto={confirmModalReactivar}
-        titulo="✅ REACTIVAR VEHÍCULO"
-        mensaje={`¿Desea reactivar el vehículo con placa "${vehiculo?.placa}" para permitir nuevas Órdenes de Trabajo? Ingrese un motivo:`}
-        requiereMotivo={true}
-        motivoValue={motivoAccion}
-        onMotivoChange={setMotivoAccion}
-        onConfirmar={ejecutarReactivacion}
-        onCancelar={() => {
-          setConfirmModalReactivar(false);
-          setMotivoAccion('');
-        }}
-      />
+        <ConfirmModal
+          abierto={confirmModalReactivar}
+          titulo="Reactivar vehículo"
+          mensaje={`¿Desea reactivar el vehículo con placa "${vehiculo?.placa}" para permitir nuevas Órdenes de Trabajo? Ingrese un motivo:`}
+          requiereMotivo={true}
+          motivoValue={motivoAccion}
+          onMotivoChange={setMotivoAccion}
+          onConfirmar={ejecutarReactivacion}
+          onCancelar={() => {
+            setConfirmModalReactivar(false);
+            setMotivoAccion('');
+          }}
+        />
+      </div>
     </div>
   );
-};
-
-const errorBannerStyle: React.CSSProperties = {
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'space-between',
-  gap: '12px',
-  padding: '14px 18px',
-  backgroundColor: 'rgba(239, 68, 68, 0.12)',
-  border: '1px solid rgba(239, 68, 68, 0.35)',
-  borderRadius: '10px',
-  color: '#FCA5A5',
-  fontSize: '14px',
-  marginBottom: '16px',
-};
-
-const btnReintentarStyle: React.CSSProperties = {
-  display: 'flex',
-  alignItems: 'center',
-  gap: '6px',
-  padding: '8px 14px',
-  backgroundColor: '#DC2626',
-  color: '#FFFFFF',
-  border: 'none',
-  borderRadius: '6px',
-  fontSize: '12px',
-  fontWeight: '600',
-  cursor: 'pointer',
-};
-
-const btnCrearOTStyle: React.CSSProperties = {
-  padding: '10px 18px',
-  backgroundColor: '#2563EB',
-  color: '#FFFFFF',
-  border: 'none',
-  borderRadius: '8px',
-  fontWeight: '700',
-  fontSize: '13px',
-  cursor: 'pointer',
-  boxShadow: 'none',
 };

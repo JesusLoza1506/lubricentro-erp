@@ -191,8 +191,8 @@ export const AccionesEstadoBar: React.FC<AccionesEstadoBarProps> = ({
             border: '1px solid #2563EB',
           }}
         >
-          <h5 style={{ margin: '0 0 8px 0', color: '#38BDF8' }}>
-            Asignar Zanja de Trabajo (Dinámica)
+          <h5 style={{ margin: '0 0 8px 0', color: 'var(--gt-focus, #38BDF8)' }}>
+            Asignar zanja de trabajo
           </h5>
           <select
             disabled={loading || !hayZanjasValidas}
@@ -203,7 +203,7 @@ export const AccionesEstadoBar: React.FC<AccionesEstadoBarProps> = ({
               padding: '6px',
               marginBottom: '8px',
               backgroundColor: '#1E293B',
-              border: '1px solid #334155',
+              border: '1px solid var(--gt-border, #2e3c4e)',
               color: '#FFF',
             }}
           >
@@ -223,7 +223,7 @@ export const AccionesEstadoBar: React.FC<AccionesEstadoBarProps> = ({
 
           {rol === 'ADMINISTRADOR' && !ordenActual.id_mecanico && (
             <>
-              <label style={{ fontSize: '12px', color: '#94A3B8' }}>
+              <label style={{ fontSize: '12px', color: 'var(--gt-muted, #94A3B8)' }}>
                 Seleccionar Mecánico Responsable *
               </label>
               <select
@@ -235,7 +235,7 @@ export const AccionesEstadoBar: React.FC<AccionesEstadoBarProps> = ({
                   padding: '6px',
                   marginBottom: '8px',
                   backgroundColor: '#1E293B',
-                  border: '1px solid #334155',
+                  border: '1px solid var(--gt-border, #2e3c4e)',
                   color: '#FFF',
                 }}
               >
@@ -255,7 +255,7 @@ export const AccionesEstadoBar: React.FC<AccionesEstadoBarProps> = ({
               onClick={() => setModoAccion('NINGUNO')}
               style={{
                 padding: '4px 10px',
-                backgroundColor: '#475569',
+                backgroundColor: 'var(--gt-surface, #192330)',
                 color: '#FFF',
                 border: 'none',
                 borderRadius: '4px',
@@ -266,7 +266,7 @@ export const AccionesEstadoBar: React.FC<AccionesEstadoBarProps> = ({
             </button>
             <button
               disabled={loading || !zanjaElegidaEsValida}
-              onClick={onIniciarSubmit}
+              data-tone="primary" onClick={onIniciarSubmit}
               style={{
                 padding: '4px 10px',
                 backgroundColor: zanjaElegidaEsValida ? '#2563EB' : '#475569',
@@ -293,8 +293,8 @@ export const AccionesEstadoBar: React.FC<AccionesEstadoBarProps> = ({
             border: '1px solid #16A34A',
           }}
         >
-          <h5 style={{ margin: '0 0 8px 0', color: '#4ADE80' }}>Finalizar Orden de Trabajo</h5>
-          <label style={{ fontSize: '12px', color: '#94A3B8' }}>Km Salida *</label>
+          <h5 style={{ margin: '0 0 8px 0', color: 'var(--gt-green, #4ADE80)' }}>Finalizar Orden de Trabajo</h5>
+          <label style={{ fontSize: '12px', color: 'var(--gt-muted, #94A3B8)' }}>Km Salida *</label>
           <input
             disabled={loading}
             type="number"
@@ -305,11 +305,11 @@ export const AccionesEstadoBar: React.FC<AccionesEstadoBarProps> = ({
               padding: '6px',
               marginBottom: '8px',
               backgroundColor: '#1E293B',
-              border: '1px solid #334155',
+              border: '1px solid var(--gt-border, #2e3c4e)',
               color: '#FFF',
             }}
           />
-          <label style={{ fontSize: '12px', color: '#94A3B8' }}>Tipo de Aceite Utilizado</label>
+          <label style={{ fontSize: '12px', color: 'var(--gt-muted, #94A3B8)' }}>Tipo de Aceite Utilizado</label>
           <select
             disabled={loading}
             value={tipoAceite}
@@ -319,7 +319,7 @@ export const AccionesEstadoBar: React.FC<AccionesEstadoBarProps> = ({
               padding: '6px',
               marginBottom: '8px',
               backgroundColor: '#1E293B',
-              border: '1px solid #334155',
+              border: '1px solid var(--gt-border, #2e3c4e)',
               color: '#FFF',
             }}
           >
@@ -327,7 +327,7 @@ export const AccionesEstadoBar: React.FC<AccionesEstadoBarProps> = ({
             <option value="MINERAL">MINERAL (5,000 km)</option>
             <option value="SINTETICO">SINTETICO (10,000 km)</option>
           </select>
-          <label style={{ fontSize: '12px', color: '#94A3B8' }}>Resumen Público *</label>
+          <label style={{ fontSize: '12px', color: 'var(--gt-muted, #94A3B8)' }}>Resumen Público *</label>
           <textarea
             disabled={loading}
             rows={2}
@@ -338,7 +338,7 @@ export const AccionesEstadoBar: React.FC<AccionesEstadoBarProps> = ({
               padding: '6px',
               marginBottom: '8px',
               backgroundColor: '#1E293B',
-              border: '1px solid #334155',
+              border: '1px solid var(--gt-border, #2e3c4e)',
               color: '#FFF',
             }}
           />
@@ -348,7 +348,7 @@ export const AccionesEstadoBar: React.FC<AccionesEstadoBarProps> = ({
               onClick={() => setModoAccion('NINGUNO')}
               style={{
                 padding: '4px 10px',
-                backgroundColor: '#475569',
+                backgroundColor: 'var(--gt-surface, #192330)',
                 color: '#FFF',
                 border: 'none',
                 borderRadius: '4px',
@@ -384,7 +384,7 @@ export const AccionesEstadoBar: React.FC<AccionesEstadoBarProps> = ({
             border: '1px solid #DC2626',
           }}
         >
-          <h5 style={{ margin: '0 0 8px 0', color: '#FCA5A5' }}>Cancelar Orden de Trabajo</h5>
+          <h5 style={{ margin: '0 0 8px 0', color: 'var(--gt-red, #FCA5A5)' }}>Cancelar Orden de Trabajo</h5>
           <textarea
             disabled={loading}
             rows={2}
@@ -396,7 +396,7 @@ export const AccionesEstadoBar: React.FC<AccionesEstadoBarProps> = ({
               padding: '6px',
               marginBottom: '8px',
               backgroundColor: '#1E293B',
-              border: '1px solid #334155',
+              border: '1px solid var(--gt-border, #2e3c4e)',
               color: '#FFF',
             }}
           />
@@ -406,7 +406,7 @@ export const AccionesEstadoBar: React.FC<AccionesEstadoBarProps> = ({
               onClick={() => setModoAccion('NINGUNO')}
               style={{
                 padding: '4px 10px',
-                backgroundColor: '#475569',
+                backgroundColor: 'var(--gt-surface, #192330)',
                 color: '#FFF',
                 border: 'none',
                 borderRadius: '4px',
@@ -442,7 +442,7 @@ export const AccionesEstadoBar: React.FC<AccionesEstadoBarProps> = ({
             border: '1px solid #0284C7',
           }}
         >
-          <h5 style={{ margin: '0 0 8px 0', color: '#38BDF8' }}>Reasignar Mecánico</h5>
+          <h5 style={{ margin: '0 0 8px 0', color: 'var(--gt-focus, #38BDF8)' }}>Reasignar Mecánico</h5>
           <select
             disabled={loading}
             value={idMecanicoNuevo}
@@ -452,7 +452,7 @@ export const AccionesEstadoBar: React.FC<AccionesEstadoBarProps> = ({
               padding: '6px',
               marginBottom: '8px',
               backgroundColor: '#1E293B',
-              border: '1px solid #334155',
+              border: '1px solid var(--gt-border, #2e3c4e)',
               color: '#FFF',
             }}
           >
@@ -474,7 +474,7 @@ export const AccionesEstadoBar: React.FC<AccionesEstadoBarProps> = ({
               padding: '6px',
               marginBottom: '8px',
               backgroundColor: '#1E293B',
-              border: '1px solid #334155',
+              border: '1px solid var(--gt-border, #2e3c4e)',
               color: '#FFF',
             }}
           />
@@ -484,7 +484,7 @@ export const AccionesEstadoBar: React.FC<AccionesEstadoBarProps> = ({
               onClick={() => setModoAccion('NINGUNO')}
               style={{
                 padding: '4px 10px',
-                backgroundColor: '#475569',
+                backgroundColor: 'var(--gt-surface, #192330)',
                 color: '#FFF',
                 border: 'none',
                 borderRadius: '4px',

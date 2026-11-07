@@ -92,7 +92,7 @@ export const ModalServicio: React.FC<ModalServicioProps> = ({
 
   return (
     <div
-      className="inv-overlay"
+      className="gloria-theme inv-overlay"
       style={{
         position: 'fixed',
         inset: 0,
@@ -105,6 +105,7 @@ export const ModalServicio: React.FC<ModalServicioProps> = ({
       <div className="inv-dialog" role="dialog" aria-modal="true" aria-label="Servicio">
         <header className="inv-dialog-header">
           <div>
+            <span className="inv-dialog-kicker">Catálogo de servicios</span>
             <h3>{servicioAEditar ? 'Editar Servicio' : 'Nuevo Servicio'}</h3>
             <p>Define el servicio que ofrecerás en el taller.</p>
           </div>

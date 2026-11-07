@@ -43,7 +43,7 @@ export const TablaServiciosOT: React.FC<TablaServiciosOTProps> = ({
           marginBottom: '8px',
         }}
       >
-        <h4 style={{ color: '#38BDF8', margin: 0 }}>Servicios Aplicados</h4>
+        <h4 style={{ color: 'var(--gt-focus, #38BDF8)', margin: 0 }}>Servicios Aplicados</h4>
         {puedeAgregarServicios && (
           <button
             onClick={() => setModoAccion('AGREGAR_SERVICIO')}
@@ -71,7 +71,7 @@ export const TablaServiciosOT: React.FC<TablaServiciosOTProps> = ({
             marginBottom: '12px',
           }}
         >
-          <label style={{ fontSize: '12px', color: '#94A3B8' }}>Seleccionar Servicio</label>
+          <label style={{ fontSize: '12px', color: 'var(--gt-muted, #94A3B8)' }}>Seleccionar Servicio</label>
           <select
             value={idServicioSel}
             onChange={(e) => setIdServicioSel(Number(e.target.value))}
@@ -80,7 +80,7 @@ export const TablaServiciosOT: React.FC<TablaServiciosOTProps> = ({
               padding: '6px',
               marginBottom: '8px',
               backgroundColor: '#1E293B',
-              border: '1px solid #334155',
+              border: '1px solid var(--gt-border, #2e3c4e)',
               color: '#FFF',
             }}
           >
@@ -91,7 +91,7 @@ export const TablaServiciosOT: React.FC<TablaServiciosOTProps> = ({
               </option>
             ))}
           </select>
-          <label style={{ fontSize: '12px', color: '#94A3B8' }}>Cantidad</label>
+          <label style={{ fontSize: '12px', color: 'var(--gt-muted, #94A3B8)' }}>Cantidad</label>
           <input
             type="number"
             min={1}
@@ -102,7 +102,7 @@ export const TablaServiciosOT: React.FC<TablaServiciosOTProps> = ({
               padding: '6px',
               marginBottom: '8px',
               backgroundColor: '#1E293B',
-              border: '1px solid #334155',
+              border: '1px solid var(--gt-border, #2e3c4e)',
               color: '#FFF',
             }}
           />
@@ -111,7 +111,7 @@ export const TablaServiciosOT: React.FC<TablaServiciosOTProps> = ({
               onClick={() => setModoAccion('NINGUNO')}
               style={{
                 padding: '4px 8px',
-                backgroundColor: '#475569',
+                backgroundColor: 'var(--gt-surface, #192330)',
                 color: '#FFF',
                 border: 'none',
                 borderRadius: '4px',
@@ -144,7 +144,7 @@ export const TablaServiciosOT: React.FC<TablaServiciosOTProps> = ({
             marginBottom: '12px',
           }}
         >
-          <label style={{ fontSize: '12px', color: '#94A3B8' }}>Nueva Cantidad de Servicio</label>
+          <label style={{ fontSize: '12px', color: 'var(--gt-muted, #94A3B8)' }}>Nueva Cantidad de Servicio</label>
           <input
             type="number"
             min={1}
@@ -155,7 +155,7 @@ export const TablaServiciosOT: React.FC<TablaServiciosOTProps> = ({
               padding: '6px',
               marginBottom: '8px',
               backgroundColor: '#1E293B',
-              border: '1px solid #334155',
+              border: '1px solid var(--gt-border, #2e3c4e)',
               color: '#FFF',
             }}
           />
@@ -164,7 +164,7 @@ export const TablaServiciosOT: React.FC<TablaServiciosOTProps> = ({
               onClick={() => setModoAccion('NINGUNO')}
               style={{
                 padding: '4px 8px',
-                backgroundColor: '#475569',
+                backgroundColor: 'var(--gt-surface, #192330)',
                 color: '#FFF',
                 border: 'none',
                 borderRadius: '4px',
@@ -188,7 +188,7 @@ export const TablaServiciosOT: React.FC<TablaServiciosOTProps> = ({
         </div>
       )}
 
-      <div className="ot-detail-table-scroll"><table
+      <div className="ot-detail-table-scroll" role="region" aria-label="Servicios aplicados" tabIndex={0}><table
         style={{
           width: '100%',
           borderCollapse: 'collapse',
@@ -197,7 +197,7 @@ export const TablaServiciosOT: React.FC<TablaServiciosOTProps> = ({
         }}
       >
         <thead>
-          <tr style={{ borderBottom: '1px solid #334155', color: '#94A3B8' }}>
+          <tr style={{ borderBottom: '1px solid var(--gt-border, #2e3c4e)', color: 'var(--gt-muted, #94A3B8)' }}>
             <th style={{ textAlign: 'left', padding: '6px' }}>Servicio</th>
             <th style={{ padding: '6px' }}>Cant.</th>
             <th style={{ padding: '6px' }}>P. Unit</th>
@@ -260,7 +260,7 @@ export const TablaServiciosOT: React.FC<TablaServiciosOTProps> = ({
             <tr>
               <td
                 colSpan={puedeAgregarServicios ? 5 : 4}
-                style={{ padding: '8px', textAlign: 'center', color: '#94A3B8' }}
+                style={{ padding: '8px', textAlign: 'center', color: 'var(--gt-muted, #94A3B8)' }}
               >
                 Sin servicios registrados
               </td>

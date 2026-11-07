@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import { inventarioService } from '../../../services/inventarioService';
 import { ActualizarProveedorDTO, CrearProveedorDTO, ProveedorDTO } from '../../../types/inventario';
 import { ModalProveedor } from './ModalProveedor';
-import { modalInputStyle, botonSecundarioStyle } from '../inventarioStyles';
+import { Search } from 'lucide-react';
 
 export function GestionProveedores() {
   const notificar = useNotificarInventario();
@@ -43,35 +43,34 @@ export function GestionProveedores() {
   };
   const filtro = busqueda.trim().toLocaleLowerCase();
   return (
-    <details
-      className="inv-providers"
-      style={{ padding: 16, background: '#1E293B', borderRadius: 12, color: '#CBD5E1' }}
-    >
-      <summary style={{ cursor: 'pointer', fontWeight: 700 }}>Proveedores</summary>
-      <div style={{ display: 'flex', gap: 12, marginTop: 12 }}>
-        <input
-          aria-label="Buscar proveedores"
-          style={modalInputStyle}
-          placeholder="Buscar por nombre o documento"
-          value={busqueda}
-          onChange={(e) => setBusqueda(e.target.value)}
-        />
-        <button style={botonSecundarioStyle} disabled={cargando} onClick={() => void cargar()}>
+    <details className="inv-providers">
+      <summary>Proveedores</summary>
+      <div className="inv-providers-toolbar">
+        <div className="inv-search">
+          <Search size={16} aria-hidden="true" />
+          <input
+            aria-label="Buscar proveedores"
+            placeholder="Buscar por nombre o documento"
+            value={busqueda}
+            onChange={(e) => setBusqueda(e.target.value)}
+          />
+        </div>
+        <button className="inv-button" disabled={cargando} onClick={() => void cargar()}>
           Actualizar
         </button>
         <button
-          style={botonSecundarioStyle}
+          className="inv-button"
           onClick={() => setEditor({ abierto: true, proveedor: null })}
         >
           Nuevo proveedor
         </button>
       </div>
       {error && (
-        <p role="alert" style={{ color: '#FCA5A5' }}>
+        <p role="alert" className="inv-form-error">
           {error}
         </p>
       )}
-      <div style={{ maxHeight: 220, overflow: 'auto', marginTop: 12 }}>
+      <div className="inv-providers-list">
         {lista
           .filter((p) =>
             `${p.nombre_razon_social} ${p.numero_documento}`.toLocaleLowerCase().includes(filtro)
@@ -79,19 +78,13 @@ export function GestionProveedores() {
           .map((p) => (
             <div
               key={p.id_proveedor}
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                padding: 10,
-                borderBottom: '1px solid #334155',
-                gap: 12,
-              }}
+              className="inv-provider-row"
             >
               <span>
                 <strong>{p.nombre_razon_social}</strong> · {p.numero_documento}
               </span>
               <button
-                style={botonSecundarioStyle}
+                className="inv-button"
                 onClick={() => setEditor({ abierto: true, proveedor: p })}
               >
                 Editar

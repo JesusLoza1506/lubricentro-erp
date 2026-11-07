@@ -110,12 +110,12 @@ export const FichaVehicularInfo: React.FC<Props> = ({
           <div className="fv-recent-summary">
             {ultimoServicio && (
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <CheckCircle2 size={20} color="#34D399" />
+                <CheckCircle2 size={20} color="var(--gt-green)" />
                 <div>
-                  <span style={{ fontSize: '11px', color: '#94A3B8', display: 'block' }}>
+                  <span style={{ fontSize: '11px', color: 'var(--gt-muted)', display: 'block' }}>
                     Última atención
                   </span>
-                  <strong style={{ fontSize: '13px', color: '#F8FAFC' }}>
+                  <strong style={{ fontSize: '13px', color: 'var(--gt-text)' }}>
                     {ultimoServicio.codigo_ot} (
                     {formatearFecha(ultimoServicio.fecha_fin || ultimoServicio.fecha_ingreso)})
                   </strong>
@@ -124,12 +124,12 @@ export const FichaVehicularInfo: React.FC<Props> = ({
             )}
             {ultimoCambioAceite && (
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <Droplet size={20} color="#38BDF8" />
+                <Droplet size={20} color="var(--gt-focus)" />
                 <div>
-                  <span style={{ fontSize: '11px', color: '#94A3B8', display: 'block' }}>
+                  <span style={{ fontSize: '11px', color: 'var(--gt-muted)', display: 'block' }}>
                     Próximo cambio de aceite
                   </span>
-                  <strong style={{ fontSize: '13px', color: '#F8FAFC' }}>
+                  <strong style={{ fontSize: '13px', color: 'var(--gt-text)' }}>
                     {ultimoCambioAceite.tipo_aceite || 'APLICADO'} (
                     {(
                       ultimoCambioAceite.km_proximo ??

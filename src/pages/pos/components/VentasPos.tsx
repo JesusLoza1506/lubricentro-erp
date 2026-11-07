@@ -56,10 +56,10 @@ export function VentasPos({
     };
   }, [aplicados, pagina, revision]);
   return (
-    <section className="pos-panel">
+    <section className="pos-panel pos-sales gt-stage" aria-labelledby="pos-sales-title">
       <div className="pos-panel-heading">
         <div>
-          <h2>Ventas y comprobantes</h2>
+          <h2 id="pos-sales-title">Ventas y comprobantes</h2>
           <p>
             {admin
               ? 'Consulta general y atención de documentos.'
@@ -144,15 +144,15 @@ export function VentasPos({
           <button onClick={() => Saplicados((p) => ({ ...p }))}>Reintentar</button>
         </div>
       ) : (
-        <div className="pos-table-wrap">
+        <div className="pos-table-wrap" role="region" aria-label="Resultados de ventas" tabIndex={0}>
           <table aria-busy={cargando}>
             <thead>
               <tr>
                 <th>Venta / fecha</th>
                 <th>Cliente</th>
                 <th>Origen</th>
-                <th>Total</th>
-                <th>Devuelto</th>
+                <th className="pos-money">Total</th>
+                <th className="pos-money">Devuelto</th>
                 <th>Documento</th>
                 <th />
               </tr>
@@ -169,10 +169,10 @@ export function VentasPos({
                     <small>{v.emisor}</small>
                   </td>
                   <td>{v.id_ot ? `OT #${v.id_ot}` : 'Directa'}</td>
-                  <td>{soles(v.total_cent)}</td>
-                  <td>{soles(v.devuelto_cent)}</td>
+                  <td className="pos-money">{soles(v.total_cent)}</td>
+                  <td className="pos-money">{soles(v.devuelto_cent)}</td>
                   <td>
-                    <span className={`pos-badge ${v.estado === 'ACEPTADO' ? 'pos-ok' : ''}`}>
+                    <span className="pos-badge" data-state={v.estado}>
                       {v.estado}
                     </span>
                   </td>

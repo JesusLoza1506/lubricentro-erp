@@ -55,7 +55,7 @@ export const TablaInsumosOT: React.FC<TablaInsumosOTProps> = ({
           marginBottom: '8px',
         }}
       >
-        <h4 style={{ color: '#38BDF8', margin: 0 }}>Insumos Consumidos</h4>
+        <h4 style={{ color: 'var(--gt-focus, #38BDF8)', margin: 0 }}>Insumos Consumidos</h4>
         {!esTerminal && ordenActual.estado === 'EN_PROCESO' && (
           <button
             disabled={procesandoDespacho}
@@ -85,7 +85,7 @@ export const TablaInsumosOT: React.FC<TablaInsumosOTProps> = ({
             marginBottom: '12px',
           }}
         >
-          <label style={{ fontSize: '12px', color: '#94A3B8' }}>Seleccionar Producto/Insumo</label>
+          <label style={{ fontSize: '12px', color: 'var(--gt-muted, #94A3B8)' }}>Seleccionar Producto/Insumo</label>
           <select
             disabled={procesandoDespacho}
             value={idProductoSel}
@@ -95,7 +95,7 @@ export const TablaInsumosOT: React.FC<TablaInsumosOTProps> = ({
               padding: '6px',
               marginBottom: '8px',
               backgroundColor: '#1E293B',
-              border: '1px solid #334155',
+              border: '1px solid var(--gt-border, #2e3c4e)',
               color: '#FFF',
             }}
           >
@@ -107,7 +107,7 @@ export const TablaInsumosOT: React.FC<TablaInsumosOTProps> = ({
               </option>
             ))}
           </select>
-          <label style={{ fontSize: '12px', color: '#94A3B8' }}>
+          <label style={{ fontSize: '12px', color: 'var(--gt-muted, #94A3B8)' }}>
             Cantidad {esGranelSel ? 'en ML (Mililitros)' : 'en Unidades (UND)'}
           </label>
           <input
@@ -123,7 +123,7 @@ export const TablaInsumosOT: React.FC<TablaInsumosOTProps> = ({
               padding: '6px',
               marginBottom: '8px',
               backgroundColor: '#1E293B',
-              border: '1px solid #334155',
+              border: '1px solid var(--gt-border, #2e3c4e)',
               color: '#FFF',
             }}
           />
@@ -133,7 +133,7 @@ export const TablaInsumosOT: React.FC<TablaInsumosOTProps> = ({
               onClick={() => setModoAccion('NINGUNO')}
               style={{
                 padding: '4px 8px',
-                backgroundColor: '#475569',
+                backgroundColor: 'var(--gt-surface, #192330)',
                 color: '#FFF',
                 border: 'none',
                 borderRadius: '4px',
@@ -161,7 +161,7 @@ export const TablaInsumosOT: React.FC<TablaInsumosOTProps> = ({
         </div>
       )}
 
-      <div className="ot-detail-table-scroll"><table
+      <div className="ot-detail-table-scroll" role="region" aria-label="Insumos consumidos" tabIndex={0}><table
         style={{
           width: '100%',
           borderCollapse: 'collapse',
@@ -170,7 +170,7 @@ export const TablaInsumosOT: React.FC<TablaInsumosOTProps> = ({
         }}
       >
         <thead>
-          <tr style={{ borderBottom: '1px solid #334155', color: '#94A3B8' }}>
+          <tr style={{ borderBottom: '1px solid var(--gt-border, #2e3c4e)', color: 'var(--gt-muted, #94A3B8)' }}>
             <th style={{ textAlign: 'left', padding: '6px' }}>Insumo</th>
             <th style={{ padding: '6px' }}>Consumido</th>
             <th style={{ padding: '6px' }}>Devuelto</th>
@@ -187,7 +187,7 @@ export const TablaInsumosOT: React.FC<TablaInsumosOTProps> = ({
                 <td style={{ padding: '6px', textAlign: 'center' }}>
                   {i.cantidad_formateada} {i.unidad_medida}
                 </td>
-                <td style={{ padding: '6px', textAlign: 'center', color: '#F59E0B' }}>
+                <td style={{ padding: '6px', textAlign: 'center', color: 'var(--gt-amber, #F59E0B)' }}>
                   {i.devuelto_ml_und} {i.unidad_medida === 'ML' ? 'ML' : 'UND'}
                 </td>
                 <td style={{ padding: '6px', textAlign: 'center', fontWeight: 'bold' }}>
@@ -198,7 +198,7 @@ export const TablaInsumosOT: React.FC<TablaInsumosOTProps> = ({
                 </td>
                 {!esTerminal && (
                   <td style={{ padding: '6px', textAlign: 'center' }}>
-                    <button
+                    <button data-tone="warning"
                       disabled={procesandoDevolucion}
                       onClick={() => {
                         setIdDetalleDevolver(i.id_detalle);
@@ -206,8 +206,8 @@ export const TablaInsumosOT: React.FC<TablaInsumosOTProps> = ({
                       }}
                       style={{
                         padding: '2px 6px',
-                        backgroundColor: '#D97706',
-                        color: '#FFF',
+                        backgroundColor: '#392f20',
+                        color: 'var(--gt-amber, #f2b544)',
                         border: 'none',
                         borderRadius: '4px',
                         cursor: procesandoDevolucion ? 'not-allowed' : 'pointer',
@@ -225,7 +225,7 @@ export const TablaInsumosOT: React.FC<TablaInsumosOTProps> = ({
             <tr>
               <td
                 colSpan={!esTerminal ? 6 : 5}
-                style={{ padding: '8px', textAlign: 'center', color: '#94A3B8' }}
+                style={{ padding: '8px', textAlign: 'center', color: 'var(--gt-muted, #94A3B8)' }}
               >
                 Sin insumos registrados
               </td>
@@ -244,7 +244,7 @@ export const TablaInsumosOT: React.FC<TablaInsumosOTProps> = ({
             border: '1px solid #D97706',
           }}
         >
-          <h5 style={{ margin: '0 0 8px 0', color: '#F59E0B' }}>
+          <h5 style={{ margin: '0 0 8px 0', color: 'var(--gt-amber, #F59E0B)' }}>
             Devolución de Insumo a Inventario
           </h5>
           <input
@@ -260,7 +260,7 @@ export const TablaInsumosOT: React.FC<TablaInsumosOTProps> = ({
               padding: '6px',
               marginBottom: '8px',
               backgroundColor: '#1E293B',
-              border: '1px solid #334155',
+              border: '1px solid var(--gt-border, #2e3c4e)',
               color: '#FFF',
             }}
           />
@@ -275,7 +275,7 @@ export const TablaInsumosOT: React.FC<TablaInsumosOTProps> = ({
               padding: '6px',
               marginBottom: '8px',
               backgroundColor: '#1E293B',
-              border: '1px solid #334155',
+              border: '1px solid var(--gt-border, #2e3c4e)',
               color: '#FFF',
             }}
           />
@@ -285,7 +285,7 @@ export const TablaInsumosOT: React.FC<TablaInsumosOTProps> = ({
               onClick={() => setModoAccion('NINGUNO')}
               style={{
                 padding: '4px 10px',
-                backgroundColor: '#475569',
+                backgroundColor: 'var(--gt-surface, #192330)',
                 color: '#FFF',
                 border: 'none',
                 borderRadius: '4px',
@@ -296,10 +296,10 @@ export const TablaInsumosOT: React.FC<TablaInsumosOTProps> = ({
             </button>
             <button
               disabled={procesandoDevolucion}
-              onClick={onDevolverInsumoSubmit}
+              data-tone="warning" onClick={onDevolverInsumoSubmit}
               style={{
                 padding: '4px 10px',
-                backgroundColor: '#D97706',
+                backgroundColor: '#392f20',
                 color: '#FFF',
                 border: 'none',
                 borderRadius: '4px',

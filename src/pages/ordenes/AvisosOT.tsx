@@ -21,7 +21,7 @@ export const useAvisosOT = () => {
 };
 
 export const AvisoOTVisible: React.FC<{ aviso: AvisoOT | null; onCerrar: () => void }> = ({ aviso, onCerrar }) => aviso ? createPortal(
-  <div className="ot-notification" role={aviso.tipo === 'ERROR' ? 'alert' : 'status'} aria-live={aviso.tipo === 'ERROR' ? 'assertive' : 'polite'} aria-atomic="true">
+  <div className="gloria-theme ot-notification" data-kind={aviso.tipo} role={aviso.tipo === 'ERROR' ? 'alert' : 'status'} aria-live={aviso.tipo === 'ERROR' ? 'assertive' : 'polite'} aria-atomic="true">
     <ToastNotification key={aviso.id} mensaje={aviso.mensaje} tipo={aviso.tipo} onCerrar={onCerrar} />
   </div>, document.body
 ) : null;

@@ -61,9 +61,9 @@ export const FichaVehicularHistorial: React.FC<Props> = ({
   };
 
   return (
-    <section className="fv-history">
+    <section className="fv-history" aria-labelledby="fv-history-title">
       <div className="fv-section-title">
-        <h3>
+        <h3 id="fv-history-title">
           Historial de mantenimientos <span>({totalRegistros})</span>
         </h3>
         <span className="fv-page-size">20 registros por página</span>
@@ -196,7 +196,8 @@ export const FichaVehicularHistorial: React.FC<Props> = ({
                                 aria-label={`Corregir datos de ${ot.codigo_ot}`}
                                 className="fv-button fv-small fv-edit-attention"
                               >
-                                <Pencil size={14} />
+                                <Pencil size={14} aria-hidden="true" />
+                                Corregir
                               </button>
                             )}
                         </div>

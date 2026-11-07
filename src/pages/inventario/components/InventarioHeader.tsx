@@ -14,15 +14,15 @@ export function InventarioHeader({
   onNuevoServicio,
 }: InventarioHeaderProps) {
   return (
-    <header className="inv-header">
+    <header className="inv-header gt-stage">
       <div className="inv-heading">
         <span className="inv-heading-icon">
-          <Package size={23} />
+          <Package size={22} aria-hidden="true" />
         </span>
         <div>
           <span className="inv-eyebrow">ALMACÉN Y CATÁLOGOS</span>
           <h2>Inventario y Stock</h2>
-          <p>Lo que tienes, lo que ingresa y lo que necesita atención.</p>
+          <p>Consulta existencias, registra compras y mantén tus catálogos al día.</p>
         </div>
       </div>
       {esAdmin && (

@@ -32,7 +32,8 @@ export function AvisoInventarioVisible({
   return aviso
     ? createPortal(
         <div
-          className="inv-notification"
+          className="gloria-theme inv-notification"
+          data-kind={aviso.tipo}
           role={aviso.tipo === 'ERROR' ? 'alert' : 'status'}
           aria-live={aviso.tipo === 'ERROR' ? 'assertive' : 'polite'}
           aria-atomic="true"

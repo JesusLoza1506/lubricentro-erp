@@ -58,7 +58,7 @@ export const ModalMotivoEstadoProducto: React.FC<Props> = ({
   };
   return (
     <div
-      className="inv-overlay"
+      className="gloria-theme inv-overlay"
       style={{
         position: 'fixed',
         inset: 0,
@@ -71,7 +71,7 @@ export const ModalMotivoEstadoProducto: React.FC<Props> = ({
       }}
     >
       <form
-        className="inv-dialog"
+        className="inv-dialog inv-dialog-compact"
         onSubmit={confirmar}
         role="dialog"
         aria-modal="true"
@@ -86,12 +86,14 @@ export const ModalMotivoEstadoProducto: React.FC<Props> = ({
           border: '1px solid #334155',
         }}
       >
-        <h3 id="estado-producto-titulo" style={{ marginTop: 0 }}>
-          {accion === 'DESACTIVAR' ? 'Dar de Baja Producto' : 'Reactivar Producto'}
-        </h3>
-        <p style={{ color: '#CBD5E1', fontSize: 14 }}>
-          {nombre}. Se conservarán sus movimientos e historial.
-        </p>
+        <header className="inv-dialog-header">
+          <div><span className="inv-dialog-kicker">Estado del catálogo</span>
+            <h3 id="estado-producto-titulo">
+              {accion === 'DESACTIVAR' ? 'Dar de Baja Producto' : 'Reactivar Producto'}
+            </h3>
+            <p>{nombre}. Se conservarán sus movimientos e historial.</p>
+          </div>
+        </header>
         <label htmlFor="motivo-estado-producto">Motivo administrativo</label>
         <textarea
           id="motivo-estado-producto"
@@ -104,43 +106,21 @@ export const ModalMotivoEstadoProducto: React.FC<Props> = ({
           style={{ ...modalInputStyle, width: '100%', boxSizing: 'border-box', marginTop: 8 }}
           aria-describedby="motivo-producto-ayuda"
         />
-        <small id="motivo-producto-ayuda" style={{ color: '#94A3B8' }}>
+        <small id="motivo-producto-ayuda" className="inv-help">
           De 5 a 250 caracteres · {Array.from(motivo.trim()).length}/250
         </small>
         {error && (
-          <p role="alert" style={{ color: '#F87171', fontSize: 14 }}>
+          <p role="alert" className="inv-form-error">
             {error}
           </p>
         )}
-        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 20 }}>
-          <button
-            type="button"
-            onClick={onCancelar}
-            disabled={guardando}
-            style={{
-              padding: '9px 14px',
-              background: '#334155',
-              color: '#F8FAFC',
-              border: 0,
-              borderRadius: 6,
-            }}
-          >
-            Cancelar
-          </button>
-          <button
-            type="submit"
-            disabled={guardando}
-            style={{
-              padding: '9px 14px',
-              background: '#2563EB',
-              color: 'white',
-              border: 0,
-              borderRadius: 6,
-            }}
-          >
+        <footer className="inv-form-footer inv-confirm-footer">
+          <button type="button" className="inv-button" onClick={onCancelar} disabled={guardando}>Cancelar</button>
+          <button type="submit" disabled={guardando} aria-busy={guardando}
+            className={`inv-button ${accion === 'DESACTIVAR' ? 'inv-danger' : 'inv-primary'}`}>
             {guardando ? 'Guardando…' : 'Confirmar'}
           </button>
-        </div>
+        </footer>
       </form>
     </div>
   );

@@ -1,6 +1,5 @@
 import React from 'react';
 import { Search, Plus, UserPlus, XCircle } from 'lucide-react';
-import { inputBusquedaStyle } from '../vehiculoStyles';
 
 interface Props {
   placaBusqueda: string;
@@ -40,8 +39,7 @@ export const FichaVehicularHeader: React.FC<Props> = ({
   return (
     <header className="fv-header">
       <div className="fv-heading">
-        <h2>Ficha vehicular</h2>
-        <p>Consulta vehículos y su historial de mantenimiento.</p>
+        <h3>Buscar por placa</h3>
       </div>
       <div className="fv-toolbar">
         <form onSubmit={onBuscar} className="fv-search-form">
@@ -56,11 +54,11 @@ export const FichaVehicularHeader: React.FC<Props> = ({
                 value={placaBusqueda}
                 onChange={handleChange}
                 onPaste={handlePaste}
-                style={inputBusquedaStyle}
+                className="gt-input gt-input--leading"
               />
             </span>
           </label>
-          <button type="submit" disabled={cargando} className="fv-button fv-primary">
+          <button type="submit" disabled={cargando} aria-busy={cargando} className="fv-button fv-primary">
             {cargando ? 'Buscando...' : 'Buscar'}
           </button>
           {onLimpiar && (
@@ -71,7 +69,7 @@ export const FichaVehicularHeader: React.FC<Props> = ({
               className="fv-button"
               title="Limpiar búsqueda y ocultar ficha"
             >
-              <XCircle size={16} /> Limpiar
+              <XCircle size={16} aria-hidden="true" /> Limpiar
             </button>
           )}
         </form>
@@ -79,11 +77,11 @@ export const FichaVehicularHeader: React.FC<Props> = ({
           <div className="fv-new-actions">
             {onAbrirCrearCliente && (
               <button onClick={onAbrirCrearCliente} className="fv-button">
-                <UserPlus size={16} /> Nuevo cliente
+                <UserPlus size={16} aria-hidden="true" /> Nuevo cliente
               </button>
             )}
             <button onClick={onAbrirCrear} className="fv-button">
-              <Plus size={16} /> Nuevo vehículo
+              <Plus size={16} aria-hidden="true" /> Nuevo vehículo
             </button>
           </div>
         )}

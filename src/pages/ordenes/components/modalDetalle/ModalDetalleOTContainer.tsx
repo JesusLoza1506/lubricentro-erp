@@ -1,5 +1,6 @@
 import '../../ordenesVisual.css';
 import React from 'react';
+import { Car, ClipboardList, X } from 'lucide-react';
 import { ModalDetalleOTProps } from '../ModalDetalleOT';
 import { useModalDetalleOT } from './useModalDetalleOT';
 import { ModalDetalleHeader } from './subcomponents/ModalDetalleHeader';
@@ -15,143 +16,117 @@ export const ModalDetalleOTContainer: React.FC<ModalDetalleOTProps> = (props) =>
   const idUsuario = (usuario as any)?.id_usuario || (usuario as any)?.id || 0;
 
   return (
-    <div className="ot-overlay"
-      style={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        backgroundColor: 'rgba(15, 23, 42, 0.85)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        zIndex: 1000,
-      }}
-    >
-      <div className="ot-dialog ot-detail-dialog" role="dialog" aria-modal="true" aria-label="Detalle de orden de trabajo"
-        style={{
-          backgroundColor: '#1E293B',
-          borderRadius: '12px',
-          width: '100%',
-          maxWidth: '820px',
-          padding: '24px',
-          border: '1px solid #334155',
-          color: '#F8FAFC',
-          maxHeight: '90vh',
-          overflowY: 'auto',
-        }}
-      >
-        <div className="ot-detail-body">
-        <ModalDetalleHeader
-          ordenActual={state.ordenActual}
-          errorMsg={state.errorMsg}
-          rol={state.rol}
-          idUsuario={idUsuario}
-          onActualizarOT={onActualizarOT || (async () => {})}
-        />
+    <div className="gloria-theme gt-overlay ot-overlay">
+      <div className="gt-dialog ot-dialog ot-detail-dialog" role="dialog" aria-modal="true"
+        aria-label="Detalle de orden de trabajo">
+        <header className="ot-dialog-heading">
+          <span className="ot-dialog-icon"><ClipboardList size={21} aria-hidden="true" /></span>
+          <div>
+            <span className="ot-eyebrow">Atención de taller</span>
+            <h2>OT: {state.ordenActual.codigo_ot}</h2>
+            <p className="ot-detail-plate"><Car size={15} aria-hidden="true" /> {state.ordenActual.placa}</p>
+          </div>
+          <span className="ot-status ot-detail-state" data-state={state.ordenActual.estado}>
+            {state.ordenActual.estado.replace(/_/g, ' ')}
+          </span>
+          <button type="button" className="ot-button ot-close" aria-label="Cerrar detalle" onClick={onClose}>
+            <X size={18} aria-hidden="true" />
+          </button>
+        </header>
 
-        {!state.esTerminal && (
-          <AccionesEstadoBar
+        <div className="ot-detail-body">
+          <ModalDetalleHeader
             ordenActual={state.ordenActual}
+            errorMsg={state.errorMsg}
             rol={state.rol}
-            loading={state.loading}
+            idUsuario={idUsuario}
+            onActualizarOT={onActualizarOT || (async () => {})}
+          />
+
+          {!state.esTerminal && (
+            <AccionesEstadoBar
+              ordenActual={state.ordenActual}
+              rol={state.rol}
+              loading={state.loading}
+              modoAccion={state.modoAccion}
+              setModoAccion={state.setModoAccion}
+              hasIniciarHandler={state.hasIniciarHandler}
+              hasFinalizarHandler={state.hasFinalizarHandler}
+              hasCancelarHandler={state.hasCancelarHandler}
+              hasReasignarHandler={state.hasReasignarHandler}
+              mecanicos={state.mecanicos}
+              tablero={state.tablero}
+              idZanjaSel={state.idZanjaSel}
+              setIdZanjaSel={state.setIdZanjaSel}
+              idMecanicoInicio={state.idMecanicoInicio}
+              setIdMecanicoInicio={state.setIdMecanicoInicio}
+              kmSalida={state.kmSalida}
+              setKmSalida={state.setKmSalida}
+              tipoAceite={state.tipoAceite}
+              setTipoAceite={state.setTipoAceite}
+              resumenPublico={state.resumenPublico}
+              setResumenPublico={state.setResumenPublico}
+              motivoAccion={state.motivoAccion}
+              setMotivoAccion={state.setMotivoAccion}
+              idMecanicoNuevo={state.idMecanicoNuevo}
+              setIdMecanicoNuevo={state.setIdMecanicoNuevo}
+              onIniciarSubmit={state.handleIniciarSubmit}
+              onFinalizarSubmit={state.handleFinalizarSubmit}
+              onCancelarSubmit={state.handleCancelarSubmit}
+              onReasignarSubmit={state.handleReasignarSubmit}
+            />
+          )}
+
+          <TablaServiciosOT
+            ordenActual={state.ordenActual}
+            puedeAgregarServicios={state.puedeAgregarServicios}
             modoAccion={state.modoAccion}
             setModoAccion={state.setModoAccion}
-            hasIniciarHandler={state.hasIniciarHandler}
-            hasFinalizarHandler={state.hasFinalizarHandler}
-            hasCancelarHandler={state.hasCancelarHandler}
-            hasReasignarHandler={state.hasReasignarHandler}
-            mecanicos={state.mecanicos}
-            tablero={state.tablero}
-            idZanjaSel={state.idZanjaSel}
-            setIdZanjaSel={state.setIdZanjaSel}
-            idMecanicoInicio={state.idMecanicoInicio}
-            setIdMecanicoInicio={state.setIdMecanicoInicio}
-            kmSalida={state.kmSalida}
-            setKmSalida={state.setKmSalida}
-            tipoAceite={state.tipoAceite}
-            setTipoAceite={state.setTipoAceite}
-            resumenPublico={state.resumenPublico}
-            setResumenPublico={state.setResumenPublico}
+            serviciosCatalogo={state.serviciosCatalogo}
+            idServicioSel={state.idServicioSel}
+            setIdServicioSel={state.setIdServicioSel}
+            cantServicioSel={state.cantServicioSel}
+            setCantServicioSel={state.setCantServicioSel}
+            setIdDetalleServicioEdit={state.setIdDetalleServicioEdit}
+            onAgregarServicioSubmit={state.handleAgregarServicioSubmit}
+            onModificarServicioSubmit={state.handleModificarServicioSubmit}
+            onEliminarServicio={state.handleEliminarServicio}
+          />
+
+          <TablaInsumosOT
+            ordenActual={state.ordenActual}
+            esTerminal={state.esTerminal}
+            modoAccion={state.modoAccion}
+            setModoAccion={state.setModoAccion}
+            productosCatalogo={state.productosCatalogo}
+            idProductoSel={state.idProductoSel}
+            setIdProductoSel={state.setIdProductoSel}
+            cantProductoSel={state.cantProductoSel}
+            setCantProductoSel={state.setCantProductoSel}
+            esGranelSel={state.esGranelSel}
+            cantDevolver={state.cantDevolver}
+            setCantDevolver={state.setCantDevolver}
             motivoAccion={state.motivoAccion}
             setMotivoAccion={state.setMotivoAccion}
-            idMecanicoNuevo={state.idMecanicoNuevo}
-            setIdMecanicoNuevo={state.setIdMecanicoNuevo}
-            onIniciarSubmit={state.handleIniciarSubmit}
-            onFinalizarSubmit={state.handleFinalizarSubmit}
-            onCancelarSubmit={state.handleCancelarSubmit}
-            onReasignarSubmit={state.handleReasignarSubmit}
+            setIdDetalleDevolver={state.setIdDetalleDevolver}
+            onAgregarInsumoSubmit={state.handleAgregarInsumoSubmit}
+            onDevolverInsumoSubmit={state.handleDevolverInsumoSubmit}
+            procesandoDespacho={state.loading && state.modoAccion === 'AGREGAR_INSUMO'}
+            procesandoDevolucion={state.loading && state.modoAccion === 'DEVOLVER'}
           />
-        )}
-
-        <TablaServiciosOT
-          ordenActual={state.ordenActual}
-          puedeAgregarServicios={state.puedeAgregarServicios}
-          modoAccion={state.modoAccion}
-          setModoAccion={state.setModoAccion}
-          serviciosCatalogo={state.serviciosCatalogo}
-          idServicioSel={state.idServicioSel}
-          setIdServicioSel={state.setIdServicioSel}
-          cantServicioSel={state.cantServicioSel}
-          setCantServicioSel={state.setCantServicioSel}
-          setIdDetalleServicioEdit={state.setIdDetalleServicioEdit}
-          onAgregarServicioSubmit={state.handleAgregarServicioSubmit}
-          onModificarServicioSubmit={state.handleModificarServicioSubmit}
-          onEliminarServicio={state.handleEliminarServicio}
-        />
-
-        <TablaInsumosOT
-          ordenActual={state.ordenActual}
-          esTerminal={state.esTerminal}
-          modoAccion={state.modoAccion}
-          setModoAccion={state.setModoAccion}
-          productosCatalogo={state.productosCatalogo}
-          idProductoSel={state.idProductoSel}
-          setIdProductoSel={state.setIdProductoSel}
-          cantProductoSel={state.cantProductoSel}
-          setCantProductoSel={state.setCantProductoSel}
-          esGranelSel={state.esGranelSel}
-          cantDevolver={state.cantDevolver}
-          setCantDevolver={state.setCantDevolver}
-          motivoAccion={state.motivoAccion}
-          setMotivoAccion={state.setMotivoAccion}
-          setIdDetalleDevolver={state.setIdDetalleDevolver}
-          onAgregarInsumoSubmit={state.handleAgregarInsumoSubmit}
-          onDevolverInsumoSubmit={state.handleDevolverInsumoSubmit}
-          procesandoDespacho={state.loading && state.modoAccion === 'AGREGAR_INSUMO'}
-          procesandoDevolucion={state.loading && state.modoAccion === 'DEVOLVER'}
-        />
 
         </div>
-        <div className="ot-dialog-footer ot-detail-footer"
-          style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            marginTop: '20px',
-            paddingTop: '12px',
-            borderTop: '1px solid #334155',
-          }}
-        >
-          <strong style={{ fontSize: '16px', color: '#10B981' }}>
-            Total de la orden: S/ {(state.ordenActual.total_general_soles ?? 0).toFixed(2)}
-          </strong>
-          {state.ordenActual.estado==='FINALIZADO' && state.rol!=='MECANICO' && props.onCobrar && <button className="ot-btn" data-tone="primary" onClick={()=>props.onCobrar?.(state.ordenActual.id_ot)}>Cobrar en POS</button>}
-          <button
-            onClick={onClose}
-            style={{
-              padding: '8px 16px',
-              backgroundColor: '#475569',
-              color: '#FFF',
-              border: 'none',
-              borderRadius: '6px',
-              cursor: 'pointer',
-            }}
-          >
-            Cerrar
-          </button>
-        </div>
+        <footer className="ot-dialog-footer ot-detail-footer">
+          <strong>Total de la orden: S/ {(state.ordenActual.total_general_soles ?? 0).toFixed(2)}</strong>
+          <div className="ot-footer-actions">
+            <button type="button" className="ot-button" onClick={onClose}>Cerrar</button>
+            {state.ordenActual.estado === 'FINALIZADO' && state.rol !== 'MECANICO' && props.onCobrar && (
+              <button type="button" className="ot-button ot-primary" onClick={() => props.onCobrar?.(state.ordenActual.id_ot)}>
+                Cobrar en POS
+              </button>
+            )}
+          </div>
+        </footer>
       </div>
     </div>
   );

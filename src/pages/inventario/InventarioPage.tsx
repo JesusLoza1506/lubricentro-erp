@@ -6,7 +6,7 @@ import {
 } from './AvisosInventario';
 import { configurarContextoInventario, solesAMicro } from '../../services/operacionInventario';
 import React, { useEffect, useState, useRef } from 'react';
-import { Wrench, Package, History, Search } from 'lucide-react';
+import { Wrench, Package, History, Search, AlertTriangle, SlidersHorizontal } from 'lucide-react';
 import {
   Producto,
   Categoria,
@@ -470,7 +470,7 @@ export const InventarioPage: React.FC = () => {
 
   return (
     <AvisosInventarioContext.Provider value={notificar}>
-      <div className="inventario-page">
+      <div className="gloria-theme inventario-page">
         <AvisoInventarioVisible aviso={aviso} onCerrar={cerrar} />
         <InventarioHeader
           esAdmin={esAdmin}
@@ -515,24 +515,40 @@ export const InventarioPage: React.FC = () => {
         {tabActiva === 'PRODUCTOS' ? (
           <>
             {datosDesactualizados && (
-              <p role="status" style={{ color: '#FBBF24' }}>
-                No se pudieron actualizar los datos. Se conserva la última consulta.{' '}
-                <button onClick={() => void cargarProductosPaginados()}>Reintentar consulta</button>
-              </p>
+              <div role="status" className="gt-notice inv-stale-notice">
+                <AlertTriangle size={17} aria-hidden="true" />
+                <span>No se pudieron actualizar los datos. Se conserva la última consulta.</span>
+                <button
+                  type="button"
+                  className="inv-button"
+                  onClick={() => void cargarProductosPaginados()}
+                >
+                  Reintentar consulta
+                </button>
+              </div>
             )}
-            <section className="inv-filter-panel" aria-label="Filtros de productos">
+            <section className="inv-filter-panel gt-stage" aria-label="Filtros de productos">
+              <InventarioFiltros
+                busqueda={busqueda}
+                setBusqueda={(b) => {
+                  setBusqueda(b);
+                  setPaginaActual(1);
+                }}
+                filtroCritico={filtroCritico || stockFiltro === 'CRITICO'}
+                setFiltroCritico={(fc) => {
+                  setFiltroCritico(fc);
+                  setStockFiltro('TODOS');
+                  setPaginaActual(1);
+                }}
+                onRefresh={cargarProductosPaginados}
+              />
               <div className="inv-filter-fields">
+                <span className="inv-filter-label">
+                  <SlidersHorizontal size={14} aria-hidden="true" /> Filtros
+                </span>
                 <label>
                   Categoría{' '}
                   <select
-                    style={{
-                      background: '#0F172A',
-                      color: '#CBD5E1',
-                      border: '1px solid #334155',
-                      borderRadius: 8,
-                      padding: 8,
-                      marginLeft: 8,
-                    }}
                     aria-label="Categoría"
                     value={categoriaFiltro}
                     onChange={(e) => {
@@ -550,14 +566,6 @@ export const InventarioPage: React.FC = () => {
                 <label>
                   Stock{' '}
                   <select
-                    style={{
-                      background: '#0F172A',
-                      color: '#CBD5E1',
-                      border: '1px solid #334155',
-                      borderRadius: 8,
-                      padding: 8,
-                      marginLeft: 8,
-                    }}
                     aria-label="Stock"
                     value={stockFiltro}
                     onChange={(e) => {
@@ -576,14 +584,6 @@ export const InventarioPage: React.FC = () => {
                   <label>
                     Estado{' '}
                     <select
-                      style={{
-                        background: '#0F172A',
-                        color: '#CBD5E1',
-                        border: '1px solid #334155',
-                        borderRadius: 8,
-                        padding: 8,
-                        marginLeft: 8,
-                      }}
                       aria-label="Estado del producto"
                       value={estadoFiltro}
                       onChange={(e) => {
@@ -599,21 +599,6 @@ export const InventarioPage: React.FC = () => {
                   </label>
                 )}
               </div>
-
-              <InventarioFiltros
-                busqueda={busqueda}
-                setBusqueda={(b) => {
-                  setBusqueda(b);
-                  setPaginaActual(1);
-                }}
-                filtroCritico={filtroCritico || stockFiltro === 'CRITICO'}
-                setFiltroCritico={(fc) => {
-                  setFiltroCritico(fc);
-                  setStockFiltro('TODOS');
-                  setPaginaActual(1);
-                }}
-                onRefresh={cargarProductosPaginados}
-              />
             </section>
 
             <InventarioTabla
@@ -642,15 +627,17 @@ export const InventarioPage: React.FC = () => {
           </>
         ) : tabActiva === 'SERVICIOS' ? (
           <>
-            <div className="inv-search inv-service-search">
-              <Search size={17} />
-              <input
-                aria-label="Buscar servicios"
-                placeholder="Buscar servicio por nombre o código"
-                value={busquedaServicios}
-                onChange={(e) => setBusquedaServicios(e.target.value)}
-              />
-            </div>
+            <section className="inv-filter-panel gt-stage" aria-label="Filtro de servicios">
+              <div className="inv-search inv-service-search">
+                <Search size={17} aria-hidden="true" />
+                <input
+                  aria-label="Buscar servicios"
+                  placeholder="Buscar servicio por nombre o código"
+                  value={busquedaServicios}
+                  onChange={(e) => setBusquedaServicios(e.target.value)}
+                />
+              </div>
+            </section>
             <ServiciosTabla
               cargando={cargando}
               servicios={servicios.filter((s) =>

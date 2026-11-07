@@ -100,7 +100,7 @@ export const ModalAjusteStock: React.FC<ModalAjusteStockProps> = ({
 
   return (
     <div
-      className="inv-overlay"
+      className="gloria-theme inv-overlay"
       style={{
         position: 'fixed',
         top: 0,
@@ -116,7 +116,7 @@ export const ModalAjusteStock: React.FC<ModalAjusteStockProps> = ({
       }}
     >
       <div
-        className="inv-dialog"
+        className="inv-dialog inv-dialog-compact"
         role="dialog"
         aria-modal="true"
         aria-label="Conteo físico"
@@ -129,28 +129,16 @@ export const ModalAjusteStock: React.FC<ModalAjusteStockProps> = ({
           boxShadow: '0 20px 40px rgba(168, 85, 247, 0.2)',
         }}
       >
-        <h3 style={{ fontSize: '18px', fontWeight: '800', color: '#F8FAFC', margin: '0 0 16px 0' }}>
-          Conteo físico de stock
-        </h3>
+        <header className="inv-dialog-header">
+          <div><span className="inv-dialog-kicker">Control de existencias</span>
+            <h3>Conteo físico de stock</h3>
+            <p>Compara las existencias físicas con el saldo registrado.</p>
+          </div>
+        </header>
 
-        <div
-          style={{
-            backgroundColor: '#1E293B',
-            padding: '12px 16px',
-            borderRadius: '10px',
-            marginBottom: '16px',
-          }}
-        >
-          <p style={{ color: '#CBD5E1', fontSize: '13px', margin: '0 0 6px 0' }}>
-            Producto: <strong style={{ color: '#F8FAFC' }}>{producto.nombre}</strong> (
-            {producto.codigo})
-          </p>
-          <p style={{ color: '#94A3B8', fontSize: '13px', margin: 0 }}>
-            Stock Registrado en Sistema:{' '}
-            <strong style={{ color: '#38BDF8' }}>
-              {stockTeoricoUI} {esML ? 'Litros (L)' : 'UNIDADES'}
-            </strong>
-          </p>
+        <div className="inv-counted-product">
+          <div><strong>{producto.nombre}</strong><span className="inv-code">{producto.codigo}</span></div>
+          <div><span>Stock registrado</span><strong>{stockTeoricoUI} {esML ? 'Litros (L)' : 'UNIDADES'}</strong></div>
         </div>
 
         <form
@@ -162,7 +150,7 @@ export const ModalAjusteStock: React.FC<ModalAjusteStockProps> = ({
             style={{ border: 0, padding: 0, margin: 0, display: 'contents' }}
           >
             <div>
-              <label
+              <label htmlFor="inv-count-physical"
                 style={{
                   display: 'block',
                   fontSize: '12px',
@@ -172,7 +160,7 @@ export const ModalAjusteStock: React.FC<ModalAjusteStockProps> = ({
               >
                 Stock Real en Almacén / Taller ({esML ? 'Litros' : 'Unidades'}) *
               </label>
-              <input
+              <input id="inv-count-physical"
                 required
                 type="number"
                 step={esML ? '0.001' : '1'}
@@ -184,22 +172,8 @@ export const ModalAjusteStock: React.FC<ModalAjusteStockProps> = ({
             </div>
 
             {diferenciaUI !== 0 && (
-              <div
-                style={{
-                  backgroundColor:
-                    diferenciaUI > 0 ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)',
-                  border: `1px solid ${diferenciaUI > 0 ? '#10B981' : '#EF4444'}`,
-                  padding: '12px',
-                  borderRadius: '8px',
-                }}
-              >
-                <span
-                  style={{
-                    fontSize: '13px',
-                    fontWeight: '700',
-                    color: diferenciaUI > 0 ? '#34D399' : '#F87171',
-                  }}
-                >
+              <div className="inv-stock-difference" data-change={diferenciaUI > 0 ? 'increase' : 'decrease'}>
+                <span>
                   Diferencia a Ajustar: {diferenciaUI > 0 ? `+${diferenciaUI}` : diferenciaUI}{' '}
                   {esML ? 'L' : 'UND'} (
                   {diferenciaUI > 0 ? 'Sobrante - Entrada' : 'Faltante - Salida'})
@@ -209,7 +183,7 @@ export const ModalAjusteStock: React.FC<ModalAjusteStockProps> = ({
 
             {diferenciaUI > 0 && stockTeoricoUI === 0 && (
               <div>
-                <label
+                <label htmlFor="inv-count-cost"
                   style={{
                     display: 'block',
                     fontSize: '12px',
@@ -219,7 +193,7 @@ export const ModalAjusteStock: React.FC<ModalAjusteStockProps> = ({
                 >
                   Costo por unidad o litro (S/), si no existe costo previo
                 </label>
-                <input
+                <input id="inv-count-cost"
                   type="number"
                   step="0.01"
                   min="0.01"
@@ -231,7 +205,7 @@ export const ModalAjusteStock: React.FC<ModalAjusteStockProps> = ({
             )}
 
             <div>
-              <label
+              <label htmlFor="inv-count-reason"
                 style={{
                   display: 'block',
                   fontSize: '12px',
@@ -242,7 +216,7 @@ export const ModalAjusteStock: React.FC<ModalAjusteStockProps> = ({
                 Motivo de la Reconciliación{' '}
                 {requiereMotivo ? '(mínimo 5 caracteres) *' : '(Opcional sin diferencias)'}
               </label>
-              <input
+              <input id="inv-count-reason"
                 required={requiereMotivo}
                 minLength={requiereMotivo ? 5 : undefined}
                 maxLength={250}
@@ -259,54 +233,28 @@ export const ModalAjusteStock: React.FC<ModalAjusteStockProps> = ({
             </div>
           </fieldset>
           {errorLocal && (
-            <p role="alert" style={{ color: '#FCA5A5' }}>
+            <p role="alert" className="inv-form-error">
               {errorLocal}
             </p>
           )}
           {incierta && (
-            <p style={{ color: '#FBBF24' }}>
+            <p className="gt-notice">
               Reintenta la solicitud conservada para confirmar su resultado.
             </p>
           )}
-          <div
-            style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '8px' }}
-          >
-            <button
-              type="button"
-              onClick={onClose}
-              disabled={guardando}
-              style={{
-                padding: '10px 16px',
-                backgroundColor: 'transparent',
-                border: '1px solid #334155',
-                color: '#CBD5E1',
-                borderRadius: '8px',
-                cursor: 'pointer',
-              }}
-            >
+          <footer className="inv-form-footer">
+            <button type="button" className="inv-button" onClick={onClose} disabled={guardando}>
               {incierta ? 'Conservar y cerrar' : 'Cancelar'}
             </button>
-            <button
-              type="submit"
-              disabled={guardando || (requiereMotivo && motivo.trim().length < 5)}
-              style={{
-                padding: '10px 20px',
-                backgroundColor: '#A855F7',
-                color: '#FFFFFF',
-                border: 'none',
-                borderRadius: '8px',
-                fontWeight: '700',
-                cursor: guardando ? 'wait' : 'pointer',
-                opacity: requiereMotivo && motivo.trim().length < 5 ? 0.6 : 1,
-              }}
-            >
+            <button type="submit" className="inv-button inv-primary" aria-busy={guardando}
+              disabled={guardando || (requiereMotivo && motivo.trim().length < 5)}>
               {guardando
                 ? 'Procesando...'
                 : incierta
                   ? 'Reintentar conteo pendiente'
                   : 'Aplicar Reconciliación'}
             </button>
-          </div>
+          </footer>
         </form>
       </div>
     </div>

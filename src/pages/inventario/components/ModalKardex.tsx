@@ -108,7 +108,7 @@ export const ModalKardex: React.FC<ModalKardexProps> = ({ abierto, producto, onC
 
   return (
     <div
-      className="inv-overlay"
+      className="gloria-theme inv-overlay"
       style={{
         position: 'fixed',
         top: 0,
@@ -124,7 +124,7 @@ export const ModalKardex: React.FC<ModalKardexProps> = ({ abierto, producto, onC
       }}
     >
       <div
-        className="inv-dialog inv-dialog-wide"
+        className="inv-dialog inv-dialog-wide inv-kardex-dialog"
         role="dialog"
         aria-modal="true"
         aria-label="Kardex"
@@ -142,7 +142,7 @@ export const ModalKardex: React.FC<ModalKardexProps> = ({ abierto, producto, onC
         }}
       >
         {/* Cabecera del Modal */}
-        <div
+        <header className="inv-dialog-header"
           style={{
             display: 'flex',
             justifyContent: 'space-between',
@@ -151,42 +151,31 @@ export const ModalKardex: React.FC<ModalKardexProps> = ({ abierto, producto, onC
           }}
         >
           <div>
-            <h3 style={{ fontSize: '18px', fontWeight: '800', color: '#F8FAFC', margin: 0 }}>
+            <span className="inv-dialog-kicker">Trazabilidad de stock</span>
+            <h3>
               Kardex · {producto.nombre}
             </h3>
-            <span style={{ fontSize: '12px', color: '#94A3B8' }}>Código: {producto.codigo}</span>
+            <p>Código: {producto.codigo}</p>
           </div>
           <button
+            type="button"
+            className="inv-icon-button"
             aria-label="Cerrar Kardex"
             onClick={onClose}
-            style={{ background: 'none', border: 'none', color: '#94A3B8', cursor: 'pointer' }}
           >
             <X size={20} />
           </button>
-        </div>
+        </header>
 
         {/* Panel de Filtros por Rango de Fechas y Tipo de Movimiento */}
-        <form
-          onSubmit={handleAplicarFiltros}
-          style={{
-            display: 'flex',
-            gap: '12px',
-            alignItems: 'flex-end',
-            backgroundColor: '#1E293B',
-            padding: '12px 16px',
-            borderRadius: '10px',
-            marginBottom: '16px',
-            flexWrap: 'wrap',
-          }}
-        >
+        <form className="inv-entry-toolbar inv-kardex-filters" onSubmit={handleAplicarFiltros}>
           <div>
-            <label
-              style={{ display: 'block', fontSize: '11px', color: '#94A3B8', marginBottom: '4px' }}
-            >
+            <label htmlFor="inv-kardex-fechaInicio">
               Desde
             </label>
             <input
               type="date"
+              id="inv-kardex-fechaInicio"
               value={fechaInicio}
               onChange={(e) => setFechaInicio(e.target.value)}
               style={filterInputStyle}
@@ -194,13 +183,12 @@ export const ModalKardex: React.FC<ModalKardexProps> = ({ abierto, producto, onC
           </div>
 
           <div>
-            <label
-              style={{ display: 'block', fontSize: '11px', color: '#94A3B8', marginBottom: '4px' }}
-            >
+            <label htmlFor="inv-kardex-fechaFin">
               Hasta
             </label>
             <input
               type="date"
+              id="inv-kardex-fechaFin"
               value={fechaFin}
               onChange={(e) => setFechaFin(e.target.value)}
               style={filterInputStyle}
@@ -208,12 +196,11 @@ export const ModalKardex: React.FC<ModalKardexProps> = ({ abierto, producto, onC
           </div>
 
           <div>
-            <label
-              style={{ display: 'block', fontSize: '11px', color: '#94A3B8', marginBottom: '4px' }}
-            >
+            <label htmlFor="inv-kardex-tipoMovimiento">
               Tipo de Movimiento
             </label>
             <select
+              id="inv-kardex-tipoMovimiento"
               value={tipoMovimiento}
               onChange={(e) => setTipoMovimiento(e.target.value)}
               style={filterInputStyle}
@@ -231,23 +218,7 @@ export const ModalKardex: React.FC<ModalKardexProps> = ({ abierto, producto, onC
             </select>
           </div>
 
-          <button
-            type="submit"
-            disabled={cargando}
-            style={{
-              padding: '8px 16px',
-              backgroundColor: '#38BDF8',
-              color: '#0F172A',
-              border: 'none',
-              borderRadius: '6px',
-              fontWeight: '700',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              fontSize: '12px',
-            }}
-          >
+          <button type="submit" className="inv-button inv-primary" disabled={cargando}>
             <Filter size={14} /> Filtrar
           </button>
         </form>
@@ -257,76 +228,25 @@ export const ModalKardex: React.FC<ModalKardexProps> = ({ abierto, producto, onC
           limita las filas mostradas. Importes históricos en S/ con seis decimales; costo unitario
           en UND o ML.
         </p>
-        {/* Panel de Saldos Inicial, Final y Stock Actual */}
-        <div
-          style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            backgroundColor: 'rgba(56, 189, 248, 0.1)',
-            border: '1px solid rgba(56, 189, 248, 0.3)',
-            padding: '10px 16px',
-            borderRadius: '8px',
-            marginBottom: '16px',
-            fontSize: '13px',
-          }}
-        >
-          <div>
-            <span style={{ color: '#94A3B8' }}>Saldo Inicial Período: </span>
-            <strong style={{ color: '#38BDF8' }}>
-              {formatearCant(saldos.saldo_inicial)} {unidadTexto}
-            </strong>
-          </div>
-          <div>
-            <span style={{ color: '#94A3B8' }}>Saldo Final Período: </span>
-            <strong style={{ color: '#34D399' }}>
-              {formatearCant(saldos.saldo_final)} {unidadTexto}
-            </strong>
-          </div>
-          <div>
-            <span style={{ color: '#94A3B8' }}>Stock Actual Catálogo: </span>
-            <strong style={{ color: '#F59E0B' }}>
-              {formatearCant(saldos.saldo_actual)} {unidadTexto}
-            </strong>
-          </div>
-        </div>
+        <dl className="inv-kardex-balances" aria-label="Saldos de inventario">
+          <div><dt>Saldo inicial del período</dt><dd>{formatearCant(saldos.saldo_inicial)} {unidadTexto}</dd></div>
+          <div><dt>Saldo final del período</dt><dd>{formatearCant(saldos.saldo_final)} {unidadTexto}</dd></div>
+          <div><dt>Stock actual del catálogo</dt><dd>{formatearCant(saldos.saldo_actual)} {unidadTexto}</dd></div>
+        </dl>
 
         {/* Alerta de Error */}
         {errorMsg && (
-          <div
-            role="alert"
-            style={{
-              backgroundColor: 'rgba(239, 68, 68, 0.15)',
-              border: '1px solid #EF4444',
-              color: '#F87171',
-              padding: '10px 14px',
-              borderRadius: '8px',
-              marginBottom: '16px',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              fontSize: '13px',
-            }}
-          >
+          <div role="alert" className="inv-form-error inv-inline-error">
             <AlertCircle size={16} />
             <span>{errorMsg}</span>
           </div>
         )}
 
-        {/* Tabla Kárdex */}
-        <div
-          style={{ flex: 1, overflow: 'auto', border: '1px solid #334155', borderRadius: '8px' }}
-        >
-          <table
-            style={{
-              width: '100%',
-              minWidth: 1150,
-              borderCollapse: 'collapse',
-              fontSize: '12px',
-              color: '#F8FAFC',
-            }}
-          >
+        <div className="inv-table-scroll inv-kardex-scroll" tabIndex={0} role="region"
+          aria-label="Movimientos de Kardex" aria-busy={cargando}>
+          <table className="inv-table inv-kardex-table">
             <thead>
-              <tr style={{ backgroundColor: '#1E293B', color: '#94A3B8', textAlign: 'left' }}>
+              <tr>
                 <th style={{ padding: '10px' }}>Fecha</th>
                 <th style={{ padding: '10px' }}>Tipo Movimiento</th>
                 <th style={{ padding: '10px' }}>Stock Ant.</th>
@@ -362,7 +282,7 @@ export const ModalKardex: React.FC<ModalKardexProps> = ({ abierto, producto, onC
                 movimientos.map((m) => (
                   <tr key={m.id_movimiento} style={{ borderBottom: '1px solid #1E293B' }}>
                     <td style={{ padding: '10px' }}>{m.fecha_movimiento}</td>
-                    <td style={{ padding: '10px', fontWeight: '700', color: '#38BDF8' }}>
+                    <td className="inv-movement-kind">
                       {m.tipo_movimiento}
                     </td>
                     <td style={{ padding: '10px' }}>{formatearCant(m.stock_anterior)}</td>
@@ -370,7 +290,7 @@ export const ModalKardex: React.FC<ModalKardexProps> = ({ abierto, producto, onC
                       style={{
                         padding: '10px',
                         fontWeight: '700',
-                        color: m.diferencia >= 0 ? '#34D399' : '#F87171',
+                        color: m.diferencia > 0 ? 'var(--gt-green)' : m.diferencia < 0 ? 'var(--gt-red)' : 'var(--gt-muted)',
                       }}
                     >
                       {m.diferencia >= 0
@@ -398,14 +318,7 @@ export const ModalKardex: React.FC<ModalKardexProps> = ({ abierto, producto, onC
                           <button
                             type="button"
                             onClick={() => setOrigenSeleccionado(m.id_movimiento)}
-                            style={{
-                              color: '#38BDF8',
-                              background: 'transparent',
-                              border: 0,
-                              padding: '0 0 6px',
-                              cursor: 'pointer',
-                              textAlign: 'left',
-                            }}
+                            className="inv-text-button"
                           >
                             Ver {m.codigo_origen || 'origen'}
                           </button>
@@ -413,7 +326,7 @@ export const ModalKardex: React.FC<ModalKardexProps> = ({ abierto, producto, onC
                         </>
                       )}
                       {m.motivo || 'Sin observación adicional'} <br />
-                      <small style={{ color: '#64748B' }}>
+                      <small className="inv-help">
                         Por: {m.usuario_nombre || 'Sistema'}
                       </small>
                     </td>
@@ -433,7 +346,7 @@ export const ModalKardex: React.FC<ModalKardexProps> = ({ abierto, producto, onC
             marginTop: '16px',
           }}
         >
-          <button
+          <button type="button" className="inv-button"
             disabled={pagina === 0 || cargando}
             onClick={() =>
               cargarKardex(
@@ -443,23 +356,11 @@ export const ModalKardex: React.FC<ModalKardexProps> = ({ abierto, producto, onC
                 aplicados.current.tipo
               )
             }
-            style={{
-              padding: '8px 12px',
-              backgroundColor: '#1E293B',
-              border: '1px solid #334155',
-              color: '#F8FAFC',
-              borderRadius: '6px',
-              cursor: pagina === 0 || cargando ? 'not-allowed' : 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              opacity: pagina === 0 || cargando ? 0.5 : 1,
-            }}
           >
             <ArrowLeft size={16} /> Anterior
           </button>
           <span style={{ fontSize: '13px', color: '#94A3B8' }}>Página {pagina + 1}</span>
-          <button
+          <button type="button" className="inv-button"
             disabled={movimientos.length < limite || cargando}
             onClick={() =>
               cargarKardex(
@@ -469,18 +370,6 @@ export const ModalKardex: React.FC<ModalKardexProps> = ({ abierto, producto, onC
                 aplicados.current.tipo
               )
             }
-            style={{
-              padding: '8px 12px',
-              backgroundColor: '#1E293B',
-              border: '1px solid #334155',
-              color: '#F8FAFC',
-              borderRadius: '6px',
-              cursor: movimientos.length < limite || cargando ? 'not-allowed' : 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              opacity: movimientos.length < limite || cargando ? 0.5 : 1,
-            }}
           >
             Siguiente <ArrowRight size={16} />
           </button>

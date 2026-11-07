@@ -71,12 +71,14 @@ export const ModalDetalleOT: React.FC<ModalDetalleOTProps> = ({
 
           {ordenTrabajo.tipo_aceite && <div className="fv-oil-note"><Droplet size={18} /><span>Aceite aplicado <strong>{ordenTrabajo.tipo_aceite}</strong></span></div>}
 
+          {(ordenTrabajo.resumen_publico || ordenTrabajo.observaciones) && <section className="fv-work-note"><h4>Resumen del trabajo</h4><p>{ordenTrabajo.resumen_publico || ordenTrabajo.observaciones}</p></section>}
+
           <section className="fv-detail-section">
             <h4>Servicios y productos utilizados</h4>
             {(!ordenTrabajo.servicios || ordenTrabajo.servicios.length === 0) && (!ordenTrabajo.insumos || ordenTrabajo.insumos.length === 0) ? (
               <p className="fv-detail-muted">No hay detalle público registrado para esta orden.</p>
             ) : (
-              <div className="fv-detail-table-scroll">
+              <div className="fv-detail-table-scroll" tabIndex={0} role="region" aria-label="Servicios e insumos registrados">
                 <table className="fv-detail-table">
                   <thead><tr><th scope="col">Descripción</th><th scope="col">Cantidad</th></tr></thead>
                   <tbody>
@@ -92,7 +94,6 @@ export const ModalDetalleOT: React.FC<ModalDetalleOTProps> = ({
             )}
           </section>
 
-          {(ordenTrabajo.resumen_publico || ordenTrabajo.observaciones) && <section className="fv-work-note"><h4>Resumen del trabajo</h4><p>{ordenTrabajo.resumen_publico || ordenTrabajo.observaciones}</p></section>}
         </div>
 
         <footer className="fv-dialog-footer"><span className="fv-detail-muted">Información registrada en esta atención.</span><button type="button" onClick={() => setModalAbierto(false)} className="fv-button">Cerrar</button></footer>

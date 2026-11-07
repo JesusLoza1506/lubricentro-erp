@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
-import { RefreshCw, ShoppingCart, ClipboardList, ReceiptText } from 'lucide-react';
+import { RefreshCw, ShoppingCart, ClipboardList, ReceiptText, AlertTriangle, UserRound, Wallet } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { ToastNotification } from '../../components/ToastNotification';
 import type { CredencialesPos, InicioPos, ResultadoPos } from '../../types/pos';
@@ -199,13 +199,23 @@ export function PosPage({
   const vaciar = () => {
     if (window.confirm('¿Descartar la venta actual sin cobrarla?')) venta.limpiar();
   };
+  const bloqueoCobro = pendiente
+    ? 'Recupera la operación pendiente antes de cobrar.'
+    : !inicio
+      ? 'El estado del punto de venta aún no está disponible.'
+      : !inicio.configurada
+        ? 'Cobro pendiente de configuración.'
+        : !inicio.caja_propia
+          ? 'Necesitas un turno propio abierto para cobrar.'
+          : undefined;
+
   return (
     <CapturasPosContext.Provider value={registrarCaptura}>
-      <main className="pos-module">
-        <header className="pos-main-header">
+      <section className="gloria-theme pos-module" aria-labelledby="pos-module-title">
+        <header className="pos-main-header gt-stage">
           <div>
             <span className="pos-eyebrow">OPERACIÓN COMERCIAL</span>
-            <h1>Punto de Venta</h1>
+            <h1 id="pos-module-title">Punto de Venta</h1>
             <p>Ventas directas y cobro de trabajos terminados.</p>
           </div>
           <div className="pos-header-actions">
@@ -222,16 +232,17 @@ export function PosPage({
             </button>
           </div>
         </header>
-        <div className="pos-statusbar">
-          <span>
-            <i className={inicio?.caja_propia ? 'pos-dot' : 'pos-dot pos-dot-off'} />
+        <div className="pos-statusbar" aria-label="Estado de caja">
+          <span className="pos-shift">
+            <Wallet size={16} aria-hidden="true" />
+            <i className={inicio?.caja_propia ? 'pos-dot' : 'pos-dot pos-dot-off'} aria-hidden="true" />
             {inicio?.caja_propia
               ? `Tu caja: ${inicio.caja?.codigo}`
               : inicio?.caja
                 ? `Caja de ${inicio.caja.titular}`
                 : 'Sin caja abierta'}
           </span>
-          <span>{usuario?.nombre_completo}</span>
+          <span className="pos-operator"><UserRound size={15} aria-hidden="true" /> {usuario?.nombre_completo}</span>
           {inicio?.caja_propia ? (
             <span>
               Efectivo disponible: <strong>{soles(inicio.caja?.efectivo_cent ?? 0)}</strong>
@@ -251,9 +262,11 @@ export function PosPage({
           </div>
         )}
         {inicio && !inicio.configurada && (
-          <div className="pos-warning">
-            Completa la configuración de empresa e integración en Administración para habilitar el
-            cobro. Puedes consultar el catálogo y preparar la venta.
+          <div className="pos-warning pos-configuration" role="status">
+            <AlertTriangle size={16} aria-hidden="true" />
+            <div><strong>Cobro todavía no habilitado</strong>
+              <p>Completa la configuración de empresa e integración en Administración. Mientras tanto, puedes preparar la venta.</p>
+            </div>
           </div>
         )}
         {pendiente && (
@@ -280,6 +293,7 @@ export function PosPage({
           <nav aria-label="Vistas de Punto de Venta">
             <button
               className={vista === 'venta' ? 'active' : ''}
+              aria-current={vista === 'venta' ? 'page' : undefined}
               onClick={() => cambiarVista('venta')}
             >
               <ShoppingCart size={17} />
@@ -287,6 +301,7 @@ export function PosPage({
             </button>
             <button
               className={vista === 'listado' ? 'active' : ''}
+              aria-current={vista === 'listado' ? 'page' : undefined}
               onClick={() => cambiarVista('listado')}
             >
               <ReceiptText size={17} />
@@ -294,7 +309,7 @@ export function PosPage({
             </button>
           </nav>
           {vista === 'venta' && (
-            <button disabled={!!pendiente} onClick={() => ScargarOt(true)}>
+            <button className="pos-load-ot" disabled={!!pendiente} onClick={() => ScargarOt(true)}>
               <ClipboardList size={17} />
               Cargar OT finalizada
             </button>
@@ -322,6 +337,7 @@ export function PosPage({
               onVaciar={vaciar}
               onCobrar={() => venta.Scobro(true)}
               puedeCobrar={!!inicio?.caja_propia && !!inicio?.configurada && !pendiente}
+              bloqueoCobro={bloqueoCobro}
             >
               <ReceptorPos
                 cliente={venta.cliente}
@@ -430,7 +446,7 @@ export function PosPage({
           </ModalPos>
         )}
         {aviso && (
-          <div role={aviso.tipo === 'ERROR' ? 'alert' : 'status'}>
+          <div className="pos-toast" data-kind={aviso.tipo} role={aviso.tipo === 'ERROR' ? 'alert' : 'status'} aria-atomic="true">
             <ToastNotification
               key={aviso.id}
               mensaje={aviso.mensaje}
@@ -439,7 +455,7 @@ export function PosPage({
             />
           </div>
         )}
-      </main>
+      </section>
     </CapturasPosContext.Provider>
   );
 }
