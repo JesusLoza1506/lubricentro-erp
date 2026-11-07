@@ -30,6 +30,7 @@ export default defineConfig(() => ({
   // Configuración de pruebas para Vitest con entorno JSDOM
   test: {
     environment: 'jsdom',
+    setupFiles: ['./src/test/setup.ts'],
     globals: true,
   },
 }));
