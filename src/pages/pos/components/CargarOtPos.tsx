@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { OtPos, PaginaPos } from '../../../types/pos';
 import { mensajePos, posApi } from '../../../services/posService';
+import { soles } from '../posUtils';
 import { ModalPos } from './ModalPos';
 export function CargarOtPos({
   onCerrar,
@@ -57,7 +58,9 @@ export function CargarOtPos({
             <tr>
               <th>Orden</th>
               <th>Vehículo</th>
+              <th>Cliente</th>
               <th>Finalización</th>
+              <th className="pos-money">Total histórico</th>
               <th />
             </tr>
           </thead>
@@ -68,7 +71,9 @@ export function CargarOtPos({
                   <strong>{ot.codigo}</strong>
                 </td>
                 <td>{ot.placa}</td>
+                <td>{ot.cliente}</td>
                 <td>{ot.fecha}</td>
+                <td className="pos-money">{soles(ot.total_cent)}</td>
                 <td>
                   <button
                     disabled={ocupado}

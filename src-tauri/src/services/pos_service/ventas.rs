@@ -27,53 +27,7 @@ pub fn preparar(
         if existe != 1 {
             return Err(error("La OT no está finalizada o ya tiene una venta."));
         }
-        let mut s=conn.prepare("SELECT id_detalle,id_servicio,codigo_snapshot,nombre_snapshot,cantidad,precio_unitario_cent FROM detalle_ot_servicios WHERE id_ot=?1 ORDER BY id_detalle")?;
-        for r in s.query_map([ot], |r| {
-            Ok((
-                r.get::<_, i64>(0)?,
-                r.get::<_, i64>(1)?,
-                r.get::<_, String>(2)?,
-                r.get::<_, String>(3)?,
-                r.get::<_, i64>(4)?,
-                r.get::<_, i64>(5)?,
-            ))
-        })? {
-            let (id, s, c, n, q, p) = r?;
-            l.push(linea(
-                None,
-                Some(s),
-                None,
-                Some(id),
-                c,
-                n,
-                "UND".into(),
-                q,
-                p,
-                None,
-                None,
-            ));
-        }
-        let mut s=conn.prepare("SELECT p.id_detalle,p.id_producto,p.codigo_snapshot,p.nombre_snapshot,p.unidad_medida,p.cantidad-coalesce((SELECT sum(diferencia) FROM movimientos_inventario WHERE id_consumo_ot=p.id_detalle AND tipo_movimiento='REPOSICION_OT'),0),p.precio_unitario_cent,p.costo_unitario_micro,p.valor_consumido_micro-coalesce((SELECT sum(valor_delta_micro) FROM movimientos_inventario WHERE id_consumo_ot=p.id_detalle AND tipo_movimiento='REPOSICION_OT'),0) FROM detalle_ot_productos p WHERE id_ot=?1 ORDER BY id_detalle")?;
-        for r in s.query_map([ot], |r| {
-            Ok(linea(
-                Some(r.get(1)?),
-                None,
-                Some(r.get(0)?),
-                None,
-                r.get(2)?,
-                r.get(3)?,
-                r.get(4)?,
-                r.get(5)?,
-                r.get(6)?,
-                Some(r.get(7)?),
-                Some(r.get(8)?),
-            ))
-        })? {
-            let r = r?;
-            if r.cantidad > 0 {
-                l.push(r);
-            }
-        }
+        l = lineas_ot(conn, ot)?;
     }
     let mut keys = HashSet::new();
     for d in &req.lineas {
@@ -84,9 +38,7 @@ pub fn preparar(
         }
         if d.tipo == "PRODUCTO" {
             let(c,n,u,p,q,v):(String,String,String,i64,i64,i64)=conn.query_row("SELECT codigo,nombre,unidad_medida,precio_venta_cent,stock_actual,valor_stock_micro FROM productos WHERE id_producto=?1 AND activo=1",[d.id],|r|Ok((r.get(0)?,r.get(1)?,r.get(2)?,r.get(3)?,r.get(4)?,r.get(5)?)))?;
-            if u == "UND" && d.cantidad > 99_999 {
-                return Err(error("Máximo 99 999 unidades por línea directa."));
-            }
+            validar_cantidad_directa(&u, d.cantidad)?;
             if p != d.precio_esperado_cent {
                 return Err(error(
                     "El precio de un producto cambió. Retira esa línea y vuelve a agregarla desde el catálogo actualizado para revisar el precio.",
@@ -107,6 +59,7 @@ pub fn preparar(
                 Some(cv),
             ));
         } else if d.tipo == "SERVICIO" {
+            validar_cantidad_directa("UND", d.cantidad)?;
             let(c,n,p):(String,String,i64)=conn.query_row("SELECT codigo,nombre,precio_venta_cent FROM servicios WHERE id_servicio=?1 AND activo=1",[d.id],|r|Ok((r.get(0)?,r.get(1)?,r.get(2)?)))?;
             if p != d.precio_esperado_cent {
                 return Err(error(
@@ -133,6 +86,65 @@ pub fn preparar(
     let t = calcular(&mut l, req.descuento_bp)?;
     Ok((l, t))
 }
+pub(super) fn lineas_ot(conn: &Connection, ot: i64) -> Result<Vec<LineaCalculada>, AppError> {
+    let mut l = Vec::new();
+    let mut s=conn.prepare("SELECT id_detalle,id_servicio,codigo_snapshot,nombre_snapshot,cantidad,precio_unitario_cent FROM detalle_ot_servicios WHERE id_ot=?1 ORDER BY id_detalle")?;
+    for r in s.query_map([ot], |r| {
+        Ok((
+            r.get::<_, i64>(0)?,
+            r.get::<_, i64>(1)?,
+            r.get::<_, String>(2)?,
+            r.get::<_, String>(3)?,
+            r.get::<_, i64>(4)?,
+            r.get::<_, i64>(5)?,
+        ))
+    })? {
+        let (id, s, c, n, q, p) = r?;
+        l.push(linea(
+            None,
+            Some(s),
+            None,
+            Some(id),
+            c,
+            n,
+            "UND".into(),
+            q,
+            p,
+            None,
+            None,
+        ));
+    }
+    let mut s=conn.prepare("SELECT p.id_detalle,p.id_producto,p.codigo_snapshot,p.nombre_snapshot,p.unidad_medida,p.cantidad-coalesce((SELECT sum(diferencia) FROM movimientos_inventario WHERE id_consumo_ot=p.id_detalle AND tipo_movimiento='REPOSICION_OT'),0),p.precio_unitario_cent,p.costo_unitario_micro,p.valor_consumido_micro-coalesce((SELECT sum(valor_delta_micro) FROM movimientos_inventario WHERE id_consumo_ot=p.id_detalle AND tipo_movimiento='REPOSICION_OT'),0) FROM detalle_ot_productos p WHERE id_ot=?1 ORDER BY id_detalle")?;
+    for r in s.query_map([ot], |r| {
+        Ok(linea(
+            Some(r.get(1)?),
+            None,
+            Some(r.get(0)?),
+            None,
+            r.get(2)?,
+            r.get(3)?,
+            r.get(4)?,
+            r.get(5)?,
+            r.get(6)?,
+            Some(r.get(7)?),
+            Some(r.get(8)?),
+        ))
+    })? {
+        let r = r?;
+        if r.cantidad > 0 {
+            l.push(r);
+        }
+    }
+    Ok(l)
+}
+
+fn validar_cantidad_directa(unidad: &str, cantidad: i64) -> Result<(), AppError> {
+    if unidad == "UND" && !(1..=99_999).contains(&cantidad) {
+        return Err(error("Ingresa de 1 a 99 999 unidades por línea directa."));
+    }
+    Ok(())
+}
+
 #[allow(clippy::too_many_arguments)]
 fn linea(
     pr: Option<i64>,
@@ -169,6 +181,14 @@ fn linea(
 pub fn cotizar(conn: &Connection, actor: i64, req: &ConfirmarVentaPos) -> Result<Value, AppError> {
     validar_rol(conn, actor)?;
     let (l, mut t) = preparar(conn, req)?;
+    if let Some(id) = req.id_ot {
+        let total = l
+            .iter()
+            .filter(|linea| linea.id_consumo_ot.is_some() || linea.id_servicio_ot.is_some())
+            .map(|linea| linea.bruto_cent)
+            .sum();
+        t["ot"] = consultas::contexto_ot(conn, id, total)?;
+    }
     t["lineas"] = publicas(&l)?;
     Ok(t)
 }

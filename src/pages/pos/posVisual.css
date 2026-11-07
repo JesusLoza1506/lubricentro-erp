@@ -1028,7 +1028,43 @@
   border-color: #764449 !important;
 }
 
+/* En una columna, el cajero puede alternar sin recorrer todo el catálogo. */
+.pos-compact-links {
+  display: none;
+}
+
+.pos-document-notes {
+  border-inline-start: 2px solid currentColor;
+  padding-inline-start: 0.75rem;
+  margin-block: 0.75rem;
+}
+
+.pos-document-notes ul {
+  margin: 0.35rem 0 0;
+  padding-inline-start: 1.25rem;
+  overflow-wrap: anywhere;
+}
+
 @media (max-width: 1110px) {
+  .pos-compact-links {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.65rem;
+    padding: 0.45rem;
+    background: #121a24;
+    border: 1px solid #35445b;
+    border-radius: 0.5rem;
+  }
+  .pos-compact-links a {
+    color: #bfdbfe;
+    padding: 0.35rem 0.5rem;
+  }
+  .pos-module :is(#pos-catalog-title, #pos-cart-title) {
+    scroll-margin-top: 4rem;
+  }
   .pos-workspace {
     flex: none;
     grid-template-columns: 1fr;

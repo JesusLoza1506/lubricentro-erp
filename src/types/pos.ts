@@ -49,6 +49,7 @@ export interface LineaPos {
   origen?: string;
 }
 export interface TotalesPos {
+  ot?: OtPos;
   bruto_cent: number;
   descuento_cent: number;
   base_cent: number;
@@ -67,6 +68,7 @@ export interface DocumentoPos {
   requiere_consulta: number;
   intento: number;
   mensaje: string | null;
+  advertencias?: string[];
   pdf: string | null;
   xml: string | null;
   cdr: string | null;
@@ -121,6 +123,7 @@ export interface FilaVentaPos {
   estado: string;
 }
 export interface OtPos {
+  total_cent: number;
   id: number;
   codigo: string;
   placa: string;

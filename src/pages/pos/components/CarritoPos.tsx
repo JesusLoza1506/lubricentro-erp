@@ -1,5 +1,5 @@
 import { Trash2, FileCheck2, CreditCard } from 'lucide-react';
-import type { LineaPos, TotalesPos } from '../../../types/pos';
+import type { LineaPos, OtPos, TotalesPos } from '../../../types/pos';
 import { cantidad, soles } from '../posUtils';
 export function CarritoPos({
   lineas,
@@ -7,6 +7,7 @@ export function CarritoPos({
   cargando,
   error,
   ot,
+  otContexto,
   descuento,
   motivo,
   onDescuento,
@@ -24,6 +25,7 @@ export function CarritoPos({
   cargando: boolean;
   error: string;
   ot: number | null;
+  otContexto: OtPos | null;
   descuento: string;
   motivo: string;
   onDescuento: (s: string) => void;
@@ -40,8 +42,12 @@ export function CarritoPos({
     <aside className="pos-panel pos-cart" aria-labelledby="pos-cart-title">
       <div className="pos-panel-heading">
         <div>
-          <h2 id="pos-cart-title">Venta actual <span className="pos-count" title="Líneas de venta">{lineas.length}</span></h2>
-          <p>{ot ? `OT #${ot} + adicionales` : 'Venta directa'}</p>
+          <h2 id="pos-cart-title" tabIndex={-1}>Venta actual <span className="pos-count" title="Líneas de venta">{lineas.length}</span></h2>
+          <p>
+            {otContexto
+              ? `${otContexto.codigo} · ${otContexto.placa}`
+              : ot ? `OT #${ot} + adicionales` : 'Venta directa'}
+          </p>
         </div>
         <button
           className="pos-icon"

@@ -25,6 +25,12 @@ pub struct LineaCalculada {
 pub fn redondear(n: i128, d: i128) -> i64 {
     ((n + d / 2) / d) as i64
 }
+pub(super) fn importe_bruto(linea: &LineaCalculada) -> Result<i64, AppError> {
+    let divisor = if linea.unidad == "ML" { 1000 } else { 1 };
+    let importe =
+        (i128::from(linea.cantidad) * i128::from(linea.precio_cent) + divisor / 2) / divisor;
+    i64::try_from(importe).map_err(|_| error("Importe fuera de rango."))
+}
 pub fn calcular(lineas: &mut [LineaCalculada], bp: i64) -> Result<serde_json::Value, AppError> {
     if !(0..=9999).contains(&bp) || lineas.is_empty() {
         return Err(error("Revisa las líneas o el porcentaje de descuento."));
@@ -39,10 +45,7 @@ pub fn calcular(lineas: &mut [LineaCalculada], bp: i64) -> Result<serde_json::Va
         {
             return Err(error("Cantidad o precio fuera de los límites de POS."));
         }
-        l.bruto_cent = redondear(
-            l.cantidad as i128 * l.precio_cent as i128,
-            if l.unidad == "ML" { 1000 } else { 1 },
-        );
+        l.bruto_cent = importe_bruto(l)?;
         if l.bruto_cent <= 0 || l.bruto_cent > 9_999_999_999 {
             return Err(error("El importe de una línea está fuera de los límites."));
         }

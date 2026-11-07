@@ -100,6 +100,72 @@ fn venta_directa_atomica_pago_vuelto_y_kardex() {
     );
 }
 #[test]
+fn servicios_directos_respetan_limite_sin_dejar_efectos() {
+    let (_d, mut c, id) = preparar(false);
+    c.execute("INSERT INTO servicios(id_servicio,codigo,nombre,precio_venta_cent) VALUES(1,'SERV-POS','Servicio directo',100)", []).unwrap();
+    let mut p = solicitud(id, 5);
+    p.lineas.push(LineaDirecta {
+        tipo: "SERVICIO".into(),
+        id: 1,
+        cantidad: 1,
+        precio_esperado_cent: 100,
+    });
+    assert_eq!(ventas::cotizar(&c, 2, &p).unwrap()["total_cent"], 10_100);
+    p.lineas[1].cantidad = 99_999;
+    assert_eq!(
+        ventas::cotizar(&c, 2, &p).unwrap()["total_cent"],
+        10_009_900
+    );
+    for cantidad in [0, 100_000] {
+        p.lineas[1].cantidad = cantidad;
+        let cotizacion = ventas::cotizar(&c, 2, &p).unwrap_err().to_string();
+        assert!(cotizacion.contains("99 999"));
+        let confirmacion = ventas::confirmar(&mut c, 2, None, &p)
+            .unwrap_err()
+            .to_string();
+        assert!(confirmacion.contains("99 999"));
+    }
+    assert_eq!(n(&c, "SELECT count(*) FROM ventas"), 0);
+    assert_eq!(n(&c, "SELECT count(*) FROM movimientos_caja"), 0);
+    assert_eq!(n(&c, "SELECT count(*) FROM comprobantes"), 0);
+    assert_eq!(
+        n(&c, "SELECT sum(correlativo_actual) FROM series_comprobante"),
+        0
+    );
+    assert_eq!(n(&c, "SELECT stock_actual FROM productos"), 10);
+}
+
+#[test]
+fn detalle_conserva_observaciones_y_estado_aceptado() {
+    let (_d, mut c, id) = preparar(false);
+    let v = ventas::confirmar(&mut c, 2, None, &solicitud(id, 5)).unwrap();
+    let doc = v["id_documento"].as_i64().unwrap();
+    let venta = v["id_venta"].as_i64().unwrap();
+    aceptar(&c, doc);
+    for (entrada, esperado) in [
+        (
+            json!("  Nota del proveedor  "),
+            json!(["Nota del proveedor"]),
+        ),
+        (
+            json!(["Primera nota", " ", "Segunda nota"]),
+            json!(["Primera nota", "Segunda nota"]),
+        ),
+        (Value::Null, json!([])),
+    ] {
+        c.execute(
+            "UPDATE comprobantes SET advertencias_json=?1 WHERE id_comprobante=?2",
+            params![entrada.to_string(), doc],
+        )
+        .unwrap();
+        let detalle = consultas::detalle(&c, 2, venta).unwrap();
+        let documento = &detalle["documentos"][0];
+        assert_eq!(documento["estado"], "ACEPTADO");
+        assert_eq!(documento["advertencias"], esperado);
+    }
+}
+
+#[test]
 fn reintento_devuelve_resultado_y_rechaza_otra_carga() {
     let (_d, mut c, id) = preparar(false);
     let mut p = solicitud(id, 5);
@@ -298,8 +364,21 @@ fn cobrar_ot_con_adicional_no_repite_consumo_y_conserva_precios() {
     p.id_ot = Some(ot.id_ot);
     p.pagos[0].monto_cent = 13000;
     p.pagos[0].recibido_cent = Some(15000);
+    let disponibles = consultas::ots(&c, 2, "ABC123", 1).unwrap();
+    assert_eq!(disponibles["total"], 1);
+    let contexto = &disponibles["filas"][0];
+    assert_eq!(contexto["id"], ot.id_ot);
+    assert!(contexto["codigo"].as_str().is_some_and(|s| !s.is_empty()));
+    assert_eq!(contexto["placa"], "ABC123");
+    assert_eq!(contexto["cliente"], "Cliente de taller");
+    assert!(contexto["fecha"].as_str().is_some_and(|s| !s.is_empty()));
+    assert_eq!(contexto["total_cent"], 11000);
+    let cotizacion = ventas::cotizar(&c, 2, &p).unwrap();
+    assert_eq!(cotizacion["ot"], *contexto);
+    assert_eq!(cotizacion["total_cent"], 13000);
     let r = ventas::confirmar(&mut c, 2, None, &p).unwrap();
     assert_eq!(r["total_cent"], 13000);
+    assert_eq!(consultas::ots(&c, 2, "ABC123", 1).unwrap()["total"], 0);
     let mov = n(
         &c,
         "SELECT id_movimiento FROM movimientos_inventario WHERE tipo_movimiento='VENTA_DIRECTA'",

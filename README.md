@@ -16,7 +16,7 @@
 ![Plataforma](https://img.shields.io/badge/Plataforma-Windows_11-2563EB?style=flat-square)
 ![Módulos](https://img.shields.io/badge/Alcance-10_m%C3%B3dulos-0F766E?style=flat-square)
 
-[Progreso](#estado) · [Login](#modulo-login-y-sesion) · [Ficha vehicular](#modulo-ficha-vehicular-e-historial) · [Taller](#modulo-ordenes-de-trabajo-taller) · [Inventario](#modulo-inventario-y-stock) · [Instalación](#instalacion) · [Documentación](#documentacion)
+[Progreso](#estado) · [Login](#modulo-login-y-sesion) · [Ficha vehicular](#modulo-ficha-vehicular-e-historial) · [Taller](#modulo-ordenes-de-trabajo-taller) · [Inventario](#modulo-inventario-y-stock) · [POS](#modulo-punto-de-venta-pos) · [Instalación](#instalacion) · [Documentación](#documentacion)
 
 </div>
 
@@ -43,9 +43,9 @@
 
 ## 2. Estado del proyecto
 
-Desarrollo secuencial, módulo por módulo, conforme al alcance funcional v7. **Login y Sesión (95/100)**, **Ficha Vehicular e Historial (93/100)**, **Órdenes de Trabajo Taller (93/100)** e **Inventario y Stock (95/100)** se encuentran en **ajustes finales**. Sus funciones principales ya están implementadas; los pendientes de cierre y la validación en escritorio se detallan en cada módulo.
+Desarrollo secuencial, módulo por módulo, conforme al alcance funcional v7. **Login y Sesión (95/100)**, **Ficha Vehicular e Historial (93/100)**, **Órdenes de Trabajo Taller (93/100)**, **Inventario y Stock (95/100)** y **Punto de Venta POS (95/100)** se encuentran en **ajustes finales**. Sus funciones principales ya están implementadas; los pendientes de cierre y la validación en escritorio se detallan en cada módulo.
 
-**La siguiente etapa será la implementación de Punto de Venta POS**, integrando ventas directas, cobro de órdenes y comprobantes sin duplicar los consumos del taller. Inicio Dashboard se desarrollará al final para reunir datos de los demás módulos.
+**El próximo módulo es Caja Chica**. La siguiente etapa se centrará en apertura de turnos, movimientos, arqueo y cierre, a partir de los cobros y reintegros que ya registra el POS. Inicio Dashboard se desarrollará al final para reunir datos de los demás módulos.
 
 | Orden | Módulo | Estado | Evaluación |
 | --- | --- | --- | --- |
@@ -53,8 +53,8 @@ Desarrollo secuencial, módulo por módulo, conforme al alcance funcional v7. **
 | 02 | [Ficha Vehicular e Historial](#modulo-ficha-vehicular-e-historial) | 🟢 Ajustes finales | 93/100 |
 | 03 | [Órdenes de Trabajo Taller](#modulo-ordenes-de-trabajo-taller) | 🟢 Ajustes finales | 93/100 |
 | 04 | [Inventario y Stock](#modulo-inventario-y-stock) | 🟢 Ajustes finales | 95/100 |
-| 05 | Punto de Venta POS | ⚪ Pendiente · próximo módulo | — |
-| 06 | Caja Chica | ⚪ Pendiente | — |
+| 05 | [Punto de Venta POS](#modulo-punto-de-venta-pos) | 🟢 Ajustes finales | 95/100 |
+| 06 | [Caja Chica](#modulo-caja-chica) | ⚪ Pendiente · próximo módulo | — |
 | 07 | Backup y Copias | ⚪ Pendiente | — |
 | 08 | Administración | ⚪ Pendiente | — |
 | 09 | Reportes | ⚪ Pendiente | — |
@@ -352,11 +352,75 @@ _Aviso de resultado de una operación_
 - Deshabilitar y mostrar el procesamiento del botón Guardar producto durante el envío.
 - Incorporar los casos adicionales detectados a las pruebas permanentes y completar los recorridos y mediciones con SQLite en disco y la aplicación de escritorio.
 
-**Estado:** 🟢 **Ajustes finales · Evaluación: 95/100**. Las funciones principales están ampliamente alineadas con el PDF. El cierre se concentra en casos particulares del conteo, protección de formularios y evidencia de validación en escritorio. La siguiente etapa de implementación corresponde a **Punto de Venta POS**.
+**Estado:** 🟢 **Ajustes finales · Evaluación: 95/100**. Las funciones principales están ampliamente alineadas con el PDF. El cierre se concentra en casos particulares del conteo, protección de formularios y evidencia de validación en escritorio.
 
 </details>
 
-**Próximo módulo: Punto de Venta POS.** Se trabajará sobre la base de Login, Ficha Vehicular, Taller e Inventario, integrando ventas y cobros con los consumos ya registrados. Los cuatro módulos anteriores permanecen en ajustes finales, con seguimiento de los pendientes documentados.
+<a id="modulo-punto-de-venta-pos"></a>
+
+<details>
+<summary><b>05 · Punto de Venta POS</b> — 🟢 Ajustes finales · Evaluación: 95/100</summary>
+
+**Qué hace:** permite vender productos y servicios, cobrar órdenes de trabajo finalizadas y registrar devoluciones. Vincula venta, pagos, caja, inventario y comprobantes electrónicos, conservando los datos históricos de cada operación.
+
+**Funciones principales:**
+
+- **Preparar ventas directas:** busca productos y servicios activos por código o nombre. Permite modificar cantidades, retirar líneas y vaciar el carrito. Valida de **1 a 99.999 unidades por línea directa en UND**, incluidos los servicios.
+- **Cobrar órdenes finalizadas:** el selector muestra código, placa, cliente, fecha de finalización y total histórico. Las líneas de la OT son de solo lectura y conservan sus precios; se pueden agregar productos o servicios directos sin volver a descontar los insumos consumidos en Taller.
+- **Seleccionar receptor:** permite reutilizar un cliente o registrar uno sin vehículo. Admite Cliente varios cuando corresponde y valida identificación y dirección según el comprobante.
+- **Emitir boleta o factura:** guarda receptor, líneas, importes, serie y número junto con la venta. El envío electrónico se realiza después de confirmar la operación local.
+- **Aplicar descuentos:** distribuye el porcentaje global entre las líneas. Hasta **5 %** no exige motivo; por encima requiere motivo y, para el cajero, autorización administrativa.
+- **Registrar pagos:** admite uno o dos medios distintos entre Efectivo, Tarjeta, Yape, Plin y Transferencia. Propone el total y el restante, calcula vuelto y registra los importes aplicados.
+- **Consultar ventas:** ofrece un listado paginado con filtros de fecha, número o cliente y estado electrónico. El administrador también puede filtrar por emisor y documentos con problemas; el cajero solo consulta sus propias ventas.
+- **Registrar devoluciones:** un mismo formulario admite devoluciones parciales y totales, calcula lo pendiente y permite seleccionarlo todo. La cantidad recuperable empieza en cero y solo retorna al inventario el material recibido físicamente.
+- **Gestionar comprobantes:** conserva los estados pendiente, error, aceptado y rechazado. El administrador puede revisar hasta **20 pendientes por acción**, consultar el documento original antes de reenviarlo y reemitir rechazos con otro número vinculado.
+- **Reimprimir y consultar archivos:** reutiliza la venta existente para el ticket y permite abrir PDF, XML y CDR cuando están disponibles. Las observaciones se muestran sin cambiar el estado **Aceptado**.
+- **Recuperar solicitudes inciertas:** conserva el identificador y los datos originales para recuperar el resultado sin repetir el cobro, la devolución ni la reemisión.
+
+**Fortalezas de implementación:**
+
+- **Confirmación atómica:** venta, líneas, pagos, caja, stock directo, numeración, documento pendiente y auditoría se guardan en una transacción.
+- **Idempotencia persistente:** repetir la misma solicitud recupera su resultado; reutilizar el identificador con otros datos se rechaza.
+- **Permisos en Rust:** exige sesión operativa y caja propia para cobrar o reintegrar. El mecánico no accede al POS y el cajero no recibe costos ni ventas ajenas.
+- **Autorización con trazabilidad:** el cajero sigue siendo el ejecutor y titular de la caja; el administrador queda registrado como autorizante.
+- **Cálculos deterministas:** dinero en céntimos, granel en mililitros y distribución controlada de descuentos, impuestos y diferencias de redondeo de las devoluciones.
+- **Historial protegido:** editar el catálogo no reescribe líneas confirmadas. Cobrar una OT no repite el consumo ni reabre el trabajo.
+- **Recuperación documental comprobada localmente:** una prueba cierra y reabre SQLite y comprueba que el intento interrumpido obliga a consultar antes de reenviar.
+- **18 pruebas específicas de POS en Rust aprobadas**, además de pruebas de interfaz y recuperación documental.
+- **Rendimiento del backend comprobado:** cinco muestras con **5.000 ventas en SQLite temporal en disco** promediaron **44,76 ms** en listado y **7,46 ms** en confirmación local. Todas quedaron por debajo de tres segundos. Falta medir el recorrido completo en escritorio.
+
+**Acceso por rol:**
+
+| Rol | Alcance |
+| --- | --- |
+| Administrador | Consulta general, cobros y reintegros con caja propia, autorización de excepciones y gestión de comprobantes pendientes o rechazados. |
+| Mecánico | Sin acceso al POS. |
+| Cajero | Ventas y consultas propias, cobros y reintegros con caja propia; autorización administrativa cuando corresponde y sin acceso a costos ni ventas ajenas. |
+
+**Capturas:**
+
+_Pantalla principal del POS: catálogo y carrito de venta_
+
+![Punto de Venta POS: catálogo de productos y carrito](docs/images/05-pos-venta.png)
+
+Quedan por añadir las capturas de selección de OT, cobro, devolución y detalle de comprobante cuando se documenten esos recorridos en escritorio.
+
+**Pendiente para cerrar:**
+
+- Mostrar en el detalle la fecha y hora del último intento documental, que ya se guardan.
+- Completar las pruebas de transporte HTTP: conexión, credenciales y respuestas del servidor.
+- Validar la integración completa en el ambiente de Prueba de NubeFact, incluidos la emisión, la consulta y el acceso a sus archivos oficiales.
+- Comprobar la impresión real, los tickets largos, los fallos de impresora y la reimpresión.
+- Completar los recorridos en Tauri con teclado, descarte de capturas, vencimiento de sesión y recuperación de solicitudes.
+- Comprobar la zona horaria y los casos de medianoche, y medir los tiempos desde la acción del usuario hasta la presentación en WebView.
+
+**Estado:** 🟢 **Ajustes finales · Evaluación: 95/100**. Las funciones económicas principales están implementadas y respaldadas por pruebas. El cierre se concentra en la información documental, la integración externa y la validación completa en escritorio.
+
+</details>
+
+<a id="modulo-caja-chica"></a>
+
+**Próximo módulo: Caja Chica — ⚪ Pendiente.** Se trabajará en la apertura de turnos, el registro de movimientos, el arqueo y el cierre, tomando como base los cobros y reintegros registrados por el POS. La apertura de caja que usa el POS forma parte de esa base y no implica que el módulo de Caja Chica esté completo.
 
 <a id="roles"></a>
 
@@ -368,8 +432,8 @@ _Aviso de resultado de una operación_
 | Ficha Vehicular e Historial | Gestión y correcciones autorizadas.                        | Consulta de información pública de atención.                | Registro, edición de datos comunes y consulta. |
 | Órdenes de Trabajo Taller | Gestión del taller, reasignación, devolución y cancelación con motivo. | Inicio de OT permitidas y ejecución de propias; sin notas ajenas ni costos. | Recepción y consulta pública; sin notas internas ni costos. |
 | Inventario y Stock          | Catálogos, proveedores, entradas, costos, kardex y conteos.             | Consulta de activos, stock y precios.                       | Consulta de activos, stock y precios.          |
-| Punto de Venta POS          | Operaciones con caja propia y gestión documental.          | Sin acceso.                                                 | Ventas propias; excepciones con autorización.  |
-| Caja Chica                  | Turno propio; consulta y cierre administrativo autorizado. | Sin acceso.                                                 | Turnos propios.                                |
+| Punto de Venta POS          | Cobros y reintegros con caja propia; consulta general y gestión documental. | Sin acceso. | Ventas propias, sin costos; autorización cuando corresponde. |
+| Caja Chica (alcance previsto) | Turno propio; consulta y cierre administrativo autorizado. | Sin acceso.                                                 | Turnos propios.                                |
 | Backup y Copias             | Configuración, copias y recuperación.                      | Sin acceso.                                                 | Sin acceso.                                    |
 | Administración              | Usuarios, empresa, facturación y taller.                   | Sin acceso.                                                 | Sin acceso.                                    |
 | Reportes                    | Consulta y exportación.                                    | Sin acceso.                                                 | Sin acceso.                                    |
@@ -392,7 +456,9 @@ Las autorizaciones se validan en Rust. Los costos y las notas internas se restri
 
 **Venta directa:** el POS contempla productos y servicios sin crear una OT.
 
-**Comprobante electrónico:** el envío ocurre después del guardado local. Las incidencias se atienden en POS sin otra venta ni cobro; devolver exige original y notas anteriores aceptados.
+**Comprobante electrónico:** el envío ocurre después del guardado local. Si el resultado es incierto, el administrador consulta el documento original antes de reenviarlo; si es rechazado, la reemisión usa otro número vinculado sin registrar otra venta ni otro cobro. Devolver exige que el original y las notas de crédito anteriores estén aceptados.
+
+**Cierre de turno:** el paso 6 refleja el flujo previsto para Caja Chica y Backup y Copias, módulos pendientes.
 
 <a id="arquitectura"></a>
 
@@ -482,7 +548,7 @@ La configuración actual de Tauri invoca `npm run dev` antes del desarrollo y `n
 
 ### 8.1. Qué se verifica
 
-En Login: acceso, sesiones, permisos, bloqueo, recuperación, revocación y consistencia ante fallos. En Ficha Vehicular: registro, edición, identidad histórica, permisos, correcciones, consultas y paginación. En Taller: recepción, estados, responsable, zanjas, servicios, consumos, devoluciones, aceite, auditoría y avisos de resultado. En Inventario: DTO públicos sin costos, catálogos, proveedores, compras, conteos, valoración de granel, kardex, filtros y reintentos sin duplicación de efectos. En las siguientes etapas se validarán también ventas, cobros, cierre, comprobantes, recuperación, numeración y fechas de Lima.
+En Login: acceso, sesiones, permisos, bloqueo, recuperación, revocación y consistencia ante fallos. En Ficha Vehicular: registro, edición, identidad histórica, permisos, correcciones, consultas y paginación. En Taller: recepción, estados, responsable, zanjas, servicios, consumos, devoluciones, aceite, auditoría y avisos de resultado. En Inventario: DTO públicos sin costos, catálogos, proveedores, compras, conteos, valoración de granel, kardex, filtros y reintentos sin duplicación de efectos. En POS: ventas directas, cobro de OT sin duplicar insumos, pagos, devoluciones, comprobantes, idempotencia y recuperación documental local. La próxima etapa incorporará la validación del arqueo y cierre de Caja Chica.
 
 ### 8.2. Cómo ejecutarlas
 
@@ -492,30 +558,36 @@ Desde la raíz:
 npm run typecheck
 npm test
 npm run build
+cargo fmt --manifest-path src-tauri/Cargo.toml -- --check
+cargo check --manifest-path src-tauri/Cargo.toml --all-targets
+cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings
 cargo test --manifest-path src-tauri/Cargo.toml
+```
+
+Para repetir la medición específica del POS desde la raíz:
+
+```powershell
+cargo test --manifest-path src-tauri/Cargo.toml --test pos_rendimiento_tests -- --ignored --nocapture
 ```
 
 Las pruebas de integración externas deben usar datos y credenciales de Prueba. El flujo de [GitHub Actions](.github/workflows/ci.yml) define comprobaciones del frontend y backend; sus resultados se consultan en [Actions](https://github.com/JesusLoza1506/lubricentro-erp/actions).
 
 ### 8.3. Estado de la validación
 
-La última evaluación reportó los siguientes resultados. Corresponden a los casos ejecutados, no a una aprobación completa de todos los recorridos:
+La última ejecución en Windows del **7 de noviembre de 2026** reportó:
 
 | Comprobación | Resultado reportado |
 | --- | --- |
-| TypeScript | Aprobado. |
-| Pruebas permanentes de frontend y servicios | **78 aprobadas**. |
-| Pruebas Rust seleccionadas de los cuatro módulos y biblioteca | **99 aprobadas**. |
-| Autenticación y regresión, incluidas en el total Rust | **30 aprobadas**. |
-| Ficha Vehicular, incluidas en el total Rust | **16 aprobadas**. |
-| Órdenes de Trabajo, incluidas en el total Rust | **13 aprobadas**. |
-| Nuevas pruebas de cierre de Inventario, incluidas en el total Rust | **13 aprobadas**, además de sus pruebas existentes. |
-| Rendimiento, ejecutado por separado | **1 prueba aprobada**, con cinco muestras. |
-| Comprobaciones adicionales de conteo | **Tres defectos reproducidos**, conservados en los pendientes de Inventario. |
+| Formato Rust, `cargo check` y Clippy | Aprobados. |
+| TypeScript y compilación del frontend | Aprobadas. |
+| Pruebas de frontend y servicios | **118 aprobadas** en **16 archivos**. |
+| Suite general de Rust (`cargo test`) | **121 aprobadas**, **0 fallidas** y **2 mediciones omitidas por defecto**. |
+| Pruebas específicas de POS, incluidas en la suite de Rust | **18 aprobadas**. |
+| Rendimiento de POS, ejecutado por separado | **1 prueba aprobada** con cinco muestras y **5.000 ventas** en SQLite temporal en disco. |
 
-Las mediciones de catálogo, críticos y kardex con **1.000 productos y 10.000 movimientos** estuvieron aproximadamente entre **0,2 y 1,8 ms**, usando SQLite **en memoria**. No sustituyen las mediciones con base en disco, comunicación Tauri y presentación de la pantalla. Las pruebas de interfaz con servicios simulados tampoco acreditan por sí solas la integración completa en escritorio.
+**Rendimiento del POS:** el listado promedió **44,76 ms** (36,27–50,18 ms) y la confirmación local **7,46 ms** (4,47–14,98 ms). La prueba mide el backend local; todavía falta validar el tiempo visible en WebView y el recorrido con NubeFact de Prueba.
 
-**Evaluación de implementación y alineación con los PDF:** Login **95/100**, Ficha Vehicular **93/100**, Taller **93/100** e Inventario y Stock **95/100**. Los cuatro están en ajustes finales. Se mantienen los recorridos y mediciones pendientes de cada módulo; Taller requiere cinco mediciones con **2.000 OT**. La siguiente implementación será **Punto de Venta POS**.
+**Evidencia previa de Inventario:** las consultas de catálogo, críticos y kardex con **1.000 productos y 10.000 movimientos** registraron aproximadamente **0,2–1,8 ms** en SQLite en memoria. Los tres casos de conteo reproducidos permanecen entre los pendientes de Inventario. Taller conserva como pendiente las cinco mediciones con **2.000 OT**.
 
 **Esquema verificado en SQLite:** 27 casos satisfactorios sobre creación, restricciones, relaciones y flujos seleccionados, correspondientes al esquema revisado. Esta evidencia se distingue de las pruebas de los módulos y no acredita la integración completa con NubeFact. Las revisiones de Login disponibles se enlazan en Documentación.
 
@@ -537,14 +609,14 @@ El informe general y las diez especificaciones funcionales v7 son documentos de 
 
 ## 10. Hoja de ruta
 
-Se mantiene la siguiente secuencia de desarrollo. Los cuatro primeros módulos están en ajustes finales; **el siguiente módulo será Punto de Venta POS**.
+Se mantiene la siguiente secuencia de desarrollo. Los cinco primeros módulos están en ajustes finales; **el siguiente módulo será Caja Chica**.
 
 1. **Login y Sesión — ajustes finales (95/100):** completar recuperación del error inicial y evidencias de teclado, foco, salida y tiempos de ingreso.
 2. **Ficha Vehicular e Historial — ajustes finales (93/100):** activar cambios pendientes al modificar datos, consolidar pruebas de interfaz y completar mediciones de escritorio.
 3. **Órdenes de Trabajo Taller — ajustes finales (93/100):** conservar identificadores al reintentar, completar auditoría de servicios y validar recorridos y rendimiento.
 4. **Inventario y Stock — ajustes finales (95/100):** resolver los casos particulares de conteo y costos, proteger capturas modificadas y completar pruebas y mediciones en escritorio.
-5. **Punto de Venta POS — próximo módulo:** implementar ventas directas, cobro de OT sin descontar nuevamente sus insumos, pagos y gestión de comprobantes con NubeFact.
-6. **Caja Chica:** completar aperturas, movimientos y cierres.
+5. **Punto de Venta POS — ajustes finales (95/100):** mostrar el último intento documental y completar las pruebas de NubeFact de Prueba, impresión, recorridos en Tauri y rendimiento visible.
+6. **Caja Chica — pendiente · próximo módulo:** completar apertura de turnos, movimientos, arqueo y cierre, vinculados con los cobros y reintegros del POS.
 7. **Backup y Copias:** completar copias de seguridad y recuperación.
 8. **Administración:** completar la configuración y gestión autorizada.
 9. **Reportes:** integrar las consultas y exportaciones de los módulos anteriores.

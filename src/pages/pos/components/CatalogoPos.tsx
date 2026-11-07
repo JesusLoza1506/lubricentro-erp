@@ -39,7 +39,7 @@ export function CatalogoPos({ onAgregar }: { onAgregar: (p: ProductoPos) => void
     <section className="pos-panel pos-catalog" aria-labelledby="pos-catalog-title">
       <div className="pos-panel-heading">
         <div>
-          <h2 id="pos-catalog-title">Productos y servicios</h2>
+          <h2 id="pos-catalog-title" tabIndex={-1}>Productos y servicios</h2>
           <p>Busca por código o nombre y agrega a la venta.</p>
         </div>
         <button

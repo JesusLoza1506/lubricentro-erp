@@ -53,6 +53,33 @@ pub fn catalogo(
     let rows=filas(conn,&format!("{sql} SELECT json_object('tipo',tipo,'id',id,'codigo',codigo,'nombre',nombre,'unidad',unidad,'precio_cent',precio_cent,'stock',stock) FROM cat {condicion} ORDER BY nombre,codigo,tipo,id LIMIT 20 OFFSET ?3"),&[&patron,&tipo,&offset])?;
     Ok(json!({"filas":rows,"total":total,"pagina":pagina.max(1)}))
 }
+const DATOS_OT: &str = "json_object('id',id_ot,'codigo',codigo_ot,'placa',placa_snapshot,'cliente',coalesce(json_extract(cliente_snapshot,'$.nombre'),'—'),'fecha',fecha_fin)";
+
+pub(super) fn contexto_ot(conn: &Connection, id: i64, total: i64) -> Result<Value, AppError> {
+    let mut ot = filas(
+        conn,
+        &format!("SELECT {DATOS_OT} FROM ordenes_trabajo WHERE id_ot=?1"),
+        &[&id],
+    )?
+    .into_iter()
+    .next()
+    .ok_or_else(|| error("No se encontró la orden de trabajo."))?;
+    ot["total_cent"] = json!(total);
+    Ok(ot)
+}
+
+fn normalizar_advertencias(valor: &Value) -> Vec<&str> {
+    match valor {
+        Value::String(nota) => vec![nota.as_str()],
+        Value::Array(notas) => notas.iter().filter_map(Value::as_str).collect(),
+        _ => Vec::new(),
+    }
+    .into_iter()
+    .map(str::trim)
+    .filter(|nota| !nota.is_empty())
+    .collect()
+}
+
 pub fn ots(conn: &Connection, actor: i64, q: &str, pagina: i64) -> Result<Value, AppError> {
     validar_rol(conn, actor)?;
     let patron = format!("%{}%", q.trim());
@@ -61,7 +88,23 @@ pub fn ots(conn: &Connection, actor: i64, q: &str, pagina: i64) -> Result<Value,
     let total: i64 = conn.query_row(&format!("SELECT count(*) {where_sql}"), [&patron], |r| {
         r.get(0)
     })?;
-    let rows=filas(conn,&format!("SELECT json_object('id',id_ot,'codigo',codigo_ot,'placa',placa_snapshot,'cliente',cliente_snapshot,'fecha',fecha_fin) {where_sql} ORDER BY fecha_fin,id_ot LIMIT 20 OFFSET ?2"),&[&patron,&offset])?;
+    let mut rows = filas(
+        conn,
+        &format!("SELECT {DATOS_OT} {where_sql} ORDER BY fecha_fin,id_ot LIMIT 20 OFFSET ?2"),
+        &[&patron, &offset],
+    )?;
+    for ot in &mut rows {
+        let id = ot["id"]
+            .as_i64()
+            .ok_or_else(|| error("Identificador de OT inválido."))?;
+        let lineas = super::ventas::lineas_ot(conn, id)?;
+        let total = lineas.iter().try_fold(0i64, |total, linea| {
+            total
+                .checked_add(super::calculos::importe_bruto(linea)?)
+                .ok_or_else(|| error("Importe de OT fuera de rango."))
+        })?;
+        ot["total_cent"] = json!(total);
+    }
     Ok(json!({"filas":rows,"total":total}))
 }
 pub fn detalle(conn: &Connection, actor: i64, id: i64) -> Result<Value, AppError> {
@@ -69,7 +112,11 @@ pub fn detalle(conn: &Connection, actor: i64, id: i64) -> Result<Value, AppError
     let mut v=filas(conn,"SELECT json_object('id',v.id_venta,'id_ot',v.id_ot,'id_emisor',v.id_emisor,'emisor',u.nombre_completo,'caja',c.codigo_caja,'fecha',fecha_venta,'tipo',tipo_original,'receptor',json(receptor_snapshot),'bruto_cent',bruto_cent,'descuento_bp',descuento_bp,'descuento_cent',descuento_cent,'base_cent',base_cent,'igv_cent',igv_cent,'total_cent',total_cent,'devuelto_cent',coalesce((SELECT sum(total_cent) FROM devoluciones WHERE id_venta=v.id_venta AND estado_registro='CONFIRMADA'),0)) FROM ventas v JOIN usuarios u ON u.id_usuario=v.id_emisor JOIN caja_chica c ON c.id_caja=v.id_caja WHERE v.id_venta=?1",&[&id])?.remove(0);
     v["lineas"]=json!(filas(conn,"SELECT json_object('id_detalle',l.id_detalle,'id_producto',id_producto,'nombre',nombre_snapshot,'codigo',codigo_snapshot,'unidad',unidad_medida,'cantidad',cantidad,'precio_cent',precio_unitario_cent,'total_cent',total_cent,'base_cent',base_cent,'devuelta',coalesce((SELECT sum(cantidad) FROM detalle_devolucion WHERE id_detalle_venta=l.id_detalle),0),'recuperada',coalesce((SELECT sum(cantidad_recuperada) FROM detalle_devolucion WHERE id_detalle_venta=l.id_detalle),0),'origen',CASE WHEN id_consumo_ot IS NOT NULL OR id_servicio_ot IS NOT NULL THEN 'OT' ELSE 'DIRECTO' END) FROM detalle_venta l WHERE id_venta=?1 ORDER BY id_detalle",&[&id])?);
     v["pagos"]=json!(filas(conn,"SELECT json_object('medio',medio_pago,'monto_cent',monto_cent,'recibido_cent',recibido_cent,'vuelto_cent',vuelto_cent,'referencia',referencia) FROM movimientos_caja WHERE id_venta=?1 AND tipo='COBRO' ORDER BY id_movimiento",&[&id])?);
-    v["documentos"]=json!(filas(conn,"SELECT json_object('id',id_comprobante,'tipo',c.tipo_comprobante,'serie',s.serie,'numero',correlativo,'estado',estado_envio,'relacion',relacion,'incierto',resultado_incierto,'requiere_consulta',requiere_consulta,'intento',intento_iniciado,'mensaje',respuesta_resumida,'pdf',ruta_pdf,'xml',ruta_xml,'cdr',ruta_cdr,'fecha',fecha_emision,'reemplazado',EXISTS(SELECT 1 FROM comprobantes x WHERE x.id_documento_anterior=c.id_comprobante)) FROM comprobantes c JOIN series_comprobante s ON s.id_serie=c.id_serie WHERE id_venta=?1 ORDER BY id_comprobante",&[&id])?);
+    let mut documentos=filas(conn,"SELECT json_object('id',id_comprobante,'tipo',c.tipo_comprobante,'serie',s.serie,'numero',correlativo,'estado',estado_envio,'relacion',relacion,'incierto',resultado_incierto,'requiere_consulta',requiere_consulta,'intento',intento_iniciado,'mensaje',respuesta_resumida,'advertencias',json(c.advertencias_json),'pdf',ruta_pdf,'xml',ruta_xml,'cdr',ruta_cdr,'fecha',fecha_emision,'reemplazado',EXISTS(SELECT 1 FROM comprobantes x WHERE x.id_documento_anterior=c.id_comprobante)) FROM comprobantes c JOIN series_comprobante s ON s.id_serie=c.id_serie WHERE id_venta=?1 ORDER BY id_comprobante",&[&id])?;
+    for documento in &mut documentos {
+        documento["advertencias"] = json!(normalizar_advertencias(&documento["advertencias"]));
+    }
+    v["documentos"] = json!(documentos);
     v["devoluciones"]=json!(filas(conn,"SELECT json_object('id',id_devolucion,'fecha',fecha_operacion,'total_cent',total_cent,'motivo',motivo) FROM devoluciones WHERE id_venta=?1 AND estado_registro='CONFIRMADA' ORDER BY id_devolucion",&[&id])?);
     if rol == "ADMINISTRADOR" {
         v["costos"]=json!(filas(conn,"SELECT json_object('id_detalle',id_detalle,'costo_total_micro',costo_total_micro) FROM detalle_venta WHERE id_venta=?1",&[&id])?);

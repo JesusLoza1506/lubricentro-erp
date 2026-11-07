@@ -213,7 +213,19 @@ export function DetalleVentaPos({
                     {d.tipo} · {d.relacion}
                     {d.reemplazado ? ' · Reemplazado' : ''}
                   </small>
-                  <p>{d.mensaje ?? 'Documento guardado localmente; pendiente de envío.'}</p>
+                  {d.mensaje ? (
+                    <p>{d.mensaje}</p>
+                  ) : d.estado !== 'ACEPTADO' ? (
+                    <p>Documento guardado localmente; pendiente de envío.</p>
+                  ) : null}
+                  {d.estado === 'ACEPTADO' && !!d.advertencias?.length && (
+                    <section className="pos-document-notes" aria-label="Observaciones del comprobante">
+                      <strong>Observaciones del comprobante</strong>
+                      <ul>
+                        {d.advertencias.map((nota, indice) => <li key={indice}>{nota}</li>)}
+                      </ul>
+                    </section>
+                  )}
                 </div>
                 <div className="pos-document-actions">
                   {(['pdf', 'xml', 'cdr'] as const).map(

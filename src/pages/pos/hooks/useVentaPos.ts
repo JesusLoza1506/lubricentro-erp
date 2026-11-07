@@ -20,6 +20,7 @@ export function useVentaPos(
 ) {
   const [directas, Sdirectas] = useState<(LineaDirecta & { producto: ProductoPos })[]>([]),
     [ot, Sot] = useState<number | null>(null),
+    [otContexto, SotContexto] = useState<OtPos | null>(null),
     [cliente, Scliente] = useState<ClienteDTO | null>(null),
     [tipo, Stipo] = useState<'BOLETA' | 'FACTURA'>('BOLETA'),
     [descuento, Sdescuento] = useState('0'),
@@ -47,6 +48,7 @@ export function useVentaPos(
   const limpiar = useCallback(() => {
     Sdirectas([]);
     Sot(null);
+    SotContexto(null);
     Scliente(null);
     Stipo('BOLETA');
     Sdescuento('0');
@@ -169,11 +171,13 @@ export function useVentaPos(
       )
     );
   }
-  async function seleccionarOt(o: OtPos) {
-    const p = { ...construir(), id_ot: o.id };
+  async function seleccionarOt(o: OtPos | number) {
+    const idOt = typeof o === 'number' ? o : o.id;
+    const p = { ...construir(), id_ot: idOt };
     const calculada = await posApi<TotalesPos>('cotizar', p);
     Slineas(calculada.lineas);
-    Sot(o.id);
+    Sot(idOt);
+    SotContexto(calculada.ot ?? (typeof o === 'number' ? null : o));
   }
   async function confirmar(pagos: PagoPos[], cred?: CredencialesPos) {
     if (envio.current) return;
@@ -196,6 +200,7 @@ export function useVentaPos(
   return {
     directas,
     ot,
+    otContexto,
     cliente,
     tipo,
     descuento,

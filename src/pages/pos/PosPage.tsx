@@ -122,7 +122,7 @@ export function PosPage({
   useEffect(() => {
     if (otInicial && inicio) {
       void venta
-        .seleccionarOt({ id: otInicial, codigo: '', placa: '', cliente: '', fecha: '' })
+        .seleccionarOt(otInicial)
         .then(() => onConsumirOt?.())
         .catch((e) => Serror(mensajePos(e)));
     }
@@ -317,6 +317,10 @@ export function PosPage({
         </div>
         {vista === 'venta' ? (
           <div className="pos-workspace">
+            <nav className="pos-compact-links" aria-label="Secciones de la venta">
+              <a href="#pos-catalog-title">Ir al catálogo</a>
+              <a href="#pos-cart-title">Ir a venta actual</a>
+            </nav>
             <CatalogoPos
               onAgregar={(p) => {
                 if (!pendiente) venta.agregar(p);
@@ -328,6 +332,7 @@ export function PosPage({
               cargando={venta.calculando}
               error={venta.error}
               ot={venta.ot}
+              otContexto={venta.otContexto}
               descuento={venta.descuento}
               motivo={venta.motivo}
               onDescuento={venta.Sdescuento}
