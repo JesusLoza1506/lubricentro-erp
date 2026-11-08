@@ -174,13 +174,15 @@ export const ModalHistorialEntradas: React.FC<ModalHistorialEntradasProps> = ({
         }}
       >
         <header className={integrado ? 'inv-list-heading inv-entry-heading' : 'inv-dialog-header'}>
-            <div>
-              <h3>Entradas de inventario</h3>
-              <p>Consulta ingresos y documentos del almacén.</p>
-            </div>
-            {!integrado && (
-              <button className="inv-button" disabled={anulando} onClick={onClose}>Cerrar</button>
-            )}
+          <div>
+            <h3>Entradas de inventario</h3>
+            <p>Consulta ingresos y documentos del almacén.</p>
+          </div>
+          {!integrado && (
+            <button className="inv-button" disabled={anulando} onClick={onClose}>
+              Cerrar
+            </button>
+          )}
         </header>
         <div className="inv-entry-toolbar">
           <label>
@@ -246,7 +248,13 @@ export const ModalHistorialEntradas: React.FC<ModalHistorialEntradasProps> = ({
           </p>
         )}
         <section className="inv-table-section" aria-label="Entradas de inventario">
-          <div className="inv-table-scroll" tabIndex={0} role="region" aria-label="Resultados de entradas" aria-busy={cargando}>
+          <div
+            className="inv-table-scroll"
+            tabIndex={0}
+            role="region"
+            aria-label="Resultados de entradas"
+            aria-busy={cargando}
+          >
             <table className="inv-table inv-entry-table">
               <thead>
                 <tr>

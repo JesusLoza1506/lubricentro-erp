@@ -17,19 +17,32 @@ export const ModalDetalleOTContainer: React.FC<ModalDetalleOTProps> = (props) =>
 
   return (
     <div className="gloria-theme gt-overlay ot-overlay">
-      <div className="gt-dialog ot-dialog ot-detail-dialog" role="dialog" aria-modal="true"
-        aria-label="Detalle de orden de trabajo">
+      <div
+        className="gt-dialog ot-dialog ot-detail-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Detalle de orden de trabajo"
+      >
         <header className="ot-dialog-heading">
-          <span className="ot-dialog-icon"><ClipboardList size={21} aria-hidden="true" /></span>
+          <span className="ot-dialog-icon">
+            <ClipboardList size={21} aria-hidden="true" />
+          </span>
           <div>
             <span className="ot-eyebrow">Atención de taller</span>
             <h2>OT: {state.ordenActual.codigo_ot}</h2>
-            <p className="ot-detail-plate"><Car size={15} aria-hidden="true" /> {state.ordenActual.placa}</p>
+            <p className="ot-detail-plate">
+              <Car size={15} aria-hidden="true" /> {state.ordenActual.placa}
+            </p>
           </div>
           <span className="ot-status ot-detail-state" data-state={state.ordenActual.estado}>
             {state.ordenActual.estado.replace(/_/g, ' ')}
           </span>
-          <button type="button" className="ot-button ot-close" aria-label="Cerrar detalle" onClick={onClose}>
+          <button
+            type="button"
+            className="ot-button ot-close"
+            aria-label="Cerrar detalle"
+            onClick={onClose}
+          >
             <X size={18} aria-hidden="true" />
           </button>
         </header>
@@ -114,17 +127,26 @@ export const ModalDetalleOTContainer: React.FC<ModalDetalleOTProps> = (props) =>
             procesandoDespacho={state.loading && state.modoAccion === 'AGREGAR_INSUMO'}
             procesandoDevolucion={state.loading && state.modoAccion === 'DEVOLVER'}
           />
-
         </div>
         <footer className="ot-dialog-footer ot-detail-footer">
-          <strong>Total de la orden: S/ {(state.ordenActual.total_general_soles ?? 0).toFixed(2)}</strong>
+          <strong>
+            Total de la orden: S/ {(state.ordenActual.total_general_soles ?? 0).toFixed(2)}
+          </strong>
           <div className="ot-footer-actions">
-            <button type="button" className="ot-button" onClick={onClose}>Cerrar</button>
-            {state.ordenActual.estado === 'FINALIZADO' && state.rol !== 'MECANICO' && props.onCobrar && (
-              <button type="button" className="ot-button ot-primary" onClick={() => props.onCobrar?.(state.ordenActual.id_ot)}>
-                Cobrar en POS
-              </button>
-            )}
+            <button type="button" className="ot-button" onClick={onClose}>
+              Cerrar
+            </button>
+            {state.ordenActual.estado === 'FINALIZADO' &&
+              state.rol !== 'MECANICO' &&
+              props.onCobrar && (
+                <button
+                  type="button"
+                  className="ot-button ot-primary"
+                  onClick={() => props.onCobrar?.(state.ordenActual.id_ot)}
+                >
+                  Cobrar en POS
+                </button>
+              )}
           </div>
         </footer>
       </div>

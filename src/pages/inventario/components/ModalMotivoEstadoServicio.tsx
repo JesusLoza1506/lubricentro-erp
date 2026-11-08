@@ -74,9 +74,12 @@ export const ModalMotivoEstadoServicio: React.FC<ModalMotivoEstadoServicioProps>
         }}
       >
         <header className="inv-dialog-header">
-          <div><span className="inv-dialog-kicker">Estado del catálogo</span>
+          <div>
+            <span className="inv-dialog-kicker">Estado del catálogo</span>
             <h3>{servicio.activo ? 'Desactivar Servicio' : 'Reactivar Servicio'}</h3>
-            <p>Servicio: <strong>{servicio.nombre}</strong></p>
+            <p>
+              Servicio: <strong>{servicio.nombre}</strong>
+            </p>
           </div>
         </header>
         {error && (
@@ -85,7 +88,8 @@ export const ModalMotivoEstadoServicio: React.FC<ModalMotivoEstadoServicioProps>
           </p>
         )}
         <form onSubmit={handleSubmit} className="inv-form">
-          <label htmlFor="inv-service-status-reason"
+          <label
+            htmlFor="inv-service-status-reason"
             style={{
               display: 'block',
               fontSize: '11px',
@@ -112,9 +116,15 @@ export const ModalMotivoEstadoServicio: React.FC<ModalMotivoEstadoServicioProps>
             }}
           />
           <footer className="inv-form-footer">
-            <button type="button" className="inv-button" disabled={procesando} onClick={onClose}>Cancelar</button>
-            <button type="submit" aria-busy={procesando} disabled={procesando || motivo.trim().length < 5}
-              className={`inv-button ${servicio.activo ? 'inv-danger' : 'inv-primary'}`}>
+            <button type="button" className="inv-button" disabled={procesando} onClick={onClose}>
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              aria-busy={procesando}
+              disabled={procesando || motivo.trim().length < 5}
+              className={`inv-button ${servicio.activo ? 'inv-danger' : 'inv-primary'}`}
+            >
               {procesando ? 'Guardando...' : 'Confirmar'}
             </button>
           </footer>

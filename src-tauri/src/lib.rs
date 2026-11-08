@@ -124,8 +124,7 @@ pub fn run() {
             listar_mecanicos_cmd,
             listar_servicios_cmd,
             // Caja Chica & POS
-            abrir_caja_cmd,
-            cerrar_caja_cmd,
+            caja_operacion_cmd,
             emitir_comprobante_cmd,
             // Dashboard, Fidelización & Backups
             obtener_dashboard_cmd,

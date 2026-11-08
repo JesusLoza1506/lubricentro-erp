@@ -137,11 +137,20 @@ describe('InventarioPage - Pruebas de Integración Frontend FASE 7', () => {
       usuario: { id_usuario: 4, nombre_completo: 'Cajero Pruebas', rol: 'CAJERO' },
     });
     vi.mocked(inventarioService.listarProductosPublicosPaginado).mockResolvedValue({
-      productos: [{
-        id_producto: 1, codigo: 'ACE-5W30', nombre: 'Aceite Sintético 5W30 1L',
-        categoria: 'ACEITE', unidad_medida: 'UND', stock_actual: 15, stock_minimo: 5,
-        precio_venta_cent: 4500, activo: true, es_critico: false,
-      }],
+      productos: [
+        {
+          id_producto: 1,
+          codigo: 'ACE-5W30',
+          nombre: 'Aceite Sintético 5W30 1L',
+          categoria: 'ACEITE',
+          unidad_medida: 'UND',
+          stock_actual: 15,
+          stock_minimo: 5,
+          precio_venta_cent: 4500,
+          activo: true,
+          es_critico: false,
+        },
+      ],
       total_registros: 1,
     });
     render(<InventarioPage />);
@@ -218,9 +227,7 @@ describe('InventarioPage - Pruebas de Integración Frontend FASE 7', () => {
     const btnAjusteList = await screen.findAllByTitle('Conteo Físico Reconciliado');
     fireEvent.click(btnAjusteList[0]);
 
-    expect(
-      await screen.findByText(/Conteo físico de stock/i)
-    ).toBeInTheDocument();
+    expect(await screen.findByText(/Conteo físico de stock/i)).toBeInTheDocument();
 
     const btnAplicar = screen.getByRole('button', { name: /Aplicar Reconciliación/i });
     fireEvent.click(btnAplicar);

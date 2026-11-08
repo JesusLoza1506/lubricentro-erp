@@ -317,7 +317,8 @@ export const ModalRegistroCompra: React.FC<ModalRegistroCompraProps> = ({
                   <button
                     type="button"
                     className="inv-icon-button"
-                    title="Editar proveedor seleccionado" aria-label="Editar proveedor seleccionado"
+                    title="Editar proveedor seleccionado"
+                    aria-label="Editar proveedor seleccionado"
                     onClick={handleEditarProveedorSeleccionado}
                   >
                     <Edit size={16} />
@@ -416,7 +417,12 @@ export const ModalRegistroCompra: React.FC<ModalRegistroCompraProps> = ({
                 </button>
               </div>
             </section>
-            <div className="inv-purchase-lines inv-table-scroll" tabIndex={0} role="region" aria-label="Productos de la compra">
+            <div
+              className="inv-purchase-lines inv-table-scroll"
+              tabIndex={0}
+              role="region"
+              aria-label="Productos de la compra"
+            >
               <table className="inv-table">
                 <thead>
                   <tr>

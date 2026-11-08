@@ -102,22 +102,30 @@ describe('Solicitudes de inventario', () => {
     expect(solesAMicro(999999.99)).toBe(999999990000);
   });
   it('conserva el identificador si vence la sesión después de una respuesta perdida', async () => {
-    vi.mocked(invoke).mockRejectedValueOnce(new Error('Respuesta perdida'))
+    vi.mocked(invoke)
+      .mockRejectedValueOnce(new Error('Respuesta perdida'))
       .mockRejectedValueOnce('NO_AUTENTICADO: Inicia sesión')
-      .mockResolvedValueOnce({status:'OK'});
-    const payload={cantidad:1};
-    await expect(ejecutarOperacionInventario('ajustar_stock_cmd',payload)).rejects.toThrow();
-    const id=solicitudPendiente('ajustar_stock_cmd')?.id;
-    await expect(ejecutarOperacionInventario('ajustar_stock_cmd',payload)).rejects.toThrow('NO_AUTENTICADO');
+      .mockResolvedValueOnce({ status: 'OK' });
+    const payload = { cantidad: 1 };
+    await expect(ejecutarOperacionInventario('ajustar_stock_cmd', payload)).rejects.toThrow();
+    const id = solicitudPendiente('ajustar_stock_cmd')?.id;
+    await expect(ejecutarOperacionInventario('ajustar_stock_cmd', payload)).rejects.toThrow(
+      'NO_AUTENTICADO'
+    );
     expect(solicitudPendiente('ajustar_stock_cmd')?.id).toBe(id);
-    configurarContextoInventario(1,'PRUEBA');
-    await ejecutarOperacionInventario('ajustar_stock_cmd',payload);
-    expect(vi.mocked(invoke).mock.calls.every(c=>(c[1] as Record<string,unknown>).idOperacion===id)).toBe(true);
+    configurarContextoInventario(1, 'PRUEBA');
+    await ejecutarOperacionInventario('ajustar_stock_cmd', payload);
+    expect(
+      vi
+        .mocked(invoke)
+        .mock.calls.every((c) => (c[1] as Record<string, unknown>).idOperacion === id)
+    ).toBe(true);
   });
   it('un resultado heredado PENDING no libera el identificador para repetir efectos', async () => {
     vi.mocked(invoke).mockRejectedValue('VALIDATION_ERROR: Resultado PENDING. Requiere revisión.');
-    await expect(ejecutarOperacionInventario('ajustar_stock_cmd',{cantidad:1})).rejects.toThrow('PENDING');
+    await expect(ejecutarOperacionInventario('ajustar_stock_cmd', { cantidad: 1 })).rejects.toThrow(
+      'PENDING'
+    );
     expect(solicitudPendiente('ajustar_stock_cmd')).not.toBeNull();
   });
-
 });

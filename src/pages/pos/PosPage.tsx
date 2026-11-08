@@ -1,6 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { invoke } from '@tauri-apps/api/core';
-import { RefreshCw, ShoppingCart, ClipboardList, ReceiptText, AlertTriangle, UserRound, Wallet } from 'lucide-react';
+import {
+  RefreshCw,
+  ShoppingCart,
+  ClipboardList,
+  ReceiptText,
+  AlertTriangle,
+  UserRound,
+  Wallet,
+} from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { ToastNotification } from '../../components/ToastNotification';
 import type { CredencialesPos, InicioPos, ResultadoPos } from '../../types/pos';
@@ -20,18 +27,23 @@ import { CobroPos } from './components/CobroPos';
 import { CargarOtPos } from './components/CargarOtPos';
 import { VentasPos } from './components/VentasPos';
 import { DetalleVentaPos } from './components/DetalleVentaPos';
-import { ModalPos } from './components/ModalPos';
 import { AutorizacionPos } from './components/AutorizacionPos';
-import { decimalBase, soles } from './posUtils';
+import { soles } from './posUtils';
 import { CapturasPosContext } from './CapturasPos';
 import './posVisual.css';
 
 export function PosPage({
   otInicial,
   onConsumirOt,
+  ventaInicial,
+  onConsumirVenta,
+  onIrCaja,
 }: {
   otInicial?: number | null;
   onConsumirOt?: () => void;
+  ventaInicial?: number | null;
+  onConsumirVenta?: () => void;
+  onIrCaja?: () => void;
 }) {
   const { usuario, ambienteActual, setHayCambiosSinGuardar } = useAuth();
   useEffect(() => {
@@ -49,9 +61,7 @@ export function PosPage({
     ),
     [pendiente, Spendiente] = useState<SolicitudPos | null>(null),
     [cred, Scred] = useState<CredencialesPos>({ username: '', password: '' }),
-    [procesando, Sprocesando] = useState(false),
-    [abrirCaja, SabrirCaja] = useState(false),
-    [fondo, Sfondo] = useState('0');
+    [procesando, Sprocesando] = useState(false);
   const [capturas, Scapturas] = useState<Record<string, boolean>>({});
   const registrarCaptura = useCallback(
     (id: string, dirty: boolean) =>
@@ -127,6 +137,13 @@ export function PosPage({
         .catch((e) => Serror(mensajePos(e)));
     }
   }, [otInicial, !!inicio]);
+  useEffect(() => {
+    if (ventaInicial) {
+      Svista('listado');
+      Sdetalle(ventaInicial);
+      onConsumirVenta?.();
+    }
+  }, [ventaInicial, onConsumirVenta]);
   const cerrarAviso = useCallback(() => Saviso(null), []);
   async function reintentar() {
     if (!pendiente || lock.current) return;
@@ -176,23 +193,6 @@ export function PosPage({
       Sprocesando(false);
     }
   }
-  async function abrirTurno() {
-    if (lock.current) return;
-    lock.current = true;
-    Sprocesando(true);
-    try {
-      const monto = decimalBase(fondo, 2, true);
-      await invoke('abrir_caja_cmd', { payload: { id_usuario: id, monto_apertura: monto } });
-      SabrirCaja(false);
-      await actualizar();
-      notificar('Turno propio abierto correctamente.', 'EXITO');
-    } catch (e) {
-      Serror(mensajePos(e));
-    } finally {
-      lock.current = false;
-      Sprocesando(false);
-    }
-  }
   function cambiarVista(v: 'venta' | 'listado') {
     Svista(v);
   }
@@ -235,21 +235,31 @@ export function PosPage({
         <div className="pos-statusbar" aria-label="Estado de caja">
           <span className="pos-shift">
             <Wallet size={16} aria-hidden="true" />
-            <i className={inicio?.caja_propia ? 'pos-dot' : 'pos-dot pos-dot-off'} aria-hidden="true" />
+            <i
+              className={inicio?.caja_propia ? 'pos-dot' : 'pos-dot pos-dot-off'}
+              aria-hidden="true"
+            />
             {inicio?.caja_propia
               ? `Tu caja: ${inicio.caja?.codigo}`
-              : inicio?.caja
-                ? `Caja de ${inicio.caja.titular}`
-                : 'Sin caja abierta'}
+              : inicio?.caja_ocupada || inicio?.caja
+                ? 'Caja ocupada'
+                : inicio
+                  ? 'Sin caja abierta'
+                  : 'Consultando caja…'}
           </span>
-          <span className="pos-operator"><UserRound size={15} aria-hidden="true" /> {usuario?.nombre_completo}</span>
+          <span className="pos-operator">
+            <UserRound size={15} aria-hidden="true" /> {usuario?.nombre_completo}
+          </span>
           {inicio?.caja_propia ? (
             <span>
               Efectivo disponible: <strong>{soles(inicio.caja?.efectivo_cent ?? 0)}</strong>
             </span>
           ) : (
-            !inicio?.caja && (
-              <button className="pos-link" onClick={() => SabrirCaja(true)}>
+            inicio &&
+            !inicio.caja_ocupada &&
+            !inicio.caja &&
+            onIrCaja && (
+              <button className="pos-link" onClick={onIrCaja}>
                 Abrir turno propio
               </button>
             )
@@ -264,8 +274,12 @@ export function PosPage({
         {inicio && !inicio.configurada && (
           <div className="pos-warning pos-configuration" role="status">
             <AlertTriangle size={16} aria-hidden="true" />
-            <div><strong>Cobro todavía no habilitado</strong>
-              <p>Completa la configuración de empresa e integración en Administración. Mientras tanto, puedes preparar la venta.</p>
+            <div>
+              <strong>Cobro todavía no habilitado</strong>
+              <p>
+                Completa la configuración de empresa e integración en Administración. Mientras
+                tanto, puedes preparar la venta.
+              </p>
             </div>
           </div>
         )}
@@ -409,49 +423,13 @@ export function PosPage({
             onAviso={notificar}
           />
         )}{' '}
-        {abrirCaja && (
-          <ModalPos
-            captura
-            titulo="Abrir turno propio"
-            onCerrar={() => {
-              if (fondo === '0' || window.confirm('¿Descartar el fondo inicial sin abrir turno?'))
-                SabrirCaja(false);
-            }}
-            ocupado={procesando}
-          >
-            <p className="pos-hint">
-              Registra el efectivo inicial recibido. La gestión completa del turno corresponde a
-              Caja Chica.
-            </p>
-            <label>
-              Fondo inicial (S/)
-              <input inputMode="decimal" value={fondo} onChange={(e) => Sfondo(e.target.value)} />
-            </label>
-            <footer className="pos-modal-footer">
-              <button
-                disabled={procesando}
-                onClick={() => {
-                  if (
-                    fondo === '0' ||
-                    window.confirm('¿Descartar el fondo inicial sin abrir turno?')
-                  )
-                    SabrirCaja(false);
-                }}
-              >
-                Cancelar
-              </button>
-              <button
-                className="pos-primary"
-                disabled={procesando}
-                onClick={() => void abrirTurno()}
-              >
-                {procesando ? 'Abriendo…' : 'Abrir turno'}
-              </button>
-            </footer>
-          </ModalPos>
-        )}
         {aviso && (
-          <div className="pos-toast" data-kind={aviso.tipo} role={aviso.tipo === 'ERROR' ? 'alert' : 'status'} aria-atomic="true">
+          <div
+            className="pos-toast"
+            data-kind={aviso.tipo}
+            role={aviso.tipo === 'ERROR' ? 'alert' : 'status'}
+            aria-atomic="true"
+          >
             <ToastNotification
               key={aviso.id}
               mensaje={aviso.mensaje}

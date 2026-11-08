@@ -62,7 +62,8 @@ describe('Pantallas de acceso', () => {
   it('mantiene bloqueada la salida de instalación hasta confirmar que se guardó el código', async () => {
     llamada.mockImplementation(async (comando) => {
       if (comando === 'requiere_instalacion') return true;
-      if (comando === 'instalacion_inicial') return { username: 'admin', codigo_recuperacion: codigoPrueba };
+      if (comando === 'instalacion_inicial')
+        return { username: 'admin', codigo_recuperacion: codigoPrueba };
       throw new Error(`Comando inesperado: ${comando}`);
     });
     await abrirLogin();
@@ -89,7 +90,8 @@ describe('Pantallas de acceso', () => {
 
   it('valida la confirmación en recuperación y borra los campos al salir y regresar', async () => {
     await abrirLogin();
-    const irARecuperacion = () => fireEvent.click(screen.getByRole('button', { name: '¿No puedes ingresar?' }));
+    const irARecuperacion = () =>
+      fireEvent.click(screen.getByRole('button', { name: '¿No puedes ingresar?' }));
     irARecuperacion();
     expect(screen.getByRole('heading', { name: 'Recuperar acceso' })).toHaveFocus();
     escribir('Usuario administrador', 'admin');
@@ -104,7 +106,12 @@ describe('Pantallas de acceso', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Volver al inicio de sesión' }));
     irARecuperacion();
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
-    for (const etiqueta of ['Usuario administrador', 'Código de recuperación', 'Nueva contraseña', 'Confirmar nueva contraseña']) {
+    for (const etiqueta of [
+      'Usuario administrador',
+      'Código de recuperación',
+      'Nueva contraseña',
+      'Confirmar nueva contraseña',
+    ]) {
       expect(screen.getByLabelText(etiqueta, { exact: true })).toHaveValue('');
     }
   });
@@ -113,7 +120,8 @@ describe('Pantallas de acceso', () => {
     const codigoNuevo = 'NUEVO-CODIGO-DE-PRUEBA';
     llamada.mockImplementation(async (comando) => {
       if (comando === 'requiere_instalacion') return false;
-      if (comando === 'recuperar_acceso_admin') return { username: 'admin', codigo_recuperacion: codigoNuevo };
+      if (comando === 'recuperar_acceso_admin')
+        return { username: 'admin', codigo_recuperacion: codigoNuevo };
       throw new Error(`Comando inesperado: ${comando}`);
     });
     await abrirLogin();
@@ -140,9 +148,10 @@ describe('Pantallas de acceso', () => {
     vi.mocked(useAuth).mockReturnValue(auth);
     let confirmarCambio!: () => void;
     llamada.mockImplementation(async (comando) => {
-      if (comando === 'cambiar_clave_obligatoria') return new Promise<void>((resolve) => {
-        confirmarCambio = resolve;
-      });
+      if (comando === 'cambiar_clave_obligatoria')
+        return new Promise<void>((resolve) => {
+          confirmarCambio = resolve;
+        });
       throw new Error(`Comando inesperado: ${comando}`);
     });
     await abrirLogin();

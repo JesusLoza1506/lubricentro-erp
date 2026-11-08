@@ -66,7 +66,12 @@ export const ModalCrearOT: React.FC<ModalCrearOTProps> = ({
           if (vehs.length > 0) seleccionarVehiculoReal(vehs[0]);
         }
       } catch (err) {
-        setErrorMsg(mensajeErrorOT(err, 'No se pudieron cargar los datos de recepción. Cierra y vuelve a abrir el formulario para reintentar.'));
+        setErrorMsg(
+          mensajeErrorOT(
+            err,
+            'No se pudieron cargar los datos de recepción. Cierra y vuelve a abrir el formulario para reintentar.'
+          )
+        );
       }
     };
     init();
@@ -77,7 +82,9 @@ export const ModalCrearOT: React.FC<ModalCrearOTProps> = ({
       vehiculoService
         .buscarVehiculosCandidatos(busqueda)
         .then(setListaVehiculosBD)
-        .catch((err: unknown) => setErrorMsg(mensajeErrorOT(err, 'No se pudo buscar el vehículo. Intenta nuevamente.')));
+        .catch((err: unknown) =>
+          setErrorMsg(mensajeErrorOT(err, 'No se pudo buscar el vehículo. Intenta nuevamente.'))
+        );
     } else {
       setListaVehiculosBD([]);
     }
@@ -148,16 +155,31 @@ export const ModalCrearOT: React.FC<ModalCrearOTProps> = ({
 
   return (
     <div className="gloria-theme gt-overlay ot-overlay">
-      <div className="gt-dialog ot-dialog ot-reception-dialog" role="dialog" aria-modal="true"
-        aria-labelledby="ot-reception-title" aria-describedby="ot-reception-description">
+      <div
+        className="gt-dialog ot-dialog ot-reception-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="ot-reception-title"
+        aria-describedby="ot-reception-description"
+      >
         <header className="ot-dialog-heading">
-          <span className="ot-dialog-icon"><ClipboardPlus size={21} aria-hidden="true" /></span>
+          <span className="ot-dialog-icon">
+            <ClipboardPlus size={21} aria-hidden="true" />
+          </span>
           <div>
             <span className="ot-eyebrow">Ingreso al taller</span>
             <h2 id="ot-reception-title">Recepcionar vehículo</h2>
-            <p id="ot-reception-description">Registra el ingreso y deja la orden en la cola de espera.</p>
+            <p id="ot-reception-description">
+              Registra el ingreso y deja la orden en la cola de espera.
+            </p>
           </div>
-          <button type="button" className="ot-button ot-close" aria-label="Cerrar recepción" disabled={loading} onClick={onClose}>
+          <button
+            type="button"
+            className="ot-button ot-close"
+            aria-label="Cerrar recepción"
+            disabled={loading}
+            onClick={onClose}
+          >
             <X size={18} aria-hidden="true" />
           </button>
         </header>
@@ -171,7 +193,12 @@ export const ModalCrearOT: React.FC<ModalCrearOTProps> = ({
         <form onSubmit={handleSubmit} className="ot-reception-form">
           <div className="ot-field ot-reception-search" ref={dropdownRef}>
             <label htmlFor="ot-reception-plate">Placa del vehículo *</label>
-            <input id="ot-reception-plate" type="text" required placeholder="Buscar por placa..." value={busqueda}
+            <input
+              id="ot-reception-plate"
+              type="text"
+              required
+              placeholder="Buscar por placa..."
+              value={busqueda}
               onFocus={() => setMostrarDropdown(true)}
               onChange={(e) => {
                 setBusqueda(e.target.value.toUpperCase());
@@ -181,16 +208,28 @@ export const ModalCrearOT: React.FC<ModalCrearOTProps> = ({
             />
             {mostrarDropdown && (
               <div className="ot-reception-results">
-                {listaVehiculosBD.length > 0 ? listaVehiculosBD.map((v) => (
-                  <button type="button" key={v.id_vehiculo} onClick={() => seleccionarVehiculoReal(v)}>
-                    <Car size={16} aria-hidden="true" /> <strong>{v.placa}</strong>
-                    <span>{v.marca} {v.modelo}</span>
-                  </button>
-                )) : (
+                {listaVehiculosBD.length > 0 ? (
+                  listaVehiculosBD.map((v) => (
+                    <button
+                      type="button"
+                      key={v.id_vehiculo}
+                      onClick={() => seleccionarVehiculoReal(v)}
+                    >
+                      <Car size={16} aria-hidden="true" /> <strong>{v.placa}</strong>
+                      <span>
+                        {v.marca} {v.modelo}
+                      </span>
+                    </button>
+                  ))
+                ) : (
                   <div className="ot-reception-no-results">
                     No se encontraron vehículos.{' '}
                     {onIrARegistrarVehiculo && (
-                      <button type="button" className="ot-register-link" onClick={onIrARegistrarVehiculo}>
+                      <button
+                        type="button"
+                        className="ot-register-link"
+                        onClick={onIrARegistrarVehiculo}
+                      >
                         Registrar uno nuevo
                       </button>
                     )}
@@ -204,8 +243,14 @@ export const ModalCrearOT: React.FC<ModalCrearOTProps> = ({
           </div>
 
           <div className="ot-field">
-            <label htmlFor="ot-reception-service">Servicio inicial * <small>· Cantidad: 1</small></label>
-            <select id="ot-reception-service" value={idServicioInicial} onChange={(e) => setIdServicioInicial(Number(e.target.value))}>
+            <label htmlFor="ot-reception-service">
+              Servicio inicial * <small>· Cantidad: 1</small>
+            </label>
+            <select
+              id="ot-reception-service"
+              value={idServicioInicial}
+              onChange={(e) => setIdServicioInicial(Number(e.target.value))}
+            >
               {serviciosDisponibles.map((s) => (
                 <option key={s.id_servicio} value={s.id_servicio}>
                   {s.nombre} (S/ {s.precio_venta_soles.toFixed(2)})
@@ -217,15 +262,29 @@ export const ModalCrearOT: React.FC<ModalCrearOTProps> = ({
           <div className="ot-reception-grid">
             <div className="ot-field">
               <label htmlFor="ot-reception-mileage">Kilometraje de ingreso *</label>
-              <input id="ot-reception-mileage" type="number" min={1} required value={kilometrajeIngreso}
-                onChange={(e) => setKilometrajeIngreso(e.target.value)} />
+              <input
+                id="ot-reception-mileage"
+                type="number"
+                min={1}
+                required
+                value={kilometrajeIngreso}
+                onChange={(e) => setKilometrajeIngreso(e.target.value)}
+              />
             </div>
             <div className="ot-field">
-              <label htmlFor="ot-reception-mechanic">Mecánico asignado <small>(opcional)</small></label>
-              <select id="ot-reception-mechanic" value={idMecanico} onChange={(e) => setIdMecanico(Number(e.target.value))}>
+              <label htmlFor="ot-reception-mechanic">
+                Mecánico asignado <small>(opcional)</small>
+              </label>
+              <select
+                id="ot-reception-mechanic"
+                value={idMecanico}
+                onChange={(e) => setIdMecanico(Number(e.target.value))}
+              >
                 <option value={0}>Sin asignar · Cola común</option>
                 {mecanicos.map((m) => (
-                  <option key={m.id_usuario} value={m.id_usuario}>{m.nombre_completo}</option>
+                  <option key={m.id_usuario} value={m.id_usuario}>
+                    {m.nombre_completo}
+                  </option>
                 ))}
               </select>
             </div>
@@ -233,13 +292,25 @@ export const ModalCrearOT: React.FC<ModalCrearOTProps> = ({
 
           <div className="ot-field">
             <label htmlFor="ot-reception-request">Pedido del cliente</label>
-            <textarea id="ot-reception-request" rows={2} value={pedidoCliente}
-              onChange={(e) => setPedidoCliente(e.target.value)} placeholder="Detalle de fallas o pedido especial..." />
+            <textarea
+              id="ot-reception-request"
+              rows={2}
+              value={pedidoCliente}
+              onChange={(e) => setPedidoCliente(e.target.value)}
+              placeholder="Detalle de fallas o pedido especial..."
+            />
           </div>
 
           <footer className="ot-dialog-footer ot-reception-footer">
-            <button type="button" className="ot-button" disabled={loading} onClick={onClose}>Cancelar</button>
-            <button type="submit" className="ot-button ot-primary" disabled={loading || !vehiculoSeleccionado} aria-busy={loading}>
+            <button type="button" className="ot-button" disabled={loading} onClick={onClose}>
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              className="ot-button ot-primary"
+              disabled={loading || !vehiculoSeleccionado}
+              aria-busy={loading}
+            >
               {loading && <span className="gt-spinner" aria-hidden="true" />}
               {loading ? 'Recepcionando...' : 'Recepcionar OT'}
             </button>

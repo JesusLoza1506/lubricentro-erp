@@ -25,7 +25,10 @@ export const esErrorNoAutenticado = (err: unknown): boolean => {
 
 export const mensajeErrorAuth = (err: unknown, fallback: string): string => {
   const msg = typeof err === 'string' ? err : err instanceof Error ? err.message : fallback;
-  return msg.replace(/^(?:NO_AUTENTICADO|AUTH_ERROR|ACCESS_DENIED|VALIDATION_ERROR|PERMISO_DENEGADO|SESSION_ACTIVE|DB_LOCK|NOT_FOUND|DATABASE_ERROR):\s*/, '');
+  return msg.replace(
+    /^(?:NO_AUTENTICADO|AUTH_ERROR|ACCESS_DENIED|VALIDATION_ERROR|PERMISO_DENEGADO|SESSION_ACTIVE|DB_LOCK|NOT_FOUND|DATABASE_ERROR):\s*/,
+    ''
+  );
 };
 
 export const apiObtenerVersionApp = async (): Promise<string> => {

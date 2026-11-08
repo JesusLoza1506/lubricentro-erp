@@ -85,7 +85,7 @@ export function DetalleVentaPos({
     onAviso(mensaje, 'EXITO');
     refrescar();
     try {
-      await documentoPos(r.id_documento, false, true,r.token_envio);
+      await documentoPos(r.id_documento, false, true, r.token_envio);
       refrescar();
     } catch (e) {
       onAviso(`Operación guardada. El documento sigue pendiente: ${mensajePos(e)}`, 'ERROR');
@@ -154,7 +154,12 @@ export function DetalleVentaPos({
               </div>
               <strong>{soles(v.total_cent)}</strong>
             </div>
-            <div className="pos-table-wrap" role="region" aria-label="Productos y servicios de la venta" tabIndex={0}>
+            <div
+              className="pos-table-wrap"
+              role="region"
+              aria-label="Productos y servicios de la venta"
+              tabIndex={0}
+            >
               <table>
                 <thead>
                   <tr>
@@ -207,7 +212,10 @@ export function DetalleVentaPos({
               <article className="pos-document" key={d.id}>
                 <div>
                   <strong>
-                    {d.serie}-{d.numero} <span className="pos-badge" data-state={d.estado}>{d.estado}</span>
+                    {d.serie}-{d.numero}{' '}
+                    <span className="pos-badge" data-state={d.estado}>
+                      {d.estado}
+                    </span>
                   </strong>
                   <small>
                     {d.tipo} · {d.relacion}
@@ -219,10 +227,15 @@ export function DetalleVentaPos({
                     <p>Documento guardado localmente; pendiente de envío.</p>
                   ) : null}
                   {d.estado === 'ACEPTADO' && !!d.advertencias?.length && (
-                    <section className="pos-document-notes" aria-label="Observaciones del comprobante">
+                    <section
+                      className="pos-document-notes"
+                      aria-label="Observaciones del comprobante"
+                    >
                       <strong>Observaciones del comprobante</strong>
                       <ul>
-                        {d.advertencias.map((nota, indice) => <li key={indice}>{nota}</li>)}
+                        {d.advertencias.map((nota, indice) => (
+                          <li key={indice}>{nota}</li>
+                        ))}
                       </ul>
                     </section>
                   )}

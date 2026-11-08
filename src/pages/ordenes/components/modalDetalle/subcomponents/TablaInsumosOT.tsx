@@ -69,7 +69,8 @@ export const TablaInsumosOT: React.FC<TablaInsumosOTProps> = ({
               fontSize: '12px',
               cursor: procesandoDespacho ? 'not-allowed' : 'pointer',
               opacity: procesandoDespacho ? 0.6 : 1,
-            }} data-tone="primary"
+            }}
+            data-tone="primary"
           >
             + Despachar Insumo
           </button>
@@ -85,7 +86,9 @@ export const TablaInsumosOT: React.FC<TablaInsumosOTProps> = ({
             marginBottom: '12px',
           }}
         >
-          <label style={{ fontSize: '12px', color: 'var(--gt-muted, #94A3B8)' }}>Seleccionar Producto/Insumo</label>
+          <label style={{ fontSize: '12px', color: 'var(--gt-muted, #94A3B8)' }}>
+            Seleccionar Producto/Insumo
+          </label>
           <select
             disabled={procesandoDespacho}
             value={idProductoSel}
@@ -153,7 +156,8 @@ export const TablaInsumosOT: React.FC<TablaInsumosOTProps> = ({
                 borderRadius: '4px',
                 cursor: procesandoDespacho ? 'not-allowed' : 'pointer',
                 opacity: procesandoDespacho ? 0.6 : 1,
-              }} data-tone="primary"
+              }}
+              data-tone="primary"
             >
               {procesandoDespacho ? 'Despachando...' : 'Confirmar Despacho'}
             </button>
@@ -161,78 +165,97 @@ export const TablaInsumosOT: React.FC<TablaInsumosOTProps> = ({
         </div>
       )}
 
-      <div className="ot-detail-table-scroll" role="region" aria-label="Insumos consumidos" tabIndex={0}><table
-        style={{
-          width: '100%',
-          borderCollapse: 'collapse',
-          marginBottom: '20px',
-          fontSize: '13px',
-        }}
+      <div
+        className="ot-detail-table-scroll"
+        role="region"
+        aria-label="Insumos consumidos"
+        tabIndex={0}
       >
-        <thead>
-          <tr style={{ borderBottom: '1px solid var(--gt-border, #2e3c4e)', color: 'var(--gt-muted, #94A3B8)' }}>
-            <th style={{ textAlign: 'left', padding: '6px' }}>Insumo</th>
-            <th style={{ padding: '6px' }}>Consumido</th>
-            <th style={{ padding: '6px' }}>Devuelto</th>
-            <th style={{ padding: '6px' }}>Neto</th>
-            <th style={{ padding: '6px' }}>Subtotal</th>
-            {!esTerminal && <th style={{ padding: '6px' }}>Acción</th>}
-          </tr>
-        </thead>
-        <tbody>
-          {ordenActual.insumos && ordenActual.insumos.length > 0 ? (
-            ordenActual.insumos.map((i) => (
-              <tr key={i.id_detalle} style={{ borderBottom: '1px solid #0F172A' }}>
-                <td style={{ padding: '6px' }}>{i.nombre_snapshot}</td>
-                <td style={{ padding: '6px', textAlign: 'center' }}>
-                  {i.cantidad_formateada} {i.unidad_medida}
-                </td>
-                <td style={{ padding: '6px', textAlign: 'center', color: 'var(--gt-amber, #F59E0B)' }}>
-                  {i.devuelto_ml_und} {i.unidad_medida === 'ML' ? 'ML' : 'UND'}
-                </td>
-                <td style={{ padding: '6px', textAlign: 'center', fontWeight: 'bold' }}>
-                  {i.neto_ml_und} {i.unidad_medida === 'ML' ? 'ML' : 'UND'}
-                </td>
-                <td style={{ padding: '6px', textAlign: 'right' }}>
-                  S/ {(i.subtotal_soles ?? 0).toFixed(2)}
-                </td>
-                {!esTerminal && (
-                  <td style={{ padding: '6px', textAlign: 'center' }}>
-                    <button data-tone="warning"
-                      disabled={procesandoDevolucion}
-                      onClick={() => {
-                        setIdDetalleDevolver(i.id_detalle);
-                        setModoAccion('DEVOLVER');
-                      }}
-                      style={{
-                        padding: '2px 6px',
-                        backgroundColor: '#392f20',
-                        color: 'var(--gt-amber, #f2b544)',
-                        border: 'none',
-                        borderRadius: '4px',
-                        cursor: procesandoDevolucion ? 'not-allowed' : 'pointer',
-                        fontSize: '11px',
-                        opacity: procesandoDevolucion ? 0.6 : 1,
-                      }}
-                    >
-                      Devolver
-                    </button>
-                  </td>
-                )}
-              </tr>
-            ))
-          ) : (
-            <tr>
-              <td
-                colSpan={!esTerminal ? 6 : 5}
-                style={{ padding: '8px', textAlign: 'center', color: 'var(--gt-muted, #94A3B8)' }}
-              >
-                Sin insumos registrados
-              </td>
+        <table
+          style={{
+            width: '100%',
+            borderCollapse: 'collapse',
+            marginBottom: '20px',
+            fontSize: '13px',
+          }}
+        >
+          <thead>
+            <tr
+              style={{
+                borderBottom: '1px solid var(--gt-border, #2e3c4e)',
+                color: 'var(--gt-muted, #94A3B8)',
+              }}
+            >
+              <th style={{ textAlign: 'left', padding: '6px' }}>Insumo</th>
+              <th style={{ padding: '6px' }}>Consumido</th>
+              <th style={{ padding: '6px' }}>Devuelto</th>
+              <th style={{ padding: '6px' }}>Neto</th>
+              <th style={{ padding: '6px' }}>Subtotal</th>
+              {!esTerminal && <th style={{ padding: '6px' }}>Acción</th>}
             </tr>
-          )}
-        </tbody>
-      </table></div>
+          </thead>
+          <tbody>
+            {ordenActual.insumos && ordenActual.insumos.length > 0 ? (
+              ordenActual.insumos.map((i) => (
+                <tr key={i.id_detalle} style={{ borderBottom: '1px solid #0F172A' }}>
+                  <td style={{ padding: '6px' }}>{i.nombre_snapshot}</td>
+                  <td style={{ padding: '6px', textAlign: 'center' }}>
+                    {i.cantidad_formateada} {i.unidad_medida}
+                  </td>
+                  <td
+                    style={{
+                      padding: '6px',
+                      textAlign: 'center',
+                      color: 'var(--gt-amber, #F59E0B)',
+                    }}
+                  >
+                    {i.devuelto_ml_und} {i.unidad_medida === 'ML' ? 'ML' : 'UND'}
+                  </td>
+                  <td style={{ padding: '6px', textAlign: 'center', fontWeight: 'bold' }}>
+                    {i.neto_ml_und} {i.unidad_medida === 'ML' ? 'ML' : 'UND'}
+                  </td>
+                  <td style={{ padding: '6px', textAlign: 'right' }}>
+                    S/ {(i.subtotal_soles ?? 0).toFixed(2)}
+                  </td>
+                  {!esTerminal && (
+                    <td style={{ padding: '6px', textAlign: 'center' }}>
+                      <button
+                        data-tone="warning"
+                        disabled={procesandoDevolucion}
+                        onClick={() => {
+                          setIdDetalleDevolver(i.id_detalle);
+                          setModoAccion('DEVOLVER');
+                        }}
+                        style={{
+                          padding: '2px 6px',
+                          backgroundColor: '#392f20',
+                          color: 'var(--gt-amber, #f2b544)',
+                          border: 'none',
+                          borderRadius: '4px',
+                          cursor: procesandoDevolucion ? 'not-allowed' : 'pointer',
+                          fontSize: '11px',
+                          opacity: procesandoDevolucion ? 0.6 : 1,
+                        }}
+                      >
+                        Devolver
+                      </button>
+                    </td>
+                  )}
+                </tr>
+              ))
+            ) : (
+              <tr>
+                <td
+                  colSpan={!esTerminal ? 6 : 5}
+                  style={{ padding: '8px', textAlign: 'center', color: 'var(--gt-muted, #94A3B8)' }}
+                >
+                  Sin insumos registrados
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
 
       {modoAccion === 'DEVOLVER' && (
         <div
@@ -296,7 +319,8 @@ export const TablaInsumosOT: React.FC<TablaInsumosOTProps> = ({
             </button>
             <button
               disabled={procesandoDevolucion}
-              data-tone="warning" onClick={onDevolverInsumoSubmit}
+              data-tone="warning"
+              onClick={onDevolverInsumoSubmit}
               style={{
                 padding: '4px 10px',
                 backgroundColor: '#392f20',

@@ -92,7 +92,8 @@ export const FichaVehicularProximosCambios: React.FC<Props> = ({
   if (cargando) {
     return (
       <div className="fv-list-empty fv-loading" role="status">
-        <span className="gt-spinner" aria-hidden="true" /> Cargando vehículos candidatos a cambio de aceite…
+        <span className="gt-spinner" aria-hidden="true" /> Cargando vehículos candidatos a cambio de
+        aceite…
       </div>
     );
   }
@@ -101,7 +102,10 @@ export const FichaVehicularProximosCambios: React.FC<Props> = ({
     return (
       <div className="gt-notice gt-notice--error fv-lookup-error" role="alert">
         <AlertCircle size={17} aria-hidden="true" />
-        <div><strong>No se pudieron consultar los próximos cambios</strong><p>{error}</p></div>
+        <div>
+          <strong>No se pudieron consultar los próximos cambios</strong>
+          <p>{error}</p>
+        </div>
         <button type="button" className="fv-button fv-small" onClick={cargarProximosCambios}>
           <RefreshCw size={14} aria-hidden="true" /> Reintentar
         </button>
@@ -113,7 +117,9 @@ export const FichaVehicularProximosCambios: React.FC<Props> = ({
     <section className="fv-upcoming" aria-labelledby="fv-upcoming-title">
       <div className="fv-section-title fv-upcoming-heading">
         <div>
-          <h3 id="fv-upcoming-title">Próximos cambios de aceite <span className="fv-count">{totalRegistros}</span></h3>
+          <h3 id="fv-upcoming-title">
+            Próximos cambios de aceite <span className="fv-count">{totalRegistros}</span>
+          </h3>
           <p>Vehículos que se acercan al próximo mantenimiento o que ya superaron el intervalo.</p>
         </div>
         <button type="button" onClick={cargarProximosCambios} className="fv-button">
@@ -137,9 +143,20 @@ export const FichaVehicularProximosCambios: React.FC<Props> = ({
         <div className="fv-filter-buttons" role="group" aria-label="Motivo del cambio">
           <Filter size={15} aria-hidden="true" />
           {(['TODOS', 'POR_KM', 'POR_FECHA', 'AMBOS'] as TipoFiltroCausa[]).map((causa) => (
-            <button type="button" key={causa} className="fv-button fv-small"
-              aria-pressed={filtroCausa === causa} onClick={() => handleCausaChange(causa)}>
-              {causa === 'TODOS' ? 'Todos' : causa === 'POR_KM' ? 'Por km' : causa === 'POR_FECHA' ? 'Por fecha' : 'Km y fecha'}
+            <button
+              type="button"
+              key={causa}
+              className="fv-button fv-small"
+              aria-pressed={filtroCausa === causa}
+              onClick={() => handleCausaChange(causa)}
+            >
+              {causa === 'TODOS'
+                ? 'Todos'
+                : causa === 'POR_KM'
+                  ? 'Por km'
+                  : causa === 'POR_FECHA'
+                    ? 'Por fecha'
+                    : 'Km y fecha'}
             </button>
           ))}
         </div>
@@ -154,20 +171,62 @@ export const FichaVehicularProximosCambios: React.FC<Props> = ({
           {lista.map((item) => (
             <article className="fv-upcoming-card" key={`${item.id_vehiculo}-${item.id_ot}`}>
               <div className="fv-upcoming-card-heading">
-                <div><strong className="fv-upcoming-plate">{item.placa}</strong><p>{item.nombre_razon_social}</p></div>
-                <span className="fv-upcoming-cause">{item.causa === 'POR_KM' ? 'Por kilometraje' : item.causa === 'POR_FECHA' ? 'Por fecha' : 'Por km y fecha'}</span>
+                <div>
+                  <strong className="fv-upcoming-plate">{item.placa}</strong>
+                  <p>{item.nombre_razon_social}</p>
+                </div>
+                <span className="fv-upcoming-cause">
+                  {item.causa === 'POR_KM'
+                    ? 'Por kilometraje'
+                    : item.causa === 'POR_FECHA'
+                      ? 'Por fecha'
+                      : 'Por km y fecha'}
+                </span>
               </div>
               <div className="fv-upcoming-mileage">
-                <div><span>Km actual</span><strong>{(item.kilometraje_actual ?? 0).toLocaleString()} <small>km</small></strong></div>
+                <div>
+                  <span>Km actual</span>
+                  <strong>
+                    {(item.kilometraje_actual ?? 0).toLocaleString()} <small>km</small>
+                  </strong>
+                </div>
                 <ArrowRight size={16} aria-hidden="true" />
-                <div><span>Próximo cambio</span><strong>{item.km_proximo !== null && item.km_proximo !== undefined ? `${item.km_proximo.toLocaleString()} km` : 'No registrado'}</strong></div>
+                <div>
+                  <span>Próximo cambio</span>
+                  <strong>
+                    {item.km_proximo !== null && item.km_proximo !== undefined
+                      ? `${item.km_proximo.toLocaleString()} km`
+                      : 'No registrado'}
+                  </strong>
+                </div>
               </div>
               <div className="fv-upcoming-meta">
-                <span><Calendar size={14} />Fecha de servicio: {item.fecha_servicio ? new Date(item.fecha_servicio).toLocaleDateString('es-PE') : 'N/A'}</span>
-                {item.tipo_aceite && <span><Droplet size={14} />{item.tipo_aceite} · Intervalo: {item.intervalo_aceite_km || 0} km</span>}
-                {item.telefono && <span><Phone size={14} />{item.telefono}</span>}
+                <span>
+                  <Calendar size={14} />
+                  Fecha de servicio:{' '}
+                  {item.fecha_servicio
+                    ? new Date(item.fecha_servicio).toLocaleDateString('es-PE')
+                    : 'N/A'}
+                </span>
+                {item.tipo_aceite && (
+                  <span>
+                    <Droplet size={14} />
+                    {item.tipo_aceite} · Intervalo: {item.intervalo_aceite_km || 0} km
+                  </span>
+                )}
+                {item.telefono && (
+                  <span>
+                    <Phone size={14} />
+                    {item.telefono}
+                  </span>
+                )}
               </div>
-              <button onClick={() => onSeleccionarPlaca(item.placa)} className="fv-button fv-open-record">Ver ficha vehicular <ArrowRight size={15} /></button>
+              <button
+                onClick={() => onSeleccionarPlaca(item.placa)}
+                className="fv-button fv-open-record"
+              >
+                Ver ficha vehicular <ArrowRight size={15} />
+              </button>
             </article>
           ))}
         </div>
@@ -175,12 +234,26 @@ export const FichaVehicularProximosCambios: React.FC<Props> = ({
 
       {totalPaginas > 1 && (
         <div className="fv-pagination fv-upcoming-pagination">
-          <span>Página <strong>{paginaActual}</strong> de <strong>{totalPaginas}</strong></span>
+          <span>
+            Página <strong>{paginaActual}</strong> de <strong>{totalPaginas}</strong>
+          </span>
           <div className="fv-pagination-controls">
-            <button type="button" className="fv-button fv-small" disabled={paginaActual === 1}
-              onClick={() => setPaginaActual((p) => Math.max(1, p - 1))}>Anterior</button>
-            <button type="button" className="fv-button fv-small" disabled={paginaActual === totalPaginas}
-              onClick={() => setPaginaActual((p) => Math.min(totalPaginas, p + 1))}>Siguiente</button>
+            <button
+              type="button"
+              className="fv-button fv-small"
+              disabled={paginaActual === 1}
+              onClick={() => setPaginaActual((p) => Math.max(1, p - 1))}
+            >
+              Anterior
+            </button>
+            <button
+              type="button"
+              className="fv-button fv-small"
+              disabled={paginaActual === totalPaginas}
+              onClick={() => setPaginaActual((p) => Math.min(totalPaginas, p + 1))}
+            >
+              Siguiente
+            </button>
           </div>
         </div>
       )}

@@ -75,27 +75,49 @@ export const ModalDetalleHeader: React.FC<ModalDetalleHeaderProps> = ({
 
       <div className="ot-private-note">
         <div className="ot-private-note-heading">
-          <h3 id="ot-private-note-title"><LockKeyhole size={15} aria-hidden="true" /> Nota interna</h3>
+          <h3 id="ot-private-note-title">
+            <LockKeyhole size={15} aria-hidden="true" /> Nota interna
+          </h3>
           {puedeEditarNota && !editandoNota && (
-            <button type="button" className="ot-button ot-small" onClick={() => {
-              setNuevaNota(ordenActual.nota_interna || '');
-              setEditandoNota(true);
-            }}>
+            <button
+              type="button"
+              className="ot-button ot-small"
+              onClick={() => {
+                setNuevaNota(ordenActual.nota_interna || '');
+                setEditandoNota(true);
+              }}
+            >
               <Pencil size={13} aria-hidden="true" /> Editar
             </button>
           )}
         </div>
         {editandoNota ? (
           <div className="ot-note-editor">
-            <textarea rows={2} value={nuevaNota} aria-label="Editar nota interna"
-              onChange={(e) => setNuevaNota(e.target.value)} />
+            <textarea
+              rows={2}
+              value={nuevaNota}
+              aria-label="Editar nota interna"
+              onChange={(e) => setNuevaNota(e.target.value)}
+            />
             <div className="ot-footer-actions">
-              <button type="button" className="ot-button ot-small" disabled={saving} onClick={() => {
-                setEditandoNota(false);
-                setErrLocal('');
-              }}>Cancelar</button>
-              <button type="button" className="ot-button ot-primary ot-small" disabled={saving}
-                aria-busy={saving} onClick={handleGuardarNota}>
+              <button
+                type="button"
+                className="ot-button ot-small"
+                disabled={saving}
+                onClick={() => {
+                  setEditandoNota(false);
+                  setErrLocal('');
+                }}
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                className="ot-button ot-primary ot-small"
+                disabled={saving}
+                aria-busy={saving}
+                onClick={handleGuardarNota}
+              >
                 {saving ? 'Guardando...' : 'Guardar'}
               </button>
             </div>

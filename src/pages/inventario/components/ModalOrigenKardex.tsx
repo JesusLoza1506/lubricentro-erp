@@ -81,14 +81,18 @@ export const ModalOrigenKardex: React.FC<{ idMovimiento: number; onClose: () => 
         }}
       >
         <header className="inv-dialog-header">
-          <div><span className="inv-dialog-kicker">Kardex · Consulta</span>
-            <h3>Origen del movimiento{origen ? ` · ${origen.codigo}` : ''}</h3></div>
+          <div>
+            <span className="inv-dialog-kicker">Kardex · Consulta</span>
+            <h3>Origen del movimiento{origen ? ` · ${origen.codigo}` : ''}</h3>
+          </div>
         </header>
         {cargando && <p role="status">Consultando origen…</p>}
         {error && (
           <div role="alert" className="inv-form-error">
             <p style={{ color: '#F87171' }}>{error}</p>
-            <button className="inv-button" onClick={() => setIntento((n) => n + 1)}>Reintentar</button>
+            <button className="inv-button" onClick={() => setIntento((n) => n + 1)}>
+              Reintentar
+            </button>
           </div>
         )}
         {origen && (
@@ -105,29 +109,34 @@ export const ModalOrigenKardex: React.FC<{ idMovimiento: number; onClose: () => 
             <p style={{ color: '#94A3B8', fontSize: 12 }}>
               Consulta del registro de origen y sus materiales históricos. No modifica la operación.
             </p>
-            <div className="inv-table-scroll inv-origin-scroll" tabIndex={0} role="region" aria-label="Materiales del movimiento">
-            <table className="inv-table">
-              <thead>
-                <tr>
-                  <th style={{ textAlign: 'left' }}>Producto / servicio</th>
-                  <th>Cantidad registrada</th>
-                  <th>Costo histórico</th>
-                </tr>
-              </thead>
-              <tbody>
-                {origen.lineas.map((l, i) => (
-                  <tr key={i} style={{ borderTop: '1px solid #334155' }}>
-                    <td style={{ padding: '10px 0' }}>{l.nombre}</td>
-                    <td style={{ textAlign: 'center' }}>
-                      {cantidadKardex(l.cantidad, l.unidad_medida)}
-                    </td>
-                    <td style={{ textAlign: 'right' }}>
-                      {l.valor_micro == null ? 'No aplica' : dineroMicro(l.valor_micro)}
-                    </td>
+            <div
+              className="inv-table-scroll inv-origin-scroll"
+              tabIndex={0}
+              role="region"
+              aria-label="Materiales del movimiento"
+            >
+              <table className="inv-table">
+                <thead>
+                  <tr>
+                    <th style={{ textAlign: 'left' }}>Producto / servicio</th>
+                    <th>Cantidad registrada</th>
+                    <th>Costo histórico</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {origen.lineas.map((l, i) => (
+                    <tr key={i} style={{ borderTop: '1px solid #334155' }}>
+                      <td style={{ padding: '10px 0' }}>{l.nombre}</td>
+                      <td style={{ textAlign: 'center' }}>
+                        {cantidadKardex(l.cantidad, l.unidad_medida)}
+                      </td>
+                      <td style={{ textAlign: 'right' }}>
+                        {l.valor_micro == null ? 'No aplica' : dineroMicro(l.valor_micro)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
             {origen.comprobantes.length > 0 && (
               <div>

@@ -101,7 +101,14 @@ export const FichaVehicularHistorial: React.FC<Props> = ({
               </div>
             )}
           </div>
-          <div className="fv-table-scroll" aria-busy={cargando} tabIndex={0} role="region" aria-label="Historial de mantenimientos" style={{ opacity: cargando ? 0.6 : 1 }}>
+          <div
+            className="fv-table-scroll"
+            aria-busy={cargando}
+            tabIndex={0}
+            role="region"
+            aria-label="Historial de mantenimientos"
+            style={{ opacity: cargando ? 0.6 : 1 }}
+          >
             <table className="fv-history-table">
               <thead>
                 <tr>
@@ -131,7 +138,9 @@ export const FichaVehicularHistorial: React.FC<Props> = ({
                           <Clock size={13} />
                           {formatearFechaHora(fechaAtencion)}
                         </span>
-                        <span className="fv-state-caption" data-state={ot.estado || 'FINALIZADO'}>{ot.estado || 'FINALIZADO'}</span>
+                        <span className="fv-state-caption" data-state={ot.estado || 'FINALIZADO'}>
+                          {ot.estado || 'FINALIZADO'}
+                        </span>
                       </td>
                       <td>
                         <p className="fv-observation" title={resumenTexto}>
@@ -145,9 +154,7 @@ export const FichaVehicularHistorial: React.FC<Props> = ({
                             </span>
                           )}
                           {ot.corregido === 1 && (
-                            <span
-                              className="fv-corrected"
-                            >
+                            <span className="fv-corrected">
                               <FilePenLine size={12} />
                               Corregido
                             </span>
@@ -160,9 +167,7 @@ export const FichaVehicularHistorial: React.FC<Props> = ({
                             <User size={13} color="#94A3B8" /> {nombreClienteAtendido}
                           </span>
                           {docClienteAtendido && (
-                            <span className="fv-client-document">
-                              Doc: {docClienteAtendido}
-                            </span>
+                            <span className="fv-client-document">Doc: {docClienteAtendido}</span>
                           )}
                         </div>
                       </td>

@@ -109,7 +109,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       label: 'Caja Chica',
       icon: Receipt,
       siempreVisible: false,
-      enDesarrollo: true,
+      enDesarrollo: false,
     },
     {
       id: 'backup',
@@ -178,7 +178,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
     }
   };
 
-  const confirmacionSesion = destinoPendiente === 'LOGOUT' || destinoPendiente === 'MODAL_CAMBIO_CLAVE';
+  const confirmacionSesion =
+    destinoPendiente === 'LOGOUT' || destinoPendiente === 'MODAL_CAMBIO_CLAVE';
 
   const confirmarAccionNavegacion = () => {
     setHayCambiosSinGuardar(false);
@@ -245,9 +246,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
         <section className="sidebar-sesion" aria-label="Cuenta y sesión">
           <div className="sidebar-cuenta">
-            <span className="sidebar-avatar"><UserRound size={17} aria-hidden="true" /></span>
+            <span className="sidebar-avatar">
+              <UserRound size={17} aria-hidden="true" />
+            </span>
             <div className="sidebar-identidad">
-              <p className="sidebar-nombre" title={usuario.nombre_completo}>{usuario.nombre_completo}</p>
+              <p className="sidebar-nombre" title={usuario.nombre_completo}>
+                {usuario.nombre_completo}
+              </p>
               <p className="sidebar-rol">{usuario.rol}</p>
             </div>
           </div>
@@ -259,8 +264,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </button>
           )}
 
-          <button type="button" className="sidebar-accion sidebar-accion-salir"
-            onClick={handleIntentarCerrarSesion}>
+          <button
+            type="button"
+            className="sidebar-accion sidebar-accion-salir"
+            onClick={handleIntentarCerrarSesion}
+          >
             <LogOut size={16} aria-hidden="true" />
             Cerrar sesión
           </button>
@@ -271,12 +279,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
         abierto={mostrarConfirmacion}
         varianteVisual={confirmacionSesion ? 'gloria' : undefined}
         textoCancelar={confirmacionSesion ? 'Seguir editando' : undefined}
-        titulo={confirmacionSesion ? "Cambios sin guardar" : "Cambios Sin Guardar"}
-        mensaje={destinoPendiente === 'LOGOUT'
-          ? 'Si cierras sesión, se perderán los cambios que aún no has guardado.'
-          : destinoPendiente === 'MODAL_CAMBIO_CLAVE'
-            ? 'Si abres el cambio de contraseña, se perderán los cambios del formulario actual.'
-            : 'Tienes información o un formulario editado sin guardar. Si navegas fuera o cierras sesión, perderás todos los datos ingresados.'}
+        titulo={confirmacionSesion ? 'Cambios sin guardar' : 'Cambios Sin Guardar'}
+        mensaje={
+          destinoPendiente === 'LOGOUT'
+            ? 'Si cierras sesión, se perderán los cambios que aún no has guardado.'
+            : destinoPendiente === 'MODAL_CAMBIO_CLAVE'
+              ? 'Si abres el cambio de contraseña, se perderán los cambios del formulario actual.'
+              : 'Tienes información o un formulario editado sin guardar. Si navegas fuera o cierras sesión, perderás todos los datos ingresados.'
+        }
         textoConfirmar="Sí, Descartar Cambios"
         onConfirmar={confirmarAccionNavegacion}
         onCancelar={() => {

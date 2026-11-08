@@ -1,0 +1,383 @@
+.caja-page {
+  background: var(--gt-bg);
+  height: 100%;
+  min-height: 0;
+  overflow: auto;
+}
+.caja-stage {
+  max-width: 1520px;
+  margin: 0 auto;
+  padding: clamp(16px, 3vw, 36px);
+  display: grid;
+  gap: 16px;
+}
+.caja-page :is(h1, h2, p),
+.caja-dialog :is(h2, p) {
+  margin: 0;
+}
+.caja-page h1 {
+  font-size: clamp(25px, 2.6vw, 34px);
+  letter-spacing: -0.025em;
+}
+.caja-page h2,
+.caja-dialog h2 {
+  font-size: 17px;
+  overflow-wrap: anywhere;
+}
+.caja-stage p,
+.caja-dialog p,
+.caja-tabla small,
+.caja-paginas {
+  color: var(--gt-muted);
+}
+.caja-cabecera {
+  padding: 22px;
+  border: 1px solid var(--gt-border);
+  border-radius: 12px;
+  background: var(--gt-nav);
+}
+.caja-stage .caja-kicker {
+  color: var(--gt-focus);
+  text-transform: uppercase;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.11em;
+}
+.caja-kicker::before {
+  content: '';
+  display: inline-block;
+  background: var(--gt-amber);
+  width: 23px;
+  height: 2px;
+  margin-right: 9px;
+  vertical-align: middle;
+}
+.caja-linea,
+.caja-acciones,
+.caja-paginas {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 9px;
+}
+.caja-linea,
+.caja-paginas {
+  justify-content: space-between;
+}
+.caja-sello {
+  border: 1px solid var(--gt-border);
+  border-radius: 6px;
+  color: var(--gt-muted);
+  padding: 3px 8px;
+  font-size: 12px;
+  font-weight: 600;
+}
+.caja-sello[data-abierta='true'] {
+  color: var(--gt-green);
+}
+.caja-page button,
+.caja-dialog button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  color: var(--gt-text);
+  background: var(--gt-surface);
+  border: 1px solid var(--gt-border);
+  border-radius: 8px;
+  min-height: 37px;
+  padding: 6px 12px;
+  cursor: pointer;
+  transition:
+    color var(--gt-fast),
+    background var(--gt-fast),
+    border-color var(--gt-fast);
+}
+.caja-page button:hover:not(:disabled),
+.caja-dialog button:hover:not(:disabled) {
+  border-color: var(--gt-focus);
+}
+.caja-page button:disabled,
+.caja-dialog button:disabled {
+  opacity: 0.58;
+  cursor: not-allowed;
+}
+.caja-page .caja-principal,
+.caja-dialog .caja-principal {
+  background: var(--gt-blue);
+  border-color: var(--gt-blue);
+  color: #fff;
+}
+.caja-dialog .caja-peligro {
+  color: var(--gt-red);
+  border-color: #975650;
+  background: #3c2528;
+}
+.caja-tabs {
+  display: flex;
+  gap: 7px;
+  border-bottom: 1px solid var(--gt-border);
+}
+.caja-tabs button {
+  border: 0;
+  border-radius: 0;
+  border-bottom: 2px solid transparent;
+  background: none;
+  color: var(--gt-muted);
+}
+.caja-tabs button[aria-current] {
+  color: var(--gt-text);
+  border-bottom-color: var(--gt-focus);
+}
+.caja-panel {
+  border: 1px solid var(--gt-border);
+  border-radius: 12px;
+  background: var(--gt-nav);
+  padding: 16px;
+  min-width: 0;
+}
+.caja-panel h2 + p {
+  margin-top: 4px;
+}
+.caja-resumen-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 4fr) minmax(0, 6fr);
+  gap: 14px;
+}
+.caja-total {
+  display: block;
+  font-size: 28px;
+  margin-top: 9px;
+  font-variant-numeric: tabular-nums;
+}
+.caja-desglose {
+  margin-bottom: 0;
+}
+.caja-desglose div {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 4px 0;
+}
+.caja-desglose dt,
+.caja-cifras dt {
+  color: var(--gt-muted);
+}
+.caja-desglose dd,
+.caja-cifras dd {
+  margin: 0;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.caja-cifras {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.caja-cifras > div {
+  flex: 1 1 100px;
+  border-radius: 7px;
+  padding: 7px;
+  background: var(--gt-bg);
+}
+.caja-tabla {
+  overflow: auto;
+  margin: 12px 0;
+  border: 1px solid var(--gt-border);
+  border-radius: 8px;
+}
+.caja-tabla table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.caja-tabla :is(th, td) {
+  padding: 9px 10px;
+  text-align: left;
+  border-bottom: 1px solid var(--gt-border);
+}
+.caja-tabla thead {
+  color: var(--gt-muted);
+  background: var(--gt-surface);
+}
+.caja-tabla tbody tr:last-child > * {
+  border-bottom: 0;
+}
+.caja-tabla td small {
+  display: block;
+  overflow-wrap: anywhere;
+}
+.caja-numero {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.caja-filtros,
+.caja-campos {
+  display: flex;
+  align-items: end;
+  flex-wrap: wrap;
+  gap: 9px;
+  margin: 12px 0;
+}
+.caja-filtros label {
+  flex: 1 1 112px;
+}
+.caja-filtros label,
+.caja-dialog label {
+  display: grid;
+  gap: 4px;
+  font-size: 13px;
+  color: var(--gt-muted);
+}
+.caja-filtros .caja-check {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  padding: 8px 0;
+}
+.caja-filtros :is(select, input:not([type='checkbox'])),
+.caja-dialog :is(input, textarea, select) {
+  width: 100%;
+  min-width: 0;
+  padding: 7px 9px;
+  min-height: 37px;
+  background: var(--gt-bg);
+  border: 1px solid var(--gt-control-border);
+  border-radius: 7px;
+  color: var(--gt-text);
+  font: inherit;
+  box-sizing: border-box;
+}
+.caja-filtros select:focus-visible,
+.caja-dialog :is(select, textarea):focus-visible {
+  outline: 2px solid var(--gt-focus);
+  outline-offset: 2px;
+}
+.caja-alerta {
+  border: 1px solid #806633;
+  background: #322a1e;
+  border-radius: 8px;
+  padding: 10px;
+  color: #ffe1a5 !important;
+}
+.caja-vacio {
+  text-align: center;
+  padding: 30px 12px;
+}
+.caja-vacio svg {
+  color: var(--gt-focus);
+}
+.caja-vacio p {
+  margin: 6px 0 12px;
+}
+.caja-page .caja-volver {
+  justify-self: start;
+}
+.caja-page .caja-enlace {
+  padding: 4px 0;
+  border: 0;
+  background: transparent;
+  text-decoration: underline;
+  color: var(--gt-focus);
+}
+.caja-dialog {
+  box-sizing: border-box;
+  width: min(520px, calc(100vw - 32px));
+  max-height: calc(100vh - 28px);
+  border: 1px solid var(--gt-border);
+  background: var(--gt-nav);
+  border-radius: 12px;
+  padding: 18px;
+  color: var(--gt-text);
+}
+.caja-dialog[open] {
+  animation: caja-entrada var(--gt-dialog) var(--gt-ease);
+}
+.caja-dialog::backdrop {
+  background: #070b13ba;
+}
+.caja-dialog form,
+.caja-dialog fieldset {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+}
+.caja-dialog form {
+  margin-top: 12px;
+}
+.caja-dialog fieldset {
+  border: 0;
+  padding: 0;
+  min-width: 0;
+}
+.caja-dialog .caja-campos {
+  margin: 0;
+}
+.caja-dialog .caja-campos label {
+  flex: 1 1 120px;
+}
+.caja-dialog textarea {
+  resize: vertical;
+}
+.caja-dialog .caja-acciones {
+  justify-content: flex-end;
+}
+.caja-arqueo {
+  margin: 0;
+}
+.caja-aviso {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  z-index: 50;
+}
+.caja-impresion {
+  display: none;
+}
+@keyframes caja-entrada {
+  from {
+    opacity: 0.5;
+    transform: translateY(5px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@media (max-width: 1100px) {
+  .caja-resumen-grid {
+    grid-template-columns: 1fr;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .caja-dialog[open] {
+    animation: none;
+  }
+  .caja-page button,
+  .caja-dialog button {
+    transition: none;
+  }
+}
+@media print {
+  body.caja-imprimiendo > :not(.caja-impresion) {
+    display: none !important;
+  }
+  body.caja-imprimiendo > .caja-impresion {
+    display: block;
+    background: white;
+    color: black;
+    font: 12pt/1.45 system-ui;
+    padding: 12pt;
+  }
+  .caja-impresion :is(th, td) {
+    text-align: left;
+    padding: 4pt 8pt;
+  }
+  .caja-impresion .caja-cifras > div {
+    border: 1px solid #ddd;
+    background: white;
+    color: black;
+  }
+  .caja-impresion .caja-cifras dt {
+    color: black;
+  }
+}

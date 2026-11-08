@@ -9,11 +9,24 @@ import { FichaVehicularPage } from './pages/vehiculo/FichaVehicularPage';
 import { OrdenesPage } from './pages/ordenes/OrdenesPage';
 import { CambioClaveModal } from './components/CambioClaveModal';
 
-const PosPage = React.lazy(() => import('./pages/pos/PosPage').then(m=>({default:m.PosPage})));
+const CajaPage = React.lazy(() =>
+  import('./pages/caja/CajaPage').then((m) => ({ default: m.CajaPage }))
+);
+const PosPage = React.lazy(() =>
+  import('./pages/pos/PosPage').then((m) => ({ default: m.PosPage }))
+);
 
 const MainApp: React.FC = () => {
-  const { usuario, estadoSesion, cargando, tienePermiso, setHayCambiosSinGuardar } = useAuth();
-  const [otParaCobrar,setOtParaCobrar]=useState<number|null>(null);
+  const {
+    usuario,
+    estadoSesion,
+    cargando,
+    tienePermiso,
+    hayCambiosSinGuardar,
+    setHayCambiosSinGuardar,
+  } = useAuth();
+  const [otParaCobrar, setOtParaCobrar] = useState<number | null>(null);
+  const [ventaParaConsultar, setVentaParaConsultar] = useState<number | null>(null);
   const [moduloActual, setModuloActual] = useState<string>('dashboard');
   const [placaSeleccionada, setPlacaSeleccionada] = useState<string>('');
   const [mostrarCambioClaveModal, setMostrarCambioClaveModal] = useState<boolean>(false);
@@ -23,6 +36,7 @@ const MainApp: React.FC = () => {
       setModuloActual('dashboard');
       setPlacaSeleccionada('');
       setOtParaCobrar(null);
+      setVentaParaConsultar(null);
       setMostrarCambioClaveModal(false);
       setHayCambiosSinGuardar(false);
     }
@@ -54,13 +68,55 @@ const MainApp: React.FC = () => {
       case 'taller':
       case 'ot':
         return tienePermiso('OT', 'ver') || tienePermiso('ORDENES', 'ver') ? (
-          <OrdenesPage onNavegarAFichaVehicular={navegarAFichaVehicular} onNavegarAPos={id=>{setOtParaCobrar(id);setModuloActual('pos');}} />
+          <OrdenesPage
+            onNavegarAFichaVehicular={navegarAFichaVehicular}
+            onNavegarAPos={(id) => {
+              setOtParaCobrar(id);
+              setModuloActual('pos');
+            }}
+          />
         ) : (
           <DashboardPage setModuloActual={setModuloActual} />
         );
 
       case 'pos':
-        return tienePermiso('POS', 'ver') ? <React.Suspense fallback={<p style={{padding:24,color:'#9bacbf'}}>Cargando Punto de Venta…</p>}><PosPage otInicial={otParaCobrar} onConsumirOt={()=>setOtParaCobrar(null)} /></React.Suspense> : <DashboardPage setModuloActual={setModuloActual} />;
+        return tienePermiso('POS', 'ver') ? (
+          <React.Suspense fallback={<p role="status">Cargando Punto de Venta…</p>}>
+            <PosPage
+              otInicial={otParaCobrar}
+              onConsumirOt={() => setOtParaCobrar(null)}
+              ventaInicial={ventaParaConsultar}
+              onConsumirVenta={() => setVentaParaConsultar(null)}
+              onIrCaja={
+                tienePermiso('CAJA', 'ver')
+                  ? () => {
+                      if (
+                        !hayCambiosSinGuardar ||
+                        window.confirm('¿Salir de Punto de Venta y descartar la captura actual?')
+                      )
+                        setModuloActual('caja');
+                    }
+                  : undefined
+              }
+            />
+          </React.Suspense>
+        ) : (
+          <DashboardPage setModuloActual={setModuloActual} />
+        );
+      case 'caja':
+        return tienePermiso('CAJA', 'ver') ? (
+          <React.Suspense fallback={<p role="status">Cargando Caja Chica…</p>}>
+            <CajaPage
+              onVenta={(id) => {
+                if (!tienePermiso('POS', 'ver')) return;
+                setVentaParaConsultar(id);
+                setModuloActual('pos');
+              }}
+            />
+          </React.Suspense>
+        ) : (
+          <DashboardPage setModuloActual={setModuloActual} />
+        );
       case 'inventario':
         return tienePermiso('INVENTARIO', 'ver') ? (
           <InventarioPage />

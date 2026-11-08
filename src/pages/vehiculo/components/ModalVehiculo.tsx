@@ -273,7 +273,13 @@ export const ModalVehiculo: React.FC<ModalVehiculoProps> = ({
   return (
     <>
       <div className="fv-modal-overlay fv-existing-overlay" style={overlayStyle}>
-        <div className="fv-existing-form" role="dialog" aria-modal={!confirmModalOpen} aria-labelledby="fv-vehicle-title" style={modalBoxStyle}>
+        <div
+          className="fv-existing-form"
+          role="dialog"
+          aria-modal={!confirmModalOpen}
+          aria-labelledby="fv-vehicle-title"
+          style={modalBoxStyle}
+        >
           <div
             className="fv-existing-title"
             style={{
@@ -283,7 +289,10 @@ export const ModalVehiculo: React.FC<ModalVehiculoProps> = ({
               marginBottom: '20px',
             }}
           >
-            <h3 id="fv-vehicle-title" style={{ fontSize: '20px', fontWeight: '800', color: 'var(--gt-text)', margin: 0 }}>
+            <h3
+              id="fv-vehicle-title"
+              style={{ fontSize: '20px', fontWeight: '800', color: 'var(--gt-text)', margin: 0 }}
+            >
               {modo === 'CREAR' ? 'Registrar Nuevo Vehículo / Cliente' : 'Editar Ficha Vehicular'}
             </h3>
             <button
@@ -303,7 +312,11 @@ export const ModalVehiculo: React.FC<ModalVehiculoProps> = ({
             </button>
           </div>
 
-          {errorModal && <div className="fv-existing-error" role="alert" style={errorBoxStyle}>⚠️ {errorModal}</div>}
+          {errorModal && (
+            <div className="fv-existing-error" role="alert" style={errorBoxStyle}>
+              ⚠️ {errorModal}
+            </div>
+          )}
 
           <form
             onSubmit={onSubmit}
@@ -336,12 +349,16 @@ export const ModalVehiculo: React.FC<ModalVehiculoProps> = ({
                           key={c.id_cliente}
                           onClick={() => seleccionarClienteExistente(c)}
                           style={dropdownItemStyle}
-                          onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'var(--gt-border)')}
+                          onMouseEnter={(e) =>
+                            (e.currentTarget.style.backgroundColor = 'var(--gt-border)')
+                          }
                           onMouseLeave={(e) =>
                             (e.currentTarget.style.backgroundColor = 'transparent')
                           }
                         >
-                          <div style={{ fontWeight: '700', color: 'var(--gt-text)', fontSize: '13px' }}>
+                          <div
+                            style={{ fontWeight: '700', color: 'var(--gt-text)', fontSize: '13px' }}
+                          >
                             {c.nombre_razon_social}
                           </div>
                           <div style={{ fontSize: '11px', color: 'var(--gt-focus)' }}>
@@ -354,7 +371,10 @@ export const ModalVehiculo: React.FC<ModalVehiculoProps> = ({
                   )}
                 </div>
 
-                <div className="fv-existing-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1.5fr 1fr', gap: '10px' }}>
+                <div
+                  className="fv-existing-grid"
+                  style={{ display: 'grid', gridTemplateColumns: '1fr 1.5fr 1fr', gap: '10px' }}
+                >
                   <div>
                     <label style={labelStyle}>Tipo Doc. *</label>
                     <select
@@ -403,7 +423,10 @@ export const ModalVehiculo: React.FC<ModalVehiculoProps> = ({
                   </div>
                 </div>
 
-                <div className="fv-existing-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                <div
+                  className="fv-existing-grid"
+                  style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}
+                >
                   <div>
                     <label style={labelStyle}>Correo Electrónico</label>
                     <input
@@ -439,7 +462,10 @@ export const ModalVehiculo: React.FC<ModalVehiculoProps> = ({
             <div className="fv-existing-section" style={sectionBoxStyle}>
               <span style={sectionTitleStyle}>Datos del Vehículo</span>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                <div className="fv-existing-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px' }}>
+                <div
+                  className="fv-existing-grid"
+                  style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px' }}
+                >
                   <div>
                     <label style={labelStyle}>Placa * (6 Caracteres)</label>
                     <input
@@ -490,7 +516,10 @@ export const ModalVehiculo: React.FC<ModalVehiculoProps> = ({
                   </div>
                 </div>
 
-                <div className="fv-existing-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1.2fr 1fr', gap: '10px' }}>
+                <div
+                  className="fv-existing-grid"
+                  style={{ display: 'grid', gridTemplateColumns: '1fr 1.2fr 1fr', gap: '10px' }}
+                >
                   <div>
                     <label style={labelStyle}>Año</label>
                     <input
@@ -612,7 +641,13 @@ export const ModalVehiculo: React.FC<ModalVehiculoProps> = ({
 
       {confirmModalOpen && (
         <div className="fv-modal-overlay fv-existing-overlay" style={overlayStyle}>
-          <div className="fv-existing-form" role="dialog" aria-modal="true" aria-labelledby="fv-sensitive-title" style={{ ...modalBoxStyle, width: '420px', textAlign: 'center' }}>
+          <div
+            className="fv-existing-form"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="fv-sensitive-title"
+            style={{ ...modalBoxStyle, width: '420px', textAlign: 'center' }}
+          >
             <h3
               id="fv-sensitive-title"
               style={{

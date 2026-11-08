@@ -102,6 +102,7 @@ export interface InicioPos {
   empresa: string | null;
   configurada: boolean;
   caja_propia: number | null;
+  caja_ocupada: boolean;
   hoy: string;
   series: { id: number; tipo: string; serie: string }[];
   caja: {

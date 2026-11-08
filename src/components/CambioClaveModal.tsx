@@ -13,7 +13,10 @@ interface Props {
 const ItemCheck: React.FC<{ ok: boolean; text: string }> = ({ ok, text }) => (
   <li className="gt-check" data-ok={ok}>
     {ok ? <Check size={14} aria-hidden="true" /> : <Minus size={14} aria-hidden="true" />}
-    <span><span className="gt-sr-only">{ok ? 'Cumplido: ' : 'Pendiente: '}</span>{text}</span>
+    <span>
+      <span className="gt-sr-only">{ok ? 'Cumplido: ' : 'Pendiente: '}</span>
+      {text}
+    </span>
   </li>
 );
 
@@ -141,8 +144,7 @@ export const CambioClaveModal: React.FC<Props> = ({ onClose }) => {
       setHayCambiosSinGuardar(false);
       onClose();
     } catch (err: any) {
-      const mensaje =
-        mensajeErrorAuth(err, 'Error al cambiar la contraseña.');
+      const mensaje = mensajeErrorAuth(err, 'Error al cambiar la contraseña.');
       setErrorMsg(mensaje);
     } finally {
       setProcesando(false);
@@ -151,18 +153,28 @@ export const CambioClaveModal: React.FC<Props> = ({ onClose }) => {
 
   return (
     <>
-      <div className="gloria-theme gt-overlay" role="dialog"
+      <div
+        className="gloria-theme gt-overlay"
+        role="dialog"
         aria-modal={mostrarConfirmacionCierre ? undefined : true}
-        aria-labelledby="modal-cambio-clave-title">
+        aria-labelledby="modal-cambio-clave-title"
+      >
         <div className="gt-dialog" ref={modalRef}>
           <header className="gt-dialog-header">
             <KeyRound size={21} aria-hidden="true" />
             <div>
-              <h3 id="modal-cambio-clave-title" className="gt-dialog-title">Cambiar contraseña</h3>
+              <h3 id="modal-cambio-clave-title" className="gt-dialog-title">
+                Cambiar contraseña
+              </h3>
               <p className="gt-dialog-description">Actualiza la contraseña de tu cuenta.</p>
             </div>
-            <button type="button" className="gt-button gt-button--icon"
-              onClick={handleIntentarCerrar} disabled={procesando} aria-label="Cerrar modal">
+            <button
+              type="button"
+              className="gt-button gt-button--icon"
+              onClick={handleIntentarCerrar}
+              disabled={procesando}
+              aria-label="Cerrar modal"
+            >
               <X size={18} aria-hidden="true" />
             </button>
           </header>
@@ -170,15 +182,38 @@ export const CambioClaveModal: React.FC<Props> = ({ onClose }) => {
           {errorMsg && <AccessNotice tone="error">{errorMsg}</AccessNotice>}
 
           <form className="gt-dialog-form" onSubmit={handleSubmit}>
-            <AccessField id="modal-password-actual" label="Contraseña actual" type="password"
-              value={passwordActual} onChange={(e) => handleInputChange(setPasswordActual, e.target.value)}
-              disabled={procesando} autoComplete="current-password" placeholder="••••••••" />
-            <AccessField id="modal-nueva-password" label="Nueva contraseña" type="password"
-              value={nuevaPassword} onChange={(e) => handleInputChange(setNuevaPassword, e.target.value)}
-              disabled={procesando} autoComplete="new-password" placeholder="••••••••" maxLength={256} />
-            <AccessField id="modal-confirm-password" label="Confirmar contraseña" type="password"
-              value={confirmarPassword} onChange={(e) => handleInputChange(setConfirmarPassword, e.target.value)}
-              disabled={procesando} autoComplete="new-password" placeholder="••••••••" maxLength={256} />
+            <AccessField
+              id="modal-password-actual"
+              label="Contraseña actual"
+              type="password"
+              value={passwordActual}
+              onChange={(e) => handleInputChange(setPasswordActual, e.target.value)}
+              disabled={procesando}
+              autoComplete="current-password"
+              placeholder="••••••••"
+            />
+            <AccessField
+              id="modal-nueva-password"
+              label="Nueva contraseña"
+              type="password"
+              value={nuevaPassword}
+              onChange={(e) => handleInputChange(setNuevaPassword, e.target.value)}
+              disabled={procesando}
+              autoComplete="new-password"
+              placeholder="••••••••"
+              maxLength={256}
+            />
+            <AccessField
+              id="modal-confirm-password"
+              label="Confirmar contraseña"
+              type="password"
+              value={confirmarPassword}
+              onChange={(e) => handleInputChange(setConfirmarPassword, e.target.value)}
+              disabled={procesando}
+              autoComplete="new-password"
+              placeholder="••••••••"
+              maxLength={256}
+            />
 
             <div className="gt-requirements">
               <p>Requisitos de la nueva contraseña</p>
@@ -186,15 +221,29 @@ export const CambioClaveModal: React.FC<Props> = ({ onClose }) => {
                 <ItemCheck ok={lenOk} text="8 a 128 caracteres" />
                 <ItemCheck ok={tieneLetra} text="Al menos una letra" />
                 <ItemCheck ok={tieneNumero} text="Al menos un número" />
-                <ItemCheck ok={nuevaPassword.length > 0 && noEsUsername} text="Distinta del usuario" />
+                <ItemCheck
+                  ok={nuevaPassword.length > 0 && noEsUsername}
+                  text="Distinta del usuario"
+                />
                 <ItemCheck ok={noEsIgualActual} text="Distinta a la actual" />
                 <ItemCheck ok={coinciden} text="Las contraseñas coinciden" />
               </ul>
             </div>
 
             <div className="gt-actions">
-              <button type="button" className="gt-button" disabled={procesando} onClick={handleIntentarCerrar}>Cancelar</button>
-              <AccessSubmit busy={procesando} busyLabel="Guardando…" disabled={!todoValido || procesando}>
+              <button
+                type="button"
+                className="gt-button"
+                disabled={procesando}
+                onClick={handleIntentarCerrar}
+              >
+                Cancelar
+              </button>
+              <AccessSubmit
+                busy={procesando}
+                busyLabel="Guardando…"
+                disabled={!todoValido || procesando}
+              >
                 Actualizar contraseña
               </AccessSubmit>
             </div>

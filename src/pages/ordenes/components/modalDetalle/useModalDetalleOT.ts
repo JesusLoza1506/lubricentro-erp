@@ -57,10 +57,13 @@ export const useModalDetalleOT = ({
 
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsgState] = useState('');
-  const setErrorMsg = useCallback((mensaje: string) => {
-    setErrorMsgState(mensaje);
-    if (mensaje) notificar(mensaje, 'ERROR');
-  }, [notificar]);
+  const setErrorMsg = useCallback(
+    (mensaje: string) => {
+      setErrorMsgState(mensaje);
+      if (mensaje) notificar(mensaje, 'ERROR');
+    },
+    [notificar]
+  );
 
   const [modoAccion, setModoAccion] = useState<
     | 'NINGUNO'
@@ -137,20 +140,28 @@ export const useModalDetalleOT = ({
     if (!esTerminal) {
       Promise.resolve(ordenesService.listarMecanicos?.())
         .then((res) => setMecanicos(res || []))
-        .catch((err: unknown) => setErrorMsg(mensajeErrorOT(err, 'No se pudo cargar el catálogo de mecánicos.')));
+        .catch((err: unknown) =>
+          setErrorMsg(mensajeErrorOT(err, 'No se pudo cargar el catálogo de mecánicos.'))
+        );
 
       Promise.resolve(ordenesService.listarServicios?.())
         .then((res) => setServiciosCatalogo(res || []))
-        .catch((err: unknown) => setErrorMsg(mensajeErrorOT(err, 'No se pudo cargar el catálogo de servicios.')));
+        .catch((err: unknown) =>
+          setErrorMsg(mensajeErrorOT(err, 'No se pudo cargar el catálogo de servicios.'))
+        );
 
       Promise.resolve(ordenesService.listarProductosInsumo?.())
         .then((res) => setProductosCatalogo(res || []))
-        .catch((err: unknown) => setErrorMsg(mensajeErrorOT(err, 'No se pudo cargar el catálogo de insumos.')));
+        .catch((err: unknown) =>
+          setErrorMsg(mensajeErrorOT(err, 'No se pudo cargar el catálogo de insumos.'))
+        );
 
       if (ordenActual.estado === 'EN_ESPERA') {
         Promise.resolve(ordenesService.obtenerTableroZanjas?.(idUsuario, rol))
           .then((res) => setTablero(res || null))
-          .catch((err: unknown) => setErrorMsg(mensajeErrorOT(err, 'No se pudo consultar la disponibilidad de zanjas.')));
+          .catch((err: unknown) =>
+            setErrorMsg(mensajeErrorOT(err, 'No se pudo consultar la disponibilidad de zanjas.'))
+          );
       }
     }
   }, [esTerminal, ordenActual.estado, idUsuario, rol]);
@@ -159,7 +170,9 @@ export const useModalDetalleOT = ({
     try {
       if (onActualizarOT) await onActualizarOT();
     } catch (err: unknown) {
-      setErrorMsg(`La operación se guardó, pero no se pudo actualizar la vista. ${mensajeErrorOT(err, 'Vuelve a consultar la orden.')}`);
+      setErrorMsg(
+        `La operación se guardó, pero no se pudo actualizar la vista. ${mensajeErrorOT(err, 'Vuelve a consultar la orden.')}`
+      );
     }
   };
 

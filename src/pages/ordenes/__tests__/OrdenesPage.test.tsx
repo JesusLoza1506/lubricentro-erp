@@ -162,11 +162,15 @@ describe('OrdenesPage - Batería Frontend FASE 4 (Vitest React)', () => {
 
     const tablero = within(screen.getByRole('region', { name: 'Zanjas de trabajo' }));
     fireEvent.click(tablero.getByRole('button', { name: 'Abrir atención' }));
-    const detalle = within(await screen.findByRole('dialog', { name: 'Detalle de orden de trabajo' }));
+    const detalle = within(
+      await screen.findByRole('dialog', { name: 'Detalle de orden de trabajo' })
+    );
     expect(detalle.getByRole('heading', { name: 'OT: OT-000101' })).toBeInTheDocument();
     expect(detalle.getByText('ABC-123')).toBeInTheDocument();
     fireEvent.click(detalle.getByRole('button', { name: 'Cerrar detalle' }));
-    expect(screen.queryByRole('dialog', { name: 'Detalle de orden de trabajo' })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('dialog', { name: 'Detalle de orden de trabajo' })
+    ).not.toBeInTheDocument();
   });
 
   it('envía el filtro Mis órdenes cuando el mecánico lo selecciona', async () => {
@@ -176,10 +180,14 @@ describe('OrdenesPage - Batería Frontend FASE 4 (Vitest React)', () => {
     const propias = screen.getByRole('button', { name: 'Mis órdenes' });
     fireEvent.click(propias);
     expect(propias).toHaveAttribute('aria-pressed', 'true');
-    await waitFor(() => expect(ordenesService.listarOrdenesTrabajoPaginado).toHaveBeenLastCalledWith(
-      expect.objectContaining({ pagina: 1, limite: 20, solo_propias: true })
-    ));
-    expect(await screen.findByRole('region', { name: 'Resultados de órdenes' })).toBeInTheDocument();
+    await waitFor(() =>
+      expect(ordenesService.listarOrdenesTrabajoPaginado).toHaveBeenLastCalledWith(
+        expect.objectContaining({ pagina: 1, limite: 20, solo_propias: true })
+      )
+    );
+    expect(
+      await screen.findByRole('region', { name: 'Resultados de órdenes' })
+    ).toBeInTheDocument();
   });
 
   it('consulta el historial y muestra la fecha local registrada para cada orden', async () => {

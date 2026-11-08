@@ -144,7 +144,12 @@ export function VentasPos({
           <button onClick={() => Saplicados((p) => ({ ...p }))}>Reintentar</button>
         </div>
       ) : (
-        <div className="pos-table-wrap" role="region" aria-label="Resultados de ventas" tabIndex={0}>
+        <div
+          className="pos-table-wrap"
+          role="region"
+          aria-label="Resultados de ventas"
+          tabIndex={0}
+        >
           <table aria-busy={cargando}>
             <thead>
               <tr>

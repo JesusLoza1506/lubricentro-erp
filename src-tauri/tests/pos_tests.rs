@@ -619,3 +619,88 @@ fn nota_rechazada_se_reemite_sin_repetir_reintegro_y_con_receptor_original() {
     );
     assert_eq!(n(&c, "SELECT stock_actual FROM productos"), 6);
 }
+
+#[test]
+fn caja_toma_solo_efectivo_aplicado_y_reintegra_venta_previa_en_turno_actual() {
+    use lubricentro_erp_lib::{
+        dto::caja_dto::{AbrirCajaDto, CierreCajaDto, FiltroMovimientosCaja},
+        services::caja_service::CajaService,
+    };
+    let (_d, mut c, producto) = preparar(false);
+    let mut req = solicitud(producto, 4);
+    req.pagos = vec![
+        PagoPos {
+            medio: "EFECTIVO".into(),
+            monto_cent: 5_000,
+            recibido_cent: Some(10_000),
+            referencia: None,
+        },
+        PagoPos {
+            medio: "YAPE".into(),
+            monto_cent: 3_000,
+            recibido_cent: None,
+            referencia: None,
+        },
+    ];
+    let venta = ventas::confirmar(&mut c, 2, None, &req).unwrap();
+    aceptar(&c, venta["id_documento"].as_i64().unwrap());
+    let linea = n(&c, "SELECT id_detalle FROM detalle_venta");
+    let anterior = CajaService::detalle(&c, 2, 1).unwrap();
+    assert_eq!(anterior["resumen"]["efectivo_esperado_cent"], 15_000);
+    assert_eq!(anterior["resumen"]["yape"]["neto_cent"], 3_000);
+    assert_eq!(
+        n(
+            &c,
+            "SELECT vuelto_cent FROM movimientos_caja WHERE medio_pago='EFECTIVO'"
+        ),
+        5_000
+    );
+    CajaService::cerrar_caja(
+        &mut c,
+        2,
+        CierreCajaDto {
+            id_operacion: uuid::Uuid::new_v4().to_string(),
+            id_caja: 1,
+            version_esperada: anterior["turno"]["version"].as_i64().unwrap(),
+            efectivo_contado_cent: 15_000,
+            fondo_siguiente_cent: 10_000,
+            motivo: None,
+        },
+    )
+    .unwrap();
+    let turno = CajaService::abrir_caja(
+        &mut c,
+        2,
+        AbrirCajaDto {
+            id_operacion: uuid::Uuid::new_v4().to_string(),
+            monto_apertura_cent: 10_000,
+        },
+    )
+    .unwrap();
+    let nuevo = turno["id_caja"].as_i64().unwrap();
+    let mut req = retorno(&venta, linea, 1, 0);
+    req.medio = "YAPE".into();
+    devoluciones::devolver(&mut c, 2, Some(1), &req).unwrap();
+    let r = CajaService::detalle(&c, 2, nuevo).unwrap();
+    assert_eq!(r["resumen"]["efectivo_esperado_cent"], 10_000);
+    assert_eq!(r["resumen"]["yape"]["neto_cent"], -2_000);
+    let movs = CajaService::movimientos(
+        &c,
+        2,
+        FiltroMovimientosCaja {
+            id_caja: nuevo,
+            pagina: None,
+            origen: Some("POS".into()),
+            direccion: Some("EGRESO".into()),
+            buscar: None,
+        },
+    )
+    .unwrap();
+    assert_eq!(movs["total"], 1);
+    assert_eq!(movs["datos"][0]["id_venta"], venta["id_venta"]);
+    assert_eq!(movs["datos"][0]["autorizante"], "Admin prueba");
+    assert_eq!(
+        CajaService::detalle(&c, 2, 1).unwrap()["resumen"]["yape"]["neto_cent"],
+        3_000
+    );
+}

@@ -19,14 +19,22 @@ export const FichaVehicularEmptyState: React.FC<Props> = ({
   if (!buscado) {
     return (
       <div className="fv-empty">
-        <div className="fv-empty-icon"><Car size={25} aria-hidden="true" /></div>
+        <div className="fv-empty-icon">
+          <Car size={25} aria-hidden="true" />
+        </div>
         <h3>Busca un vehículo por placa</h3>
-        <p>Consulta sus datos, propietario e historial de mantenimiento desde el buscador superior.</p>
+        <p>
+          Consulta sus datos, propietario e historial de mantenimiento desde el buscador superior.
+        </p>
         <details className="fv-examples">
           <summary>Ejemplos de búsqueda</summary>
           <div>
-            <button onClick={() => onEjecutarBusqueda('ABC-123')} className="fv-button fv-small">ABC-123</button>
-            <button onClick={() => onEjecutarBusqueda('XYZ-789')} className="fv-button fv-small">XYZ-789</button>
+            <button onClick={() => onEjecutarBusqueda('ABC-123')} className="fv-button fv-small">
+              ABC-123
+            </button>
+            <button onClick={() => onEjecutarBusqueda('XYZ-789')} className="fv-button fv-small">
+              XYZ-789
+            </button>
           </div>
         </details>
       </div>
@@ -34,9 +42,13 @@ export const FichaVehicularEmptyState: React.FC<Props> = ({
   }
   return (
     <div className="fv-empty fv-empty-not-found">
-      <div className="fv-empty-icon"><SearchX size={25} aria-hidden="true" /></div>
+      <div className="fv-empty-icon">
+        <SearchX size={25} aria-hidden="true" />
+      </div>
       <h3>Vehículo no encontrado</h3>
-      <p>No existe registro para la placa <strong>{placaBusqueda}</strong>.</p>
+      <p>
+        No existe registro para la placa <strong>{placaBusqueda}</strong>.
+      </p>
       {puedeCrear && (
         <button onClick={onAbrirCrear} className="fv-button fv-primary">
           Registrar {placaBusqueda} Ahora

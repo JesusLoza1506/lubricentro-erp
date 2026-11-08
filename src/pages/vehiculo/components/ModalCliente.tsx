@@ -125,7 +125,13 @@ export const ModalCliente: React.FC<ModalClienteProps> = ({
 
   return (
     <div className="fv-modal-overlay fv-existing-overlay" style={overlayStyle}>
-      <div className="fv-existing-form" role="dialog" aria-modal={true} aria-labelledby="fv-client-title" style={modalBoxStyle}>
+      <div
+        className="fv-existing-form"
+        role="dialog"
+        aria-modal={true}
+        aria-labelledby="fv-client-title"
+        style={modalBoxStyle}
+      >
         <div
           className="fv-existing-title"
           style={{
@@ -135,7 +141,10 @@ export const ModalCliente: React.FC<ModalClienteProps> = ({
             marginBottom: '16px',
           }}
         >
-          <h3 id="fv-client-title" style={{ fontSize: '18px', fontWeight: '800', color: '#F8FAFC', margin: 0 }}>
+          <h3
+            id="fv-client-title"
+            style={{ fontSize: '18px', fontWeight: '800', color: '#F8FAFC', margin: 0 }}
+          >
             {modo === 'CREAR' ? 'Registrar Nuevo Cliente' : 'Editar Información del Cliente'}
           </h3>
           <button
@@ -155,7 +164,11 @@ export const ModalCliente: React.FC<ModalClienteProps> = ({
           </button>
         </div>
 
-        {errorModal && <div className="fv-existing-error" role="alert" style={errorBoxStyle}>⚠️ {errorModal}</div>}
+        {errorModal && (
+          <div className="fv-existing-error" role="alert" style={errorBoxStyle}>
+            ⚠️ {errorModal}
+          </div>
+        )}
 
         <form onSubmit={onSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
           <div>
@@ -174,7 +187,10 @@ export const ModalCliente: React.FC<ModalClienteProps> = ({
             />
           </div>
 
-          <div className="fv-existing-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1.5fr', gap: '10px' }}>
+          <div
+            className="fv-existing-grid"
+            style={{ display: 'grid', gridTemplateColumns: '1fr 1.5fr', gap: '10px' }}
+          >
             <div>
               <label style={labelStyle}>Tipo Documento *</label>
               <select
@@ -209,7 +225,10 @@ export const ModalCliente: React.FC<ModalClienteProps> = ({
             </div>
           </div>
 
-          <div className="fv-existing-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+          <div
+            className="fv-existing-grid"
+            style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}
+          >
             <div>
               <label style={labelStyle}>Teléfono</label>
               <input

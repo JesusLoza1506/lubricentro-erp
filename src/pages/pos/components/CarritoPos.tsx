@@ -42,11 +42,18 @@ export function CarritoPos({
     <aside className="pos-panel pos-cart" aria-labelledby="pos-cart-title">
       <div className="pos-panel-heading">
         <div>
-          <h2 id="pos-cart-title" tabIndex={-1}>Venta actual <span className="pos-count" title="Líneas de venta">{lineas.length}</span></h2>
+          <h2 id="pos-cart-title" tabIndex={-1}>
+            Venta actual{' '}
+            <span className="pos-count" title="Líneas de venta">
+              {lineas.length}
+            </span>
+          </h2>
           <p>
             {otContexto
               ? `${otContexto.codigo} · ${otContexto.placa}`
-              : ot ? `OT #${ot} + adicionales` : 'Venta directa'}
+              : ot
+                ? `OT #${ot} + adicionales`
+                : 'Venta directa'}
           </p>
         </div>
         <button
@@ -58,7 +65,12 @@ export function CarritoPos({
           <Trash2 size={17} />
         </button>
       </div>
-      <div className="pos-cart-scroll" role="region" aria-label="Detalle de la venta actual" tabIndex={0}>
+      <div
+        className="pos-cart-scroll"
+        role="region"
+        aria-label="Detalle de la venta actual"
+        tabIndex={0}
+      >
         <div className="pos-cart-lines">
           {!lineas.length ? (
             <div className="pos-empty">
@@ -164,7 +176,11 @@ export function CarritoPos({
           <span>Total a cobrar</span>
           <strong>{soles(totales?.total_cent ?? 0)}</strong>
         </div>
-        {bloqueoCobro && <p className="pos-checkout-hint" id="pos-checkout-reason">{bloqueoCobro}</p>}
+        {bloqueoCobro && (
+          <p className="pos-checkout-hint" id="pos-checkout-reason">
+            {bloqueoCobro}
+          </p>
+        )}
         <button
           type="button"
           className="pos-primary pos-pay"

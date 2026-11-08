@@ -1,7 +1,12 @@
 import React, { useEffect, useRef } from 'react';
 import { AlertTriangle, CheckCircle2, Copy, ShieldAlert } from 'lucide-react';
 
-export function AccessHeading({ label, title, description, focus = false }: {
+export function AccessHeading({
+  label,
+  title,
+  description,
+  focus = false,
+}: {
   label: string;
   title: string;
   description: string;
@@ -14,13 +19,18 @@ export function AccessHeading({ label, title, description, focus = false }: {
   return (
     <header className="gloria-access-header">
       <p className="gloria-access-kicker">{label}</p>
-      <h2 ref={heading} tabIndex={focus ? -1 : undefined}>{title}</h2>
+      <h2 ref={heading} tabIndex={focus ? -1 : undefined}>
+        {title}
+      </h2>
       <p>{description}</p>
     </header>
   );
 }
 
-export function AccessNotice({ tone, children }: {
+export function AccessNotice({
+  tone,
+  children,
+}: {
   tone: 'warning' | 'error' | 'success';
   children: React.ReactNode;
 }) {
@@ -33,7 +43,14 @@ export function AccessNotice({ tone, children }: {
   );
 }
 
-export function AccessField({ label, inputRef, icon, action, hint, ...input }: React.InputHTMLAttributes<HTMLInputElement> & {
+export function AccessField({
+  label,
+  inputRef,
+  icon,
+  action,
+  hint,
+  ...input
+}: React.InputHTMLAttributes<HTMLInputElement> & {
   id: string;
   label: string;
   inputRef?: React.Ref<HTMLInputElement>;
@@ -46,31 +63,59 @@ export function AccessField({ label, inputRef, icon, action, hint, ...input }: R
     <div className="gt-field">
       <label htmlFor={input.id}>{label}</label>
       <div className="gt-field-wrap">
-        {icon && <span className="gt-field-icon" aria-hidden="true">{icon}</span>}
-        <input {...input} ref={inputRef} aria-describedby={hintId}
-          className={`gt-input${icon ? ' gt-input--leading' : ''}${action ? ' gt-input--trailing' : ''}`} />
+        {icon && (
+          <span className="gt-field-icon" aria-hidden="true">
+            {icon}
+          </span>
+        )}
+        <input
+          {...input}
+          ref={inputRef}
+          aria-describedby={hintId}
+          className={`gt-input${icon ? ' gt-input--leading' : ''}${action ? ' gt-input--trailing' : ''}`}
+        />
         {action}
       </div>
-      {hint && <p className="gt-field-hint" id={hintId}>{hint}</p>}
+      {hint && (
+        <p className="gt-field-hint" id={hintId}>
+          {hint}
+        </p>
+      )}
     </div>
   );
 }
 
-export function AccessSubmit({ busy, busyLabel, children, disabled = busy }: {
+export function AccessSubmit({
+  busy,
+  busyLabel,
+  children,
+  disabled = busy,
+}: {
   busy: boolean;
   busyLabel: string;
   children: React.ReactNode;
   disabled?: boolean;
 }) {
   return (
-    <button type="submit" className="gt-button gt-button--primary" disabled={disabled} aria-busy={busy}>
+    <button
+      type="submit"
+      className="gt-button gt-button--primary"
+      disabled={disabled}
+      aria-busy={busy}
+    >
       {busy && <span className="gt-spinner" aria-hidden="true" />}
       {busy ? busyLabel : children}
     </button>
   );
 }
 
-export function RecoveryCode({ code, copied, onCopy, onContinue, confirmation }: {
+export function RecoveryCode({
+  code,
+  copied,
+  onCopy,
+  onContinue,
+  confirmation,
+}: {
   code: string;
   copied: boolean;
   onCopy: (code: string) => void;
@@ -79,19 +124,33 @@ export function RecoveryCode({ code, copied, onCopy, onContinue, confirmation }:
 }) {
   return (
     <div className="gloria-code">
-      <code className="gloria-code-value" tabIndex={0} aria-label="Código de recuperación">{code}</code>
+      <code className="gloria-code-value" tabIndex={0} aria-label="Código de recuperación">
+        {code}
+      </code>
       <button type="button" className="gt-button" data-copied={copied} onClick={() => onCopy(code)}>
-        {copied ? <CheckCircle2 size={16} aria-hidden="true" /> : <Copy size={16} aria-hidden="true" />}
+        {copied ? (
+          <CheckCircle2 size={16} aria-hidden="true" />
+        ) : (
+          <Copy size={16} aria-hidden="true" />
+        )}
         <span role="status">{copied ? 'Copiado' : 'Copiar código'}</span>
       </button>
       {confirmation && (
         <label className="gloria-code-confirm">
-          <input type="checkbox" checked={confirmation.checked} onChange={(e) => confirmation.onChange(e.target.checked)} />
+          <input
+            type="checkbox"
+            checked={confirmation.checked}
+            onChange={(e) => confirmation.onChange(e.target.checked)}
+          />
           He guardado el código en un lugar seguro.
         </label>
       )}
-      <button type="button" className="gt-button gt-button--primary"
-        disabled={confirmation ? !confirmation.checked : false} onClick={onContinue}>
+      <button
+        type="button"
+        className="gt-button gt-button--primary"
+        disabled={confirmation ? !confirmation.checked : false}
+        onClick={onContinue}
+      >
         Ir a iniciar sesión
       </button>
     </div>

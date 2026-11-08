@@ -36,10 +36,13 @@ export const LoginPage: React.FC = () => {
   const copiaTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const copiaIntentoRef = useRef(0);
 
-  useEffect(() => () => {
-    copiaIntentoRef.current += 1;
-    if (copiaTimerRef.current !== null) clearTimeout(copiaTimerRef.current);
-  }, []);
+  useEffect(
+    () => () => {
+      copiaIntentoRef.current += 1;
+      if (copiaTimerRef.current !== null) clearTimeout(copiaTimerRef.current);
+    },
+    []
+  );
 
   const [modo, setModo] = useState<ModoPantalla>('LOGIN');
   const [mostrarPassword, setMostrarPassword] = useState(false);
@@ -201,8 +204,7 @@ export const LoginPage: React.FC = () => {
     } catch (err: any) {
       setNuevaClaveOblig('');
       setConfirmClaveOblig('');
-      const mensaje =
-        mensajeErrorAuth(err, 'Error al actualizar la contraseña.');
+      const mensaje = mensajeErrorAuth(err, 'Error al actualizar la contraseña.');
       setErrorMsg(mensaje);
     } finally {
       setProcesando(false);
@@ -251,8 +253,7 @@ export const LoginPage: React.FC = () => {
     } catch (err: any) {
       setInstPassword('');
       setInstConfirmPassword('');
-      const mensaje =
-        mensajeErrorAuth(err, 'Error al realizar la instalación inicial.');
+      const mensaje = mensajeErrorAuth(err, 'Error al realizar la instalación inicial.');
       setErrorMsg(mensaje);
     } finally {
       setProcesando(false);
@@ -340,7 +341,9 @@ export const LoginPage: React.FC = () => {
       <main className="gloria-access" aria-label="Acceso al ERP">
         <div className="gloria-access-card">
           <div className="gloria-access-body">
-            {!esProdBD && <span className="gloria-environment">Entorno: {ambienteActual.toUpperCase()}</span>}
+            {!esProdBD && (
+              <span className="gloria-environment">Entorno: {ambienteActual.toUpperCase()}</span>
+            )}
             {mensajeInactividad && <AccessNotice tone="warning">{mensajeInactividad}</AccessNotice>}
             {errorMsg && <AccessNotice tone="error">{errorMsg}</AccessNotice>}
             {exitoMsg && modo !== 'LOGIN' && <AccessNotice tone="success">{exitoMsg}</AccessNotice>}

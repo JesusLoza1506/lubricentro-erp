@@ -55,7 +55,8 @@ export const TablaServiciosOT: React.FC<TablaServiciosOTProps> = ({
               borderRadius: '4px',
               fontSize: '12px',
               cursor: 'pointer',
-            }} data-tone="primary"
+            }}
+            data-tone="primary"
           >
             + Agregar Servicio
           </button>
@@ -71,7 +72,9 @@ export const TablaServiciosOT: React.FC<TablaServiciosOTProps> = ({
             marginBottom: '12px',
           }}
         >
-          <label style={{ fontSize: '12px', color: 'var(--gt-muted, #94A3B8)' }}>Seleccionar Servicio</label>
+          <label style={{ fontSize: '12px', color: 'var(--gt-muted, #94A3B8)' }}>
+            Seleccionar Servicio
+          </label>
           <select
             value={idServicioSel}
             onChange={(e) => setIdServicioSel(Number(e.target.value))}
@@ -127,7 +130,8 @@ export const TablaServiciosOT: React.FC<TablaServiciosOTProps> = ({
                 color: '#FFF',
                 border: 'none',
                 borderRadius: '4px',
-              }} data-tone="primary"
+              }}
+              data-tone="primary"
             >
               Guardar Servicio
             </button>
@@ -144,7 +148,9 @@ export const TablaServiciosOT: React.FC<TablaServiciosOTProps> = ({
             marginBottom: '12px',
           }}
         >
-          <label style={{ fontSize: '12px', color: 'var(--gt-muted, #94A3B8)' }}>Nueva Cantidad de Servicio</label>
+          <label style={{ fontSize: '12px', color: 'var(--gt-muted, #94A3B8)' }}>
+            Nueva Cantidad de Servicio
+          </label>
           <input
             type="number"
             min={1}
@@ -180,7 +186,8 @@ export const TablaServiciosOT: React.FC<TablaServiciosOTProps> = ({
                 color: '#FFF',
                 border: 'none',
                 borderRadius: '4px',
-              }} data-tone="secondary"
+              }}
+              data-tone="secondary"
             >
               Actualizar Cantidad
             </button>
@@ -188,86 +195,100 @@ export const TablaServiciosOT: React.FC<TablaServiciosOTProps> = ({
         </div>
       )}
 
-      <div className="ot-detail-table-scroll" role="region" aria-label="Servicios aplicados" tabIndex={0}><table
-        style={{
-          width: '100%',
-          borderCollapse: 'collapse',
-          marginBottom: '16px',
-          fontSize: '13px',
-        }}
+      <div
+        className="ot-detail-table-scroll"
+        role="region"
+        aria-label="Servicios aplicados"
+        tabIndex={0}
       >
-        <thead>
-          <tr style={{ borderBottom: '1px solid var(--gt-border, #2e3c4e)', color: 'var(--gt-muted, #94A3B8)' }}>
-            <th style={{ textAlign: 'left', padding: '6px' }}>Servicio</th>
-            <th style={{ padding: '6px' }}>Cant.</th>
-            <th style={{ padding: '6px' }}>P. Unit</th>
-            <th style={{ padding: '6px' }}>Subtotal</th>
-            {puedeAgregarServicios && <th style={{ padding: '6px' }}>Acciones</th>}
-          </tr>
-        </thead>
-        <tbody>
-          {ordenActual.servicios && ordenActual.servicios.length > 0 ? (
-            ordenActual.servicios.map((s) => (
-              <tr key={s.id_detalle} style={{ borderBottom: '1px solid #0F172A' }}>
-                <td style={{ padding: '6px' }}>{s.nombre_snapshot}</td>
-                <td style={{ padding: '6px', textAlign: 'center' }}>{s.cantidad}</td>
-                <td style={{ padding: '6px', textAlign: 'right' }}>
-                  S/ {(s.precio_unitario_soles ?? 0).toFixed(2)}
-                </td>
-                <td style={{ padding: '6px', textAlign: 'right', fontWeight: 'bold' }}>
-                  S/ {(s.subtotal_soles ?? 0).toFixed(2)}
-                </td>
-                {puedeAgregarServicios && (
-                  <td style={{ padding: '6px', textAlign: 'center' }}>
-                    <button
-                      onClick={() => {
-                        setIdDetalleServicioEdit(s.id_detalle);
-                        setCantServicioSel(s.cantidad);
-                        setModoAccion('EDITAR_SERVICIO');
-                      }}
-                      style={{
-                        padding: '2px 6px',
-                        backgroundColor: '#0284C7',
-                        color: '#FFF',
-                        border: 'none',
-                        borderRadius: '4px',
-                        cursor: 'pointer',
-                        fontSize: '11px',
-                        marginRight: '4px',
-                      }} data-tone="secondary"
-                    >
-                      Editar
-                    </button>
-                    <button
-                      onClick={() => onEliminarServicio(s.id_detalle)}
-                      style={{
-                        padding: '2px 6px',
-                        backgroundColor: '#DC2626',
-                        color: '#FFF',
-                        border: 'none',
-                        borderRadius: '4px',
-                        cursor: 'pointer',
-                        fontSize: '11px',
-                      }} data-tone="danger"
-                    >
-                      Retirar
-                    </button>
-                  </td>
-                )}
-              </tr>
-            ))
-          ) : (
-            <tr>
-              <td
-                colSpan={puedeAgregarServicios ? 5 : 4}
-                style={{ padding: '8px', textAlign: 'center', color: 'var(--gt-muted, #94A3B8)' }}
-              >
-                Sin servicios registrados
-              </td>
+        <table
+          style={{
+            width: '100%',
+            borderCollapse: 'collapse',
+            marginBottom: '16px',
+            fontSize: '13px',
+          }}
+        >
+          <thead>
+            <tr
+              style={{
+                borderBottom: '1px solid var(--gt-border, #2e3c4e)',
+                color: 'var(--gt-muted, #94A3B8)',
+              }}
+            >
+              <th style={{ textAlign: 'left', padding: '6px' }}>Servicio</th>
+              <th style={{ padding: '6px' }}>Cant.</th>
+              <th style={{ padding: '6px' }}>P. Unit</th>
+              <th style={{ padding: '6px' }}>Subtotal</th>
+              {puedeAgregarServicios && <th style={{ padding: '6px' }}>Acciones</th>}
             </tr>
-          )}
-        </tbody>
-      </table></div>
+          </thead>
+          <tbody>
+            {ordenActual.servicios && ordenActual.servicios.length > 0 ? (
+              ordenActual.servicios.map((s) => (
+                <tr key={s.id_detalle} style={{ borderBottom: '1px solid #0F172A' }}>
+                  <td style={{ padding: '6px' }}>{s.nombre_snapshot}</td>
+                  <td style={{ padding: '6px', textAlign: 'center' }}>{s.cantidad}</td>
+                  <td style={{ padding: '6px', textAlign: 'right' }}>
+                    S/ {(s.precio_unitario_soles ?? 0).toFixed(2)}
+                  </td>
+                  <td style={{ padding: '6px', textAlign: 'right', fontWeight: 'bold' }}>
+                    S/ {(s.subtotal_soles ?? 0).toFixed(2)}
+                  </td>
+                  {puedeAgregarServicios && (
+                    <td style={{ padding: '6px', textAlign: 'center' }}>
+                      <button
+                        onClick={() => {
+                          setIdDetalleServicioEdit(s.id_detalle);
+                          setCantServicioSel(s.cantidad);
+                          setModoAccion('EDITAR_SERVICIO');
+                        }}
+                        style={{
+                          padding: '2px 6px',
+                          backgroundColor: '#0284C7',
+                          color: '#FFF',
+                          border: 'none',
+                          borderRadius: '4px',
+                          cursor: 'pointer',
+                          fontSize: '11px',
+                          marginRight: '4px',
+                        }}
+                        data-tone="secondary"
+                      >
+                        Editar
+                      </button>
+                      <button
+                        onClick={() => onEliminarServicio(s.id_detalle)}
+                        style={{
+                          padding: '2px 6px',
+                          backgroundColor: '#DC2626',
+                          color: '#FFF',
+                          border: 'none',
+                          borderRadius: '4px',
+                          cursor: 'pointer',
+                          fontSize: '11px',
+                        }}
+                        data-tone="danger"
+                      >
+                        Retirar
+                      </button>
+                    </td>
+                  )}
+                </tr>
+              ))
+            ) : (
+              <tr>
+                <td
+                  colSpan={puedeAgregarServicios ? 5 : 4}
+                  style={{ padding: '8px', textAlign: 'center', color: 'var(--gt-muted, #94A3B8)' }}
+                >
+                  Sin servicios registrados
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
     </section>
   );
 };

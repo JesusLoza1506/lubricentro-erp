@@ -33,11 +33,24 @@ afterEach(() => {
 
 describe('Dashboard de inicio', () => {
   it('distingue datos cargando de métricas reales y abre el módulo elegido', async () => {
-    vi.mocked(useAuth).mockReturnValue(authDePrueba({
-      tienePermiso: permisos('BACKUP', 'COLA_SUNAT', 'OT', 'POS', 'FICHA_VEHICULAR', 'INVENTARIO'),
-    }));
+    vi.mocked(useAuth).mockReturnValue(
+      authDePrueba({
+        tienePermiso: permisos(
+          'BACKUP',
+          'COLA_SUNAT',
+          'OT',
+          'POS',
+          'FICHA_VEHICULAR',
+          'INVENTARIO'
+        ),
+      })
+    );
     let resolver!: (dto: DashboardDTO) => void;
-    vi.mocked(invoke).mockReturnValueOnce(new Promise<DashboardDTO>((resolve) => { resolver = resolve; }));
+    vi.mocked(invoke).mockReturnValueOnce(
+      new Promise<DashboardDTO>((resolve) => {
+        resolver = resolve;
+      })
+    );
     const navegar = vi.fn();
     render(<DashboardPage setModuloActual={navegar} />);
 
@@ -58,10 +71,12 @@ describe('Dashboard de inicio', () => {
   });
 
   it('un mecánico solo ve sus órdenes y los accesos permitidos', async () => {
-    vi.mocked(useAuth).mockReturnValue(authDePrueba({
-      usuario: sesionDePrueba({ id_usuario: 3, rol: 'MECANICO' }),
-      tienePermiso: permisos('OT'),
-    }));
+    vi.mocked(useAuth).mockReturnValue(
+      authDePrueba({
+        usuario: sesionDePrueba({ id_usuario: 3, rol: 'MECANICO' }),
+        tienePermiso: permisos('OT'),
+      })
+    );
     const navegar = vi.fn();
     render(<DashboardPage setModuloActual={navegar} />);
     const ordenes = within(screen.getByRole('region', { name: 'Mis órdenes activas' }));
@@ -78,9 +93,11 @@ describe('Dashboard de inicio', () => {
   it('si falla la consulta muestra datos no disponibles sin bloquear los accesos', async () => {
     vi.spyOn(console, 'error').mockImplementation(() => {});
     vi.mocked(invoke).mockRejectedValueOnce(new Error('Sin respuesta'));
-    vi.mocked(useAuth).mockReturnValue(authDePrueba({
-      tienePermiso: permisos('BACKUP', 'COLA_SUNAT', 'INVENTARIO'),
-    }));
+    vi.mocked(useAuth).mockReturnValue(
+      authDePrueba({
+        tienePermiso: permisos('BACKUP', 'COLA_SUNAT', 'INVENTARIO'),
+      })
+    );
     const navegar = vi.fn();
     render(<DashboardPage setModuloActual={navegar} />);
     const resumen = within(screen.getByRole('region', { name: 'Resumen de hoy' }));

@@ -24,13 +24,18 @@ pub fn visible(conn: &Connection, actor: i64, id: i64) -> Result<String, AppErro
     Ok(rol)
 }
 pub fn inicio(conn: &Connection, actor: i64) -> Result<Value, AppError> {
-    validar_rol(conn, actor)?;
+    let rol = validar_rol(conn, actor)?;
     let c = configuracion(conn)?;
-    let caja=filas(conn,"SELECT json_object('id',id_caja,'codigo',codigo_caja,'titular',u.nombre_completo,'propia',c.id_usuario=?1,'efectivo_cent',monto_apertura_cent+coalesce((SELECT sum(signo*monto_cent) FROM movimientos_caja WHERE id_caja=c.id_caja AND medio_pago='EFECTIVO'),0)) FROM caja_chica c JOIN usuarios u ON u.id_usuario=c.id_usuario WHERE estado='ABIERTA'",&[&actor])?;
+    let caja=filas(conn,"SELECT json_object('id',id_caja,'codigo',codigo_caja,'titular',u.nombre_completo,'propia',c.id_usuario=?1,'efectivo_cent',monto_apertura_cent+coalesce((SELECT sum(signo*monto_cent) FROM movimientos_caja WHERE id_caja=c.id_caja AND medio_pago='EFECTIVO'),0)) FROM caja_chica c JOIN usuarios u ON u.id_usuario=c.id_usuario WHERE estado='ABIERTA' AND (c.id_usuario=?1 OR ?2='ADMINISTRADOR')",&[&actor,&rol])?;
+    let caja_ocupada: bool = conn.query_row(
+        "SELECT EXISTS(SELECT 1 FROM caja_chica WHERE estado='ABIERTA')",
+        [],
+        |r| r.get(0),
+    )?;
     let series=filas(conn,"SELECT json_object('id',id_serie,'tipo',tipo_comprobante,'serie',serie) FROM series_comprobante WHERE activa=1 AND requiere_conciliacion=0 AND ambiente=?1",&[&c["ambiente"].as_str().unwrap_or("")])?;
     let hoy: String = conn.query_row("SELECT date('now','-5 hours')", [], |r| r.get(0))?;
     Ok(
-        json!({"ambiente":c["ambiente"],"empresa":c["razon_social"],"configurada":super::validar_config(&c).is_ok(),"caja":caja.first(),"series":series,"hoy":hoy,"caja_propia":caja_propia(conn,actor).ok()}),
+        json!({"ambiente":c["ambiente"],"empresa":c["razon_social"],"configurada":super::validar_config(&c).is_ok(),"caja":caja.first(),"caja_ocupada":caja_ocupada,"series":series,"hoy":hoy,"caja_propia":caja_propia(conn,actor).ok()}),
     )
 }
 pub fn catalogo(

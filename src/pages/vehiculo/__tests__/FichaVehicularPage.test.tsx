@@ -95,7 +95,9 @@ describe('FichaVehicularPage - Pruebas de Integración Frontend (Punto 15)', () 
 
     let resolverFicha!: (ficha: FichaVehicularCompletaDTO) => void;
     vi.mocked(vehiculoService.obtenerFichaVehicularCompleta).mockReturnValueOnce(
-      new Promise((resolve) => { resolverFicha = resolve; })
+      new Promise((resolve) => {
+        resolverFicha = resolve;
+      })
     );
 
     render(<FichaVehicularPage />);
@@ -110,7 +112,6 @@ describe('FichaVehicularPage - Pruebas de Integración Frontend (Punto 15)', () 
     expect(screen.queryByText('Juan Pérez (Propietario Actual)')).toBeNull();
     await act(async () => resolverFicha(mockFicha));
     expect(screen.queryByRole('status')).toBeNull();
-
 
     await waitFor(() => {
       expect(screen.getByText('Juan Pérez (Propietario Actual)')).toBeDefined();
@@ -235,36 +236,47 @@ describe('FichaVehicularPage - Pruebas de Integración Frontend (Punto 15)', () 
     vi.mocked(vehiculoService.obtenerProximosCambiosAceite)
       .mockRejectedValueOnce(new Error('Consulta interrumpida'))
       .mockResolvedValueOnce({
-        items: [{
-          id_vehiculo: 1,
-          placa: 'ABC123',
-          kilometraje_actual: 49000,
-          id_cliente: 1,
-          nombre_razon_social: 'Juan Pérez',
-          id_ot: 1,
-          fecha_servicio: '2026-06-01T11:30:00Z',
-          km_proximo: 50000,
-          causa: 'POR_KM',
-        }],
+        items: [
+          {
+            id_vehiculo: 1,
+            placa: 'ABC123',
+            kilometraje_actual: 49000,
+            id_cliente: 1,
+            nombre_razon_social: 'Juan Pérez',
+            id_ot: 1,
+            fecha_servicio: '2026-06-01T11:30:00Z',
+            km_proximo: 50000,
+            causa: 'POR_KM',
+          },
+        ],
         total_registros: 1,
         pagina_actual: 1,
         total_paginas: 1,
       });
     vi.mocked(vehiculoService.obtenerFichaVehicularCompleta).mockResolvedValueOnce({
       vehiculo: {
-        id_vehiculo: 1, id_cliente: 1, placa: 'ABC123', marca: 'Toyota', modelo: 'Yaris',
-        kilometraje_actual: 49000, activo: 1,
+        id_vehiculo: 1,
+        id_cliente: 1,
+        placa: 'ABC123',
+        marca: 'Toyota',
+        modelo: 'Yaris',
+        kilometraje_actual: 49000,
+        activo: 1,
       },
       historial: { items: [], total_registros: 0, pagina_actual: 1, total_paginas: 1 },
     });
 
     render(<FichaVehicularPage />);
     fireEvent.click(screen.getByRole('button', { name: 'Próximos cambios de aceite' }));
-    expect(within(await screen.findByRole('alert')).getByText('Consulta interrumpida')).toBeDefined();
+    expect(
+      within(await screen.findByRole('alert')).getByText('Consulta interrumpida')
+    ).toBeDefined();
     fireEvent.click(screen.getByRole('button', { name: 'Reintentar' }));
     fireEvent.click(await screen.findByRole('button', { name: 'Ver ficha vehicular' }));
     expect(screen.getByRole('button', { name: 'Ficha del vehículo', pressed: true })).toBeDefined();
-    await waitFor(() => expect(vehiculoService.obtenerFichaVehicularCompleta).toHaveBeenCalledWith('ABC123', 1, 20));
+    await waitFor(() =>
+      expect(vehiculoService.obtenerFichaVehicularCompleta).toHaveBeenCalledWith('ABC123', 1, 20)
+    );
     expect(await screen.findByText('Toyota Yaris')).toBeDefined();
   });
 });

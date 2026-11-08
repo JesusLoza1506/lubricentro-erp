@@ -39,7 +39,9 @@ export function CatalogoPos({ onAgregar }: { onAgregar: (p: ProductoPos) => void
     <section className="pos-panel pos-catalog" aria-labelledby="pos-catalog-title">
       <div className="pos-panel-heading">
         <div>
-          <h2 id="pos-catalog-title" tabIndex={-1}>Productos y servicios</h2>
+          <h2 id="pos-catalog-title" tabIndex={-1}>
+            Productos y servicios
+          </h2>
           <p>Busca por código o nombre y agrega a la venta.</p>
         </div>
         <button
@@ -83,14 +85,22 @@ export function CatalogoPos({ onAgregar }: { onAgregar: (p: ProductoPos) => void
         </div>
       ) : (
         <>
-          <div className="pos-table-wrap" role="region" tabIndex={0} aria-label="Resultados del catálogo" aria-busy={cargando}>
+          <div
+            className="pos-table-wrap"
+            role="region"
+            tabIndex={0}
+            aria-label="Resultados del catálogo"
+            aria-busy={cargando}
+          >
             <table>
               <thead>
                 <tr>
                   <th>Producto / servicio</th>
                   <th>Disponible</th>
                   <th className="pos-money">Precio</th>
-                  <th scope="col"><span className="gt-sr-only">Agregar</span></th>
+                  <th scope="col">
+                    <span className="gt-sr-only">Agregar</span>
+                  </th>
                 </tr>
               </thead>
               <tbody>

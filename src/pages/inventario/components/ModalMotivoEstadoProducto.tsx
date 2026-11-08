@@ -87,7 +87,8 @@ export const ModalMotivoEstadoProducto: React.FC<Props> = ({
         }}
       >
         <header className="inv-dialog-header">
-          <div><span className="inv-dialog-kicker">Estado del catálogo</span>
+          <div>
+            <span className="inv-dialog-kicker">Estado del catálogo</span>
             <h3 id="estado-producto-titulo">
               {accion === 'DESACTIVAR' ? 'Dar de Baja Producto' : 'Reactivar Producto'}
             </h3>
@@ -115,9 +116,15 @@ export const ModalMotivoEstadoProducto: React.FC<Props> = ({
           </p>
         )}
         <footer className="inv-form-footer inv-confirm-footer">
-          <button type="button" className="inv-button" onClick={onCancelar} disabled={guardando}>Cancelar</button>
-          <button type="submit" disabled={guardando} aria-busy={guardando}
-            className={`inv-button ${accion === 'DESACTIVAR' ? 'inv-danger' : 'inv-primary'}`}>
+          <button type="button" className="inv-button" onClick={onCancelar} disabled={guardando}>
+            Cancelar
+          </button>
+          <button
+            type="submit"
+            disabled={guardando}
+            aria-busy={guardando}
+            className={`inv-button ${accion === 'DESACTIVAR' ? 'inv-danger' : 'inv-primary'}`}
+          >
             {guardando ? 'Guardando…' : 'Confirmar'}
           </button>
         </footer>

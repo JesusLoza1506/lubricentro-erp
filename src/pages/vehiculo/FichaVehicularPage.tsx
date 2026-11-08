@@ -428,16 +428,25 @@ export const FichaVehicularPage: React.FC<FichaVehicularPageProps> = ({
           <h2>Ficha vehicular</h2>
           <p>Consulta vehículos y su historial de mantenimiento.</p>
         </div>
-        <span className="fv-hero-icon" aria-hidden="true"><Car size={24} /></span>
+        <span className="fv-hero-icon" aria-hidden="true">
+          <Car size={24} />
+        </span>
       </header>
 
       <nav className="fv-tabs" aria-label="Vistas de Ficha Vehicular">
-        <button type="button" aria-pressed={pestanaActiva === 'FICHA'} onClick={() => setPestanaActiva('FICHA')}>
+        <button
+          type="button"
+          aria-pressed={pestanaActiva === 'FICHA'}
+          onClick={() => setPestanaActiva('FICHA')}
+        >
           <Car size={17} aria-hidden="true" /> Ficha del vehículo
         </button>
         {!esMecanico && (
-          <button type="button" aria-pressed={pestanaActiva === 'PROXIMOS_CAMBIOS'}
-            onClick={() => setPestanaActiva('PROXIMOS_CAMBIOS')}>
+          <button
+            type="button"
+            aria-pressed={pestanaActiva === 'PROXIMOS_CAMBIOS'}
+            onClick={() => setPestanaActiva('PROXIMOS_CAMBIOS')}
+          >
             <Bell size={17} aria-hidden="true" /> Próximos cambios de aceite
           </button>
         )}
@@ -492,7 +501,8 @@ export const FichaVehicularPage: React.FC<FichaVehicularPageProps> = ({
 
             {!vehiculo && cargando && !errorSistema && (
               <div className="fv-list-empty fv-loading" role="status">
-                <span className="gt-spinner" aria-hidden="true" /> Consultando la ficha del vehículo…
+                <span className="gt-spinner" aria-hidden="true" /> Consultando la ficha del
+                vehículo…
               </div>
             )}
 
@@ -520,7 +530,11 @@ export const FichaVehicularPage: React.FC<FichaVehicularPageProps> = ({
                     <>
                       {puedeCrearOT && (
                         <div className="fv-create-order">
-                          <button type="button" onClick={handleAbrirCrearOTDirecta} className="fv-button fv-primary">
+                          <button
+                            type="button"
+                            onClick={handleAbrirCrearOTDirecta}
+                            className="fv-button fv-primary"
+                          >
                             <Plus size={16} aria-hidden="true" /> Crear OT
                           </button>
                         </div>

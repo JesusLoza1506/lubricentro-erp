@@ -21,14 +21,41 @@ interface DashboardPageProps {
 }
 
 const accesos = [
-  { permiso: 'OT', destino: 'taller', icono: Wrench, titulo: 'Órdenes de Trabajo',
-    descripcion: 'Revisa las zanjas y las órdenes del taller.' },
-  { permiso: 'POS', destino: 'pos', icono: ShoppingCart, titulo: 'Punto de Venta',
-    descripcion: 'Registra ventas y consulta comprobantes.' },
-  { permiso: 'FICHA_VEHICULAR', destino: 'ficha_vehicular', icono: Car, titulo: 'Ficha Vehicular',
-    descripcion: 'Busca por placa y consulta el historial del vehículo.' },
-  { permiso: 'INVENTARIO', destino: 'inventario', icono: Package, titulo: 'Inventario y Stock',
-    descripcion: 'Consulta productos y existencias.' },
+  {
+    permiso: 'OT',
+    destino: 'taller',
+    icono: Wrench,
+    titulo: 'Órdenes de Trabajo',
+    descripcion: 'Revisa las zanjas y las órdenes del taller.',
+  },
+  {
+    permiso: 'POS',
+    destino: 'pos',
+    icono: ShoppingCart,
+    titulo: 'Punto de Venta',
+    descripcion: 'Registra ventas y consulta comprobantes.',
+  },
+  {
+    permiso: 'FICHA_VEHICULAR',
+    destino: 'ficha_vehicular',
+    icono: Car,
+    titulo: 'Ficha Vehicular',
+    descripcion: 'Busca por placa y consulta el historial del vehículo.',
+  },
+  {
+    permiso: 'INVENTARIO',
+    destino: 'inventario',
+    icono: Package,
+    titulo: 'Inventario y Stock',
+    descripcion: 'Consulta productos y existencias.',
+  },
+  {
+    permiso: 'CAJA',
+    destino: 'caja',
+    icono: Wallet,
+    titulo: 'Caja Chica',
+    descripcion: 'Abre tu turno, consulta movimientos y guarda el arqueo.',
+  },
 ] as const;
 
 interface IndicadorProps {
@@ -105,22 +132,46 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ setModuloActual })
           <section className="inicio-seccion" aria-labelledby="inicio-hoy-titulo">
             <h3 id="inicio-hoy-titulo">Resumen de hoy</h3>
             <dl className="inicio-indicadores" aria-busy={cargandoMetrics}>
-              <Indicador titulo="Ventas del día" icono={Receipt}
+              <Indicador
+                titulo="Ventas del día"
+                icono={Receipt}
                 valor={valor(`S/ ${(metrics?.ventas_del_dia ?? 0).toFixed(2)}`)}
-                detalle={detalle(metrics?.comprobantes_emitidos === 1
-                  ? '1 comprobante emitido'
-                  : `${metrics?.comprobantes_emitidos ?? 0} comprobantes emitidos`)} />
-              <Indicador titulo="Órdenes activas" icono={ClipboardList}
-                valor={valor(String(ots))} detalle={detalle('Órdenes en taller')} />
-              <Indicador titulo="Stock crítico" icono={Package}
+                detalle={detalle(
+                  metrics?.comprobantes_emitidos === 1
+                    ? '1 comprobante emitido'
+                    : `${metrics?.comprobantes_emitidos ?? 0} comprobantes emitidos`
+                )}
+              />
+              <Indicador
+                titulo="Órdenes activas"
+                icono={ClipboardList}
+                valor={valor(String(ots))}
+                detalle={detalle('Órdenes en taller')}
+              />
+              <Indicador
+                titulo="Stock crítico"
+                icono={Package}
                 valor={valor(String(stockCritico))}
-                detalle={detalle(stockCritico === 1 ? '1 producto en umbral mínimo' : 'Productos en umbral mínimo')}
-                tono={!cargandoMetrics && stockCritico > 0 ? 'aviso' : undefined} />
-              <Indicador titulo="Estado de caja" icono={Wallet} valor={valor(estadoCaja || '—')}
-                detalle={detalle(cajaNormalizada === 'abierta' ? 'Turno en curso'
-                  : cajaNormalizada === 'cerrada' ? 'Sin turno abierto'
-                    : estadoCaja ? 'Estado registrado' : 'Dato no disponible')}
-                tono={!cargandoMetrics && cajaNormalizada === 'abierta' ? 'exito' : undefined} />
+                detalle={detalle(
+                  stockCritico === 1 ? '1 producto en umbral mínimo' : 'Productos en umbral mínimo'
+                )}
+                tono={!cargandoMetrics && stockCritico > 0 ? 'aviso' : undefined}
+              />
+              <Indicador
+                titulo="Estado de caja"
+                icono={Wallet}
+                valor={valor(estadoCaja || '—')}
+                detalle={detalle(
+                  cajaNormalizada === 'abierta'
+                    ? 'Turno en curso'
+                    : cajaNormalizada === 'cerrada'
+                      ? 'Sin turno abierto'
+                      : estadoCaja
+                        ? 'Estado registrado'
+                        : 'Dato no disponible'
+                )}
+                tono={!cargandoMetrics && cajaNormalizada === 'abierta' ? 'exito' : undefined}
+              />
             </dl>
           </section>
         )}
@@ -129,11 +180,15 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ setModuloActual })
           <section className="inicio-seccion" aria-labelledby="inicio-ordenes-titulo">
             <h3 id="inicio-ordenes-titulo">Mis órdenes activas</h3>
             <div className="inicio-ordenes" aria-busy={cargandoMetrics}>
-              <span className="inicio-icono"><Clock size={20} aria-hidden="true" /></span>
+              <span className="inicio-icono">
+                <Clock size={20} aria-hidden="true" />
+              </span>
               <div>
                 <p className="inicio-ordenes-cifra">{valor(String(ots))}</p>
                 <p className="inicio-ordenes-texto">
-                  {detalle(ots > 0 ? 'Órdenes activas asignadas' : 'No tienes órdenes activas asignadas.')}
+                  {detalle(
+                    ots > 0 ? 'Órdenes activas asignadas' : 'No tienes órdenes activas asignadas.'
+                  )}
                 </p>
               </div>
             </div>
@@ -145,15 +200,28 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ setModuloActual })
           {visibles.length > 0 ? (
             <div className="inicio-accesos">
               {visibles.map(({ destino, icono: Icono, titulo, descripcion }) => (
-                <button key={destino} type="button" className="inicio-acceso"
+                <button
+                  key={destino}
+                  type="button"
+                  className="inicio-acceso"
                   aria-labelledby={`inicio-acceso-${destino}`}
                   aria-describedby={`inicio-descripcion-${destino}`}
-                  onClick={() => setModuloActual(destino)}>
-                  <span className="inicio-icono"><Icono size={20} aria-hidden="true" /></span>
+                  onClick={() => setModuloActual(destino)}
+                >
+                  <span className="inicio-icono">
+                    <Icono size={20} aria-hidden="true" />
+                  </span>
                   <span className="inicio-acceso-texto">
-                    <span id={`inicio-acceso-${destino}`} className="inicio-acceso-titulo">{titulo}</span>
-                    <span id={`inicio-descripcion-${destino}`} className="inicio-acceso-descripcion">
-                      {destino === 'taller' && esOperativoTallerOnly ? 'Revisa tus servicios asignados y tu zanja.' : descripcion}
+                    <span id={`inicio-acceso-${destino}`} className="inicio-acceso-titulo">
+                      {titulo}
+                    </span>
+                    <span
+                      id={`inicio-descripcion-${destino}`}
+                      className="inicio-acceso-descripcion"
+                    >
+                      {destino === 'taller' && esOperativoTallerOnly
+                        ? 'Revisa tus servicios asignados y tu zanja.'
+                        : descripcion}
                     </span>
                   </span>
                   <ArrowRight className="inicio-acceso-flecha" size={19} aria-hidden="true" />

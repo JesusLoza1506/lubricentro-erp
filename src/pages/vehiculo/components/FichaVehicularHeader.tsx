@@ -58,7 +58,12 @@ export const FichaVehicularHeader: React.FC<Props> = ({
               />
             </span>
           </label>
-          <button type="submit" disabled={cargando} aria-busy={cargando} className="fv-button fv-primary">
+          <button
+            type="submit"
+            disabled={cargando}
+            aria-busy={cargando}
+            className="fv-button fv-primary"
+          >
             {cargando ? 'Buscando...' : 'Buscar'}
           </button>
           {onLimpiar && (

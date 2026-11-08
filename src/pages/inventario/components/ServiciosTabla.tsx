@@ -23,7 +23,13 @@ export function ServiciosTabla({
         <h3>Catálogo de servicios</h3>
         <p>Consulta precios y disponibilidad de los servicios del taller.</p>
       </header>
-      <div className="inv-table-scroll" tabIndex={0} role="region" aria-label="Resultados del catálogo de servicios" aria-busy={cargando}>
+      <div
+        className="inv-table-scroll"
+        tabIndex={0}
+        role="region"
+        aria-label="Resultados del catálogo de servicios"
+        aria-busy={cargando}
+      >
         <table className="inv-table inv-services-table">
           <thead>
             <tr>

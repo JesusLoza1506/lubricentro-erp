@@ -16,7 +16,7 @@
 ![Plataforma](https://img.shields.io/badge/Plataforma-Windows_11-2563EB?style=flat-square)
 ![Módulos](https://img.shields.io/badge/Alcance-10_m%C3%B3dulos-0F766E?style=flat-square)
 
-[Progreso](#estado) · [Login](#modulo-login-y-sesion) · [Ficha vehicular](#modulo-ficha-vehicular-e-historial) · [Taller](#modulo-ordenes-de-trabajo-taller) · [Inventario](#modulo-inventario-y-stock) · [POS](#modulo-punto-de-venta-pos) · [Instalación](#instalacion) · [Documentación](#documentacion)
+[Progreso](#estado) · [Login](#modulo-login-y-sesion) · [Ficha vehicular](#modulo-ficha-vehicular-e-historial) · [Taller](#modulo-ordenes-de-trabajo-taller) · [Inventario](#modulo-inventario-y-stock) · [POS](#modulo-punto-de-venta-pos) · [Caja Chica](#modulo-caja-chica) · [Instalación](#instalacion) · [Documentación](#documentacion)
 
 </div>
 
@@ -43,22 +43,22 @@
 
 ## 2. Estado del proyecto
 
-Desarrollo secuencial, módulo por módulo, conforme al alcance funcional v7. **Login y Sesión (95/100)**, **Ficha Vehicular e Historial (93/100)**, **Órdenes de Trabajo Taller (93/100)**, **Inventario y Stock (95/100)** y **Punto de Venta POS (95/100)** se encuentran en **ajustes finales**. Sus funciones principales ya están implementadas; los pendientes de cierre y la validación en escritorio se detallan en cada módulo.
+Desarrollo secuencial, módulo por módulo, conforme al alcance funcional v7. **Login y Sesión (95/100)**, **Ficha Vehicular e Historial (93/100)**, **Órdenes de Trabajo Taller (93/100)**, **Inventario y Stock (95/100)**, **Punto de Venta POS (95/100)** y **Caja Chica (94/100)** se encuentran en **ajustes finales**. Sus funciones principales ya están implementadas; los pendientes de cierre y la validación en escritorio se detallan en cada módulo.
 
-**El próximo módulo es Caja Chica**. La siguiente etapa se centrará en apertura de turnos, movimientos, arqueo y cierre, a partir de los cobros y reintegros que ya registra el POS. Inicio Dashboard se desarrollará al final para reunir datos de los demás módulos.
+**El próximo módulo es Backup y Copias.** La siguiente etapa se centrará en crear y verificar respaldos y probar la restauración. Caja Chica sigue en ajustes finales mientras se completa su validación en escritorio. Inicio Dashboard se desarrollará al final para reunir datos de los demás módulos.
 
-| Orden | Módulo | Estado | Evaluación |
-| --- | --- | --- | --- |
-| 01 | [Login y Sesión](#modulo-login-y-sesion) | 🟢 Ajustes finales | 95/100 |
-| 02 | [Ficha Vehicular e Historial](#modulo-ficha-vehicular-e-historial) | 🟢 Ajustes finales | 93/100 |
-| 03 | [Órdenes de Trabajo Taller](#modulo-ordenes-de-trabajo-taller) | 🟢 Ajustes finales | 93/100 |
-| 04 | [Inventario y Stock](#modulo-inventario-y-stock) | 🟢 Ajustes finales | 95/100 |
-| 05 | [Punto de Venta POS](#modulo-punto-de-venta-pos) | 🟢 Ajustes finales | 95/100 |
-| 06 | [Caja Chica](#modulo-caja-chica) | ⚪ Pendiente · próximo módulo | — |
-| 07 | Backup y Copias | ⚪ Pendiente | — |
-| 08 | Administración | ⚪ Pendiente | — |
-| 09 | Reportes | ⚪ Pendiente | — |
-| 10 | Inicio Dashboard | ⚪ Pendiente; se desarrollará al final | — |
+| Orden | Módulo                                                             | Estado                                 | Evaluación |
+| ----- | ------------------------------------------------------------------ | -------------------------------------- | ---------- |
+| 01    | [Login y Sesión](#modulo-login-y-sesion)                           | 🟢 Ajustes finales                     | 95/100     |
+| 02    | [Ficha Vehicular e Historial](#modulo-ficha-vehicular-e-historial) | 🟢 Ajustes finales                     | 93/100     |
+| 03    | [Órdenes de Trabajo Taller](#modulo-ordenes-de-trabajo-taller)     | 🟢 Ajustes finales                     | 93/100     |
+| 04    | [Inventario y Stock](#modulo-inventario-y-stock)                   | 🟢 Ajustes finales                     | 95/100     |
+| 05    | [Punto de Venta POS](#modulo-punto-de-venta-pos)                   | 🟢 Ajustes finales                     | 95/100     |
+| 06    | [Caja Chica](#modulo-caja-chica)                                   | 🟢 Ajustes finales                     | 94/100     |
+| 07    | [Backup y Copias](#modulo-backup-y-copias)                         | ⚪ Pendiente · próximo módulo          | —          |
+| 08    | Administración                                                     | ⚪ Pendiente                           | —          |
+| 09    | Reportes                                                           | ⚪ Pendiente                           | —          |
+| 10    | Inicio Dashboard                                                   | ⚪ Pendiente; se desarrollará al final | —          |
 
 **Leyenda:** ⚪ Pendiente · 🟡 En curso · 🟢 Ajustes finales · ✅ Completado.
 
@@ -230,11 +230,11 @@ _Próximos cambios de aceite_
 
 **Acceso por rol:**
 
-| Rol | Alcance |
-| --- | --- |
-| Administrador | Recepción y gestión del taller; asignación y reasignación, notas, servicios, consumos, devolución de materiales y cancelación con motivo. |
-| Mecánico | Consulta de propias y libres; inicio de las permitidas y ejecución de sus órdenes. Gestiona servicios y nota interna en las condiciones autorizadas, sin costos internos ni notas ajenas. |
-| Cajero | Recepción y consulta pública autorizada, sin notas internas ni costos ni operaciones de ejecución reservadas. |
+| Rol           | Alcance                                                                                                                                                                                   |
+| ------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Administrador | Recepción y gestión del taller; asignación y reasignación, notas, servicios, consumos, devolución de materiales y cancelación con motivo.                                                 |
+| Mecánico      | Consulta de propias y libres; inicio de las permitidas y ejecución de sus órdenes. Gestiona servicios y nota interna en las condiciones autorizadas, sin costos internos ni notas ajenas. |
+| Cajero        | Recepción y consulta pública autorizada, sin notas internas ni costos ni operaciones de ejecución reservadas.                                                                             |
 
 **Capturas:**
 
@@ -303,11 +303,11 @@ _Aviso de resultado de una operación_
 
 **Acceso por rol:**
 
-| Rol | Alcance |
-| --- | --- |
-| Administrador | Gestión de productos, servicios y proveedores; compras, entradas, costos, valoración, kardex, conteos y cambios de estado o anulaciones con motivo. |
-| Mecánico | Consulta autorizada de productos y servicios activos, stock y precios de venta; sin costos, valoración ni operaciones administrativas. Los consumos del taller se registran desde OT. |
-| Cajero | Consulta autorizada de productos y servicios activos, stock y precios de venta; sin costos, valoración ni operaciones administrativas de Inventario. |
+| Rol           | Alcance                                                                                                                                                                               |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Administrador | Gestión de productos, servicios y proveedores; compras, entradas, costos, valoración, kardex, conteos y cambios de estado o anulaciones con motivo.                                   |
+| Mecánico      | Consulta autorizada de productos y servicios activos, stock y precios de venta; sin costos, valoración ni operaciones administrativas. Los consumos del taller se registran desde OT. |
+| Cajero        | Consulta autorizada de productos y servicios activos, stock y precios de venta; sin costos, valoración ni operaciones administrativas de Inventario.                                  |
 
 **Capturas:**
 
@@ -386,16 +386,16 @@ _Aviso de resultado de una operación_
 - **Cálculos deterministas:** dinero en céntimos, granel en mililitros y distribución controlada de descuentos, impuestos y diferencias de redondeo de las devoluciones.
 - **Historial protegido:** editar el catálogo no reescribe líneas confirmadas. Cobrar una OT no repite el consumo ni reabre el trabajo.
 - **Recuperación documental comprobada localmente:** una prueba cierra y reabre SQLite y comprueba que el intento interrumpido obliga a consultar antes de reenviar.
-- **18 pruebas específicas de POS en Rust aprobadas**, además de pruebas de interfaz y recuperación documental.
+- **19 pruebas de la suite de POS en Rust aprobadas**, incluida la integración con Caja Chica, además de pruebas de interfaz y recuperación documental.
 - **Rendimiento del backend comprobado:** cinco muestras con **5.000 ventas en SQLite temporal en disco** promediaron **44,76 ms** en listado y **7,46 ms** en confirmación local. Todas quedaron por debajo de tres segundos. Falta medir el recorrido completo en escritorio.
 
 **Acceso por rol:**
 
-| Rol | Alcance |
-| --- | --- |
-| Administrador | Consulta general, cobros y reintegros con caja propia, autorización de excepciones y gestión de comprobantes pendientes o rechazados. |
-| Mecánico | Sin acceso al POS. |
-| Cajero | Ventas y consultas propias, cobros y reintegros con caja propia; autorización administrativa cuando corresponde y sin acceso a costos ni ventas ajenas. |
+| Rol           | Alcance                                                                                                                                                 |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Administrador | Consulta general, cobros y reintegros con caja propia, autorización de excepciones y gestión de comprobantes pendientes o rechazados.                   |
+| Mecánico      | Sin acceso al POS.                                                                                                                                      |
+| Cajero        | Ventas y consultas propias, cobros y reintegros con caja propia; autorización administrativa cuando corresponde y sin acceso a costos ni ventas ajenas. |
 
 **Capturas:**
 
@@ -420,24 +420,89 @@ Quedan por añadir las capturas de selección de OT, cobro, devolución y detall
 
 <a id="modulo-caja-chica"></a>
 
-**Próximo módulo: Caja Chica — ⚪ Pendiente.** Se trabajará en la apertura de turnos, el registro de movimientos, el arqueo y el cierre, tomando como base los cobros y reintegros registrados por el POS. La apertura de caja que usa el POS forma parte de esa base y no implica que el módulo de Caja Chica esté completo.
+<details>
+<summary><b>06 · Caja Chica</b> — 🟢 Ajustes finales · Evaluación: 94/100</summary>
+
+**Qué hace:** controla los turnos de caja, el efectivo disponible y los movimientos de ventas, devoluciones e ingresos o egresos manuales. Permite cerrar cada turno comparando el efectivo esperado con el contado y conservar su historial.
+
+**Funciones principales:**
+
+- **Abrir turno propio:** registra el fondo inicial, sugiere el fondo reservado en el cierre anterior e impide abrir otro turno si hay uno activo. Cambiar de usuario no transfiere ni cierra el turno.
+- **Consultar saldos:** desglosa el efectivo esperado y presenta por separado los totales de Tarjeta, Yape, Plin y Transferencia. Los pagos digitales no aumentan el efectivo disponible.
+- **Integrar cobros y devoluciones del POS:** los movimientos quedan en el turno del usuario que realiza la operación. En un pago mixto solo se contabiliza el efectivo aplicado; el dinero recibido y el vuelto no vuelven a sumarse.
+- **Registrar movimientos manuales:** admite ingresos y egresos en efectivo con categoría, concepto y límites de importe. Verifica la disponibilidad antes de registrar una salida.
+- **Revertir movimientos manuales:** conserva el original y registra su inverso con motivo obligatorio. Impide repetir la reversión y comprueba el saldo si el inverso retira efectivo.
+- **Cerrar con arqueo:** solicita el efectivo contado, calcula la diferencia y exige motivo desde un céntimo de diferencia. Permite reservar un fondo para el siguiente turno y calcula el retiro sin registrar otro egreso.
+- **Detectar cambios durante el arqueo:** si se registra un movimiento después de consultar el resumen, exige revisar los nuevos importes y conserva el conteo introducido.
+- **Consultar historial y movimientos:** ofrece filtros, búsqueda y **20 registros por página**. Permite abrir el detalle del turno y acceder a las ventas relacionadas según los permisos de POS. El historial conserva las cifras del cierre.
+- **Realizar cierres administrativos:** el administrador puede cerrar por ausencia o cerrar un turno recuperado, con motivo obligatorio.
+- **Agregar aclaraciones:** el administrador puede registrar o editar una aclaración del cierre con autor, fecha y auditoría. Los importes guardados no cambian.
+- **Proteger la información y preparar la impresión:** el cajero solo consulta sus turnos; ante un turno ajeno recibe el aviso de ocupación. El administrador puede consultar los cierres autorizados y preparar su impresión.
+
+**Fortalezas de implementación:**
+
+- **Precisión monetaria:** los importes se almacenan en céntimos enteros.
+- **Guardado atómico:** la operación, su auditoría y su resultado se guardan en una sola transacción.
+- **Reintentos sin duplicados:** los identificadores persistentes permiten recuperar el resultado de una solicitud incierta.
+- **Permisos en Rust:** el backend valida la sesión, el rol y el usuario responsable de la operación.
+- **Control de versión del arqueo:** impide cerrar con un resumen desactualizado.
+- **Organización del código:** separa consultas, escrituras, formularios y presentación.
+- **Cobertura automatizada:** **4 pruebas Rust y 3 pruebas de interfaz propias de Caja Chica aprobadas**, además de la prueba de integración con POS y dos comprobaciones temporales adicionales reportadas en la revisión.
+- **Caso del PDF verificado con el POS real del ERP:** **S/ 330 esperados**, **S/ 324 contados**, diferencia de **−S/ 6** y retiro de **S/ 224**, tras reservar **S/ 100**.
+- **Rendimiento del backend comprobado:** con **5.000 turnos y 100.000 movimientos** en SQLite temporal en disco, las **20 muestras** de cada operación medida —resumen, primera página de movimientos y cierre— quedaron por debajo de **2 segundos**, según la última revisión.
+
+**Acceso por rol:**
+
+| Rol           | Alcance                                                                                                                          |
+| ------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| Administrador | Opera su turno, consulta otros turnos, realiza cierres por ausencia o recuperación y añade aclaraciones.                         |
+| Mecánico      | Sin acceso a Caja Chica.                                                                                                         |
+| Cajero        | Abre, opera y cierra su propio turno; consulta sus movimientos y cierres. Si hay un turno ajeno, solo ve el estado de ocupación. |
+
+**Capturas:**
+
+Vistas de la interfaz con datos ficticios en ambiente de demostración.
+
+_Mi caja: efectivo, pagos digitales y movimientos del turno_
+
+![Caja Chica: resumen de efectivo, pagos digitales y movimientos del turno](docs/images/06-caja-chica.png)
+
+_Historial de turnos: filtros y cierres registrados_
+
+![Caja Chica: historial de turnos con filtros y acceso al detalle](docs/images/06-caja-historial.png)
+
+**Pendiente para cerrar:**
+
+- Corregir la respuesta tardía al volver al historial: si se actualiza un detalle y se regresa antes de recibir la respuesta, esta puede volver a abrirlo. El fallo se reprodujo sin observar alteración de importes.
+- Incorporar ese caso a las pruebas permanentes y ampliar la cobertura de filtros, paginación, reversiones, aclaraciones e impresión.
+- Completar los recorridos en Tauri: teclado, foco de diálogos, cambio de usuario, navegación entre Caja Chica y POS e impresión real.
+- Comprobar operaciones alrededor de la medianoche en Lima y turnos que permanecen abiertos entre días.
+- Medir el recorrido completo desde la interfaz de escritorio. La medición aprobada cubre el backend con SQLite temporal en disco.
+
+**Estado:** 🟢 **Ajustes finales · Evaluación: 94/100**. Las reglas principales están implementadas y respaldadas por pruebas. Quedan la corrección de navegación, la ampliación de la cobertura de interfaz y la validación final en escritorio.
+
+</details>
+
+<a id="modulo-backup-y-copias"></a>
+
+**Próximo módulo: Backup y Copias — ⚪ Pendiente.** Se trabajará en la creación y verificación de copias de seguridad y en la restauración de datos.
 
 <a id="roles"></a>
 
 ## 4. Roles y permisos
 
-| Módulo                      | Administrador                                              | Mecánico                                                    | Cajero                                         |
-| --------------------------- | ---------------------------------------------------------- | ----------------------------------------------------------- | ---------------------------------------------- |
-| Login y Sesión              | Cuenta propia y gestión autorizada.                        | Cuenta propia.                                              | Cuenta propia.                                 |
-| Ficha Vehicular e Historial | Gestión y correcciones autorizadas.                        | Consulta de información pública de atención.                | Registro, edición de datos comunes y consulta. |
-| Órdenes de Trabajo Taller | Gestión del taller, reasignación, devolución y cancelación con motivo. | Inicio de OT permitidas y ejecución de propias; sin notas ajenas ni costos. | Recepción y consulta pública; sin notas internas ni costos. |
-| Inventario y Stock          | Catálogos, proveedores, entradas, costos, kardex y conteos.             | Consulta de activos, stock y precios.                       | Consulta de activos, stock y precios.          |
-| Punto de Venta POS          | Cobros y reintegros con caja propia; consulta general y gestión documental. | Sin acceso. | Ventas propias, sin costos; autorización cuando corresponde. |
-| Caja Chica (alcance previsto) | Turno propio; consulta y cierre administrativo autorizado. | Sin acceso.                                                 | Turnos propios.                                |
-| Backup y Copias             | Configuración, copias y recuperación.                      | Sin acceso.                                                 | Sin acceso.                                    |
-| Administración              | Usuarios, empresa, facturación y taller.                   | Sin acceso.                                                 | Sin acceso.                                    |
-| Reportes                    | Consulta y exportación.                                    | Sin acceso.                                                 | Sin acceso.                                    |
-| Inicio Dashboard            | Resumen del negocio.                                       | Resumen de trabajos propios y disponibles.                  | Resumen de caja y OT por cobrar.               |
+| Módulo                      | Administrador                                                                       | Mecánico                                                                    | Cajero                                                                      |
+| --------------------------- | ----------------------------------------------------------------------------------- | --------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
+| Login y Sesión              | Cuenta propia y gestión autorizada.                                                 | Cuenta propia.                                                              | Cuenta propia.                                                              |
+| Ficha Vehicular e Historial | Gestión y correcciones autorizadas.                                                 | Consulta de información pública de atención.                                | Registro, edición de datos comunes y consulta.                              |
+| Órdenes de Trabajo Taller   | Gestión del taller, reasignación, devolución y cancelación con motivo.              | Inicio de OT permitidas y ejecución de propias; sin notas ajenas ni costos. | Recepción y consulta pública; sin notas internas ni costos.                 |
+| Inventario y Stock          | Catálogos, proveedores, entradas, costos, kardex y conteos.                         | Consulta de activos, stock y precios.                                       | Consulta de activos, stock y precios.                                       |
+| Punto de Venta POS          | Cobros y reintegros con caja propia; consulta general y gestión documental.         | Sin acceso.                                                                 | Ventas propias, sin costos; autorización cuando corresponde.                |
+| Caja Chica                  | Turno propio, consulta general, cierres por ausencia o recuperación y aclaraciones. | Sin acceso.                                                                 | Operación y consulta de turnos propios; solo ve ocupación en turnos ajenos. |
+| Backup y Copias             | Configuración, copias y recuperación.                                               | Sin acceso.                                                                 | Sin acceso.                                                                 |
+| Administración              | Usuarios, empresa, facturación y taller.                                            | Sin acceso.                                                                 | Sin acceso.                                                                 |
+| Reportes                    | Consulta y exportación.                                                             | Sin acceso.                                                                 | Sin acceso.                                                                 |
+| Inicio Dashboard            | Resumen del negocio.                                                                | Resumen de trabajos propios y disponibles.                                  | Resumen de caja y OT por cobrar.                                            |
 
 Las autorizaciones se validan en Rust. Los costos y las notas internas se restringen por rol; ocultar botones no sustituye el control del backend.
 
@@ -445,20 +510,20 @@ Las autorizaciones se validan en Rust. Los costos y las notas internas se restri
 
 ## 5. Flujo de trabajo
 
-| Paso                     | Acción                                                              | Resultado esperado                                                     |
-| ------------------------ | ------------------------------------------------------------------- | ---------------------------------------------------------------------- |
-| **1. Identificar**       | Buscar la placa y verificar cliente y kilometraje.                  | Ficha seleccionada o registro de un vehículo nuevo.                    |
-| **2. Recibir**           | Crear una OT con servicio inicial y mecánico opcional.                     | Orden en espera, sin reserva ni descuento de stock.                    |
-| **3. Ejecutar**          | Iniciar trabajo en una zanja libre y registrar consumos reales.     | Materiales descontados una vez y trabajo asignado.                     |
-| **4. Finalizar**         | Confirmar kilometraje, resumen y tipo de aceite cuando corresponda. | OT finalizada, historial actualizado y zanja libre.                    |
-| **5. Cobrar**            | Recuperar la OT desde POS y confirmar el pago.                      | Venta y cobro registrados sin repetir la salida de insumos del taller. |
-| **6. Cerrar y proteger** | Contar efectivo, cerrar el turno y gestionar una copia.             | Cierre conservado y datos protegidos según la política de copias.      |
+| Paso                   | Acción                                                                | Resultado esperado                                                             |
+| ---------------------- | --------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| **1. Identificar**     | Buscar la placa y verificar cliente y kilometraje.                    | Ficha seleccionada o registro de un vehículo nuevo.                            |
+| **2. Recibir**         | Crear una OT con servicio inicial y mecánico opcional.                | Orden en espera, sin reserva ni descuento de stock.                            |
+| **3. Ejecutar**        | Iniciar trabajo en una zanja libre y registrar consumos reales.       | Materiales descontados una vez y trabajo asignado.                             |
+| **4. Finalizar**       | Confirmar kilometraje, resumen y tipo de aceite cuando corresponda.   | OT finalizada, historial actualizado y zanja libre.                            |
+| **5. Cobrar**          | Abrir un turno propio, recuperar la OT desde POS y confirmar el pago. | Venta y cobro vinculados al turno sin repetir la salida de insumos del taller. |
+| **6. Cerrar el turno** | Contar el efectivo, revisar la diferencia y confirmar el arqueo.      | Cierre conservado con efectivo esperado y contado, fondo siguiente y retiro.   |
 
 **Venta directa:** el POS contempla productos y servicios sin crear una OT.
 
 **Comprobante electrónico:** el envío ocurre después del guardado local. Si el resultado es incierto, el administrador consulta el documento original antes de reenviarlo; si es rechazado, la reemisión usa otro número vinculado sin registrar otra venta ni otro cobro. Devolver exige que el original y las notas de crédito anteriores estén aceptados.
 
-**Cierre de turno:** el paso 6 refleja el flujo previsto para Caja Chica y Backup y Copias, módulos pendientes.
+**Cierre de turno:** Caja Chica guarda el arqueo y permite consultarlo desde el historial. La creación, verificación y restauración de copias corresponde a Backup y Copias, el próximo módulo.
 
 <a id="arquitectura"></a>
 
@@ -548,7 +613,7 @@ La configuración actual de Tauri invoca `npm run dev` antes del desarrollo y `n
 
 ### 8.1. Qué se verifica
 
-En Login: acceso, sesiones, permisos, bloqueo, recuperación, revocación y consistencia ante fallos. En Ficha Vehicular: registro, edición, identidad histórica, permisos, correcciones, consultas y paginación. En Taller: recepción, estados, responsable, zanjas, servicios, consumos, devoluciones, aceite, auditoría y avisos de resultado. En Inventario: DTO públicos sin costos, catálogos, proveedores, compras, conteos, valoración de granel, kardex, filtros y reintentos sin duplicación de efectos. En POS: ventas directas, cobro de OT sin duplicar insumos, pagos, devoluciones, comprobantes, idempotencia y recuperación documental local. La próxima etapa incorporará la validación del arqueo y cierre de Caja Chica.
+En Login: acceso, sesiones, permisos, bloqueo, recuperación, revocación y consistencia ante fallos. En Ficha Vehicular: registro, edición, identidad histórica, permisos, correcciones, consultas y paginación. En Taller: recepción, estados, responsable, zanjas, servicios, consumos, devoluciones, aceite, auditoría y avisos de resultado. En Inventario: DTO públicos sin costos, catálogos, proveedores, compras, conteos, valoración de granel, kardex, filtros y reintentos sin duplicación de efectos. En POS: ventas directas, cobro de OT sin duplicar insumos, pagos, devoluciones, comprobantes, idempotencia y recuperación documental local. En Caja Chica: apertura idempotente, privacidad entre cajeros, arqueo con control de versión, reversión, aclaración, cierre recuperado e integración con cobros y reintegros del POS.
 
 ### 8.2. Cómo ejecutarlas
 
@@ -564,10 +629,11 @@ cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings
 cargo test --manifest-path src-tauri/Cargo.toml
 ```
 
-Para repetir la medición específica del POS desde la raíz:
+Para repetir las mediciones del backend de POS y Caja Chica desde la raíz:
 
 ```powershell
 cargo test --manifest-path src-tauri/Cargo.toml --test pos_rendimiento_tests -- --ignored --nocapture
+cargo test --manifest-path src-tauri/Cargo.toml --test caja_rendimiento_tests -- --ignored --nocapture
 ```
 
 Las pruebas de integración externas deben usar datos y credenciales de Prueba. El flujo de [GitHub Actions](.github/workflows/ci.yml) define comprobaciones del frontend y backend; sus resultados se consultan en [Actions](https://github.com/JesusLoza1506/lubricentro-erp/actions).
@@ -576,16 +642,20 @@ Las pruebas de integración externas deben usar datos y credenciales de Prueba. 
 
 La última ejecución en Windows del **7 de noviembre de 2026** reportó:
 
-| Comprobación | Resultado reportado |
-| --- | --- |
-| Formato Rust, `cargo check` y Clippy | Aprobados. |
-| TypeScript y compilación del frontend | Aprobadas. |
-| Pruebas de frontend y servicios | **118 aprobadas** en **16 archivos**. |
-| Suite general de Rust (`cargo test`) | **121 aprobadas**, **0 fallidas** y **2 mediciones omitidas por defecto**. |
-| Pruebas específicas de POS, incluidas en la suite de Rust | **18 aprobadas**. |
-| Rendimiento de POS, ejecutado por separado | **1 prueba aprobada** con cinco muestras y **5.000 ventas** en SQLite temporal en disco. |
+| Comprobación                                      | Resultado reportado                                                                                                                                                    |
+| ------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Formato Rust, `cargo check` y Clippy              | Aprobados.                                                                                                                                                             |
+| TypeScript y compilación del frontend             | Aprobadas.                                                                                                                                                             |
+| Pruebas de frontend y servicios                   | **121 aprobadas** en **17 archivos**, incluidas **3 de Caja Chica**.                                                                                                   |
+| Suite general de Rust (`cargo test`)              | **126 aprobadas**, **0 fallidas** y **3 mediciones omitidas por defecto**.                                                                                             |
+| Suite Rust de POS                                 | **19 aprobadas**, incluida la integración con Caja Chica.                                                                                                              |
+| Suite Rust de Caja Chica                          | **4 aprobadas**.                                                                                                                                                       |
+| Rendimiento de POS, ejecutado por separado        | **1 prueba aprobada** con cinco muestras y **5.000 ventas** en SQLite temporal en disco.                                                                               |
+| Rendimiento de Caja Chica, reportado por separado | **1 prueba aprobada** con **5.000 turnos y 100.000 movimientos** en SQLite temporal en disco. Las **20 muestras** por operación quedaron por debajo de **2 segundos**. |
 
 **Rendimiento del POS:** el listado promedió **44,76 ms** (36,27–50,18 ms) y la confirmación local **7,46 ms** (4,47–14,98 ms). La prueba mide el backend local; todavía falta validar el tiempo visible en WebView y el recorrido con NubeFact de Prueba.
+
+**Rendimiento de Caja Chica:** la medición abarca el resumen, la primera página de movimientos y el cierre en Rust. Queda por medir el recorrido completo desde la interfaz en Tauri.
 
 **Evidencia previa de Inventario:** las consultas de catálogo, críticos y kardex con **1.000 productos y 10.000 movimientos** registraron aproximadamente **0,2–1,8 ms** en SQLite en memoria. Los tres casos de conteo reproducidos permanecen entre los pendientes de Inventario. Taller conserva como pendiente las cinco mediciones con **2.000 OT**.
 
@@ -609,15 +679,15 @@ El informe general y las diez especificaciones funcionales v7 son documentos de 
 
 ## 10. Hoja de ruta
 
-Se mantiene la siguiente secuencia de desarrollo. Los cinco primeros módulos están en ajustes finales; **el siguiente módulo será Caja Chica**.
+Se mantiene la siguiente secuencia de desarrollo. Los seis primeros módulos están en ajustes finales; **el siguiente módulo será Backup y Copias**.
 
 1. **Login y Sesión — ajustes finales (95/100):** completar recuperación del error inicial y evidencias de teclado, foco, salida y tiempos de ingreso.
 2. **Ficha Vehicular e Historial — ajustes finales (93/100):** activar cambios pendientes al modificar datos, consolidar pruebas de interfaz y completar mediciones de escritorio.
 3. **Órdenes de Trabajo Taller — ajustes finales (93/100):** conservar identificadores al reintentar, completar auditoría de servicios y validar recorridos y rendimiento.
 4. **Inventario y Stock — ajustes finales (95/100):** resolver los casos particulares de conteo y costos, proteger capturas modificadas y completar pruebas y mediciones en escritorio.
 5. **Punto de Venta POS — ajustes finales (95/100):** mostrar el último intento documental y completar las pruebas de NubeFact de Prueba, impresión, recorridos en Tauri y rendimiento visible.
-6. **Caja Chica — pendiente · próximo módulo:** completar apertura de turnos, movimientos, arqueo y cierre, vinculados con los cobros y reintegros del POS.
-7. **Backup y Copias:** completar copias de seguridad y recuperación.
+6. **Caja Chica — ajustes finales (94/100):** corregir la respuesta tardía al regresar al historial y completar las pruebas de interfaz, impresión, medianoche en Lima y rendimiento en escritorio.
+7. **Backup y Copias — pendiente · próximo módulo:** implementar la creación, verificación y restauración de copias de seguridad.
 8. **Administración:** completar la configuración y gestión autorizada.
 9. **Reportes:** integrar las consultas y exportaciones de los módulos anteriores.
 10. **Inicio Dashboard:** integrar al final los indicadores y resúmenes por rol con los datos de los demás módulos.
