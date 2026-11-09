@@ -130,4 +130,24 @@ describe('Dashboard de inicio', () => {
     expect(navegar).toHaveBeenCalledExactlyOnceWith('backup');
   });
 
+  it('abre Administración desde Inicio si la sesión es administrativa', async () => {
+    vi.mocked(useAuth).mockReturnValue(authDePrueba({ tienePermiso: permisos('ADMIN') }));
+    const navegar = vi.fn();
+    render(<DashboardPage setModuloActual={navegar} />);
+    const accesos = within(screen.getByRole('navigation', { name: 'Accesos rápidos' }));
+    fireEvent.click(accesos.getByRole('button', { name: 'Administración' }));
+    expect(navegar).toHaveBeenCalledExactlyOnceWith('administracion');
+    await act(async () => {});
+  });
+
+  it('no muestra Administración a un cajero aunque figure el permiso', async () => {
+    vi.mocked(useAuth).mockReturnValue(
+      authDePrueba({ usuario: sesionDePrueba({ rol: 'CAJERO' }), tienePermiso: permisos('ADMIN', 'CAJA') })
+    );
+    render(<DashboardPage setModuloActual={vi.fn()} />);
+    expect(screen.queryByRole('button', { name: 'Administración' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Caja Chica' })).toBeInTheDocument();
+    await act(async () => {});
+  });
+
 });

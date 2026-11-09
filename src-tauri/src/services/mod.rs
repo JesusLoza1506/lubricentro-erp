@@ -1,3 +1,4 @@
+pub mod admin_service;
 pub mod auditoria_service;
 pub mod auth_service;
 pub mod backup_service;

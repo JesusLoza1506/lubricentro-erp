@@ -704,3 +704,39 @@ fn caja_toma_solo_efectivo_aplicado_y_reintegra_venta_previa_en_turno_actual() {
         3_000
     );
 }
+
+#[test]
+fn editar_empresa_con_comprobante_pendiente_conserva_ruc_y_foto_anterior() {
+    use lubricentro_erp_lib::services::admin_service::{empresa, guardar_empresa, Empresa};
+    let (_d, mut c, id) = preparar(false);
+    let venta = ventas::confirmar(&mut c, 2, None, &solicitud(id, 5)).unwrap();
+    assert_eq!(venta["total_cent"], 10000);
+    let ver = empresa(&c).unwrap();
+    assert_eq!(ver["ruc_fijo"], true);
+    let datos = |ruc: &str| Empresa {
+        ruc: ruc.into(),
+        razon_social: "Empresa de prueba".into(),
+        nombre_comercial: "Lubricentro demo".into(),
+        direccion: "Av. Nueva 500".into(),
+        ubigeo: "110201".into(),
+        telefono: "+51 987 654 321".into(),
+        correo: "demo@example.invalid".into(),
+        version: ver["version"].as_i64().unwrap(),
+        motivo: Some("Corrección de prueba".into()),
+    };
+    assert!(guardar_empresa(&mut c, 1, datos("20999999990")).is_err());
+    let nueva = guardar_empresa(&mut c, 1, datos("20600695771")).unwrap();
+    assert_eq!(nueva["direccion"], "Av. Nueva 500");
+    assert_eq!(nueva["telefono"], "987654321");
+    let (direccion, estado): (String, String) = c
+        .query_row(
+            "SELECT json_extract(empresa_snapshot,'$.direccion'),estado_envio FROM comprobantes",
+            [],
+            |r| Ok((r.get(0)?, r.get(1)?)),
+        )
+        .unwrap();
+    assert_eq!(
+        (direccion.as_str(), estado.as_str()),
+        ("Av. Principal 123", "PENDIENTE")
+    );
+}

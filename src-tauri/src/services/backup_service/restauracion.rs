@@ -1,4 +1,5 @@
 use super::*;
+use crate::services::admin_service::facturacion::{self, AlmacenLocal, ModoToken, Secretos};
 use std::{collections::BTreeMap, io::Write};
 
 #[derive(Default, Serialize, Deserialize)]
@@ -44,15 +45,8 @@ fn ruta_api(c: &Connection) -> R<Option<String>> {
         |r| r.get(0),
     )?)
 }
-fn credencial(ambiente: &str, r: &str) -> R<keyring::Entry> {
-    keyring::Entry::new(&format!("lubricentro_erp_nubefact_{ambiente}"), r)
-        .map_err(|_| err("No se pudo abrir el almacén de credenciales."))
-}
 fn token_existe(ambiente: &str, r: Option<&str>) -> bool {
-    r.and_then(|x| credencial(ambiente, x).ok())
-        .and_then(|e| e.get_password().ok())
-        .map(Zeroizing::new)
-        .is_some_and(|x| !x.trim().is_empty())
+    r.is_some_and(|r| AlmacenLocal.existe(ambiente, r))
 }
 fn agregar_maximos(c: &Connection, result: &mut BTreeMap<String, i64>) -> R<()> {
     let mut stmt=c.prepare("SELECT s.tipo_comprobante||':'||s.serie, max(s.correlativo_actual,s.mayor_previo,s.ultimo_real_comprobado,
@@ -366,15 +360,29 @@ impl BackupState {
         *slot = None;
         Ok(json!({"restaurada":true,"requiere_login":true}))
     }
+    pub fn maximo_conservado(&self, c: &Connection, tipo: &str, codigo: &str) -> R<i64> {
+        let raw = match fs::read(self.root.join("activo.json")) {
+            Ok(v) => v,
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(0),
+            Err(e) => return io(Err(e)),
+        };
+        let r: Registro = serde_json::from_slice(&raw)
+            .map_err(|_| err("No se pudo leer el registro de máximos de Backup."))?;
+        if r.identidad.as_ref() != Some(&identidad(c)?) {
+            return Ok(0);
+        }
+        Ok(r.maximos
+            .get(&format!("{tipo}:{codigo}"))
+            .copied()
+            .unwrap_or(0))
+    }
     pub fn resumen(&self, c: &Connection) -> R<Value> {
         let pendiente = flag(c)?;
-        let mut series = Vec::new();
-        if pendiente {
-            series=crate::services::pos_service::consultas::filas(c,
-                "SELECT json_object('id',id_serie,'serie',serie,'tipo',tipo_comprobante,'local',correlativo_actual,'previo',mayor_previo,
-                  'remoto',ultimo_real_comprobado,'pendiente',requiere_conciliacion,'siguiente',1+max(correlativo_actual,mayor_previo,ultimo_real_comprobado))
-                 FROM series_comprobante WHERE activa=1 AND ambiente=(SELECT ambiente_actual FROM configuracion WHERE id_config=1) ORDER BY tipo_comprobante,serie",&[])?;
-        }
+        let series = if pendiente {
+            facturacion::series_recuperacion(c)?
+        } else {
+            Vec::new()
+        };
         let token: bool = c.query_row(
             "SELECT revision_token_pendiente FROM configuracion WHERE id_config=1",
             [],
@@ -398,50 +406,18 @@ impl BackupState {
         if !flag(c)? {
             return Err(err("No existe una recuperación pendiente."));
         }
-        if valor.trim().is_empty() || valor.len() > 2048 {
-            return Err(err("Ingrese un token válido."));
-        }
-        let ruta = match ruta_api(c)? {
-            Some(actual) => actual,
-            None => ruta
-                .ok_or_else(|| err("Indique la URL del API de NubeFact."))?
-                .to_owned(),
-        };
-        let url = reqwest::Url::parse(&ruta).map_err(|_| err("URL de NubeFact inválida."))?;
-        if url.scheme() != "https"
-            || url.host_str() != Some("api.nubefact.com")
-            || !url.username().is_empty()
-            || url.password().is_some()
-            || url.query().is_some()
-            || url.fragment().is_some()
-        {
-            return Err(err(
-                "Use una URL HTTPS de api.nubefact.com sin credenciales en la dirección.",
-            ));
-        }
-        let ident = identidad(c)?;
-        let ref_nueva = format!("recuperacion-{}", id());
-        let e = credencial(&ident.ambiente, &ref_nueva)?;
-        e.set_password(valor)
-            .map_err(|_| err("No se pudo guardar el token protegido."))?;
-        let result: R<()> = (|| {
-            let tx = c.transaction()?;
-            tx.execute("UPDATE configuracion SET nubefact_token_ref=?1,nubefact_ruta_api=?2,revision_token_pendiente=0,version=version+1 WHERE id_config=1",params![ref_nueva,ruta])?;
-            auditar(
-                &tx,
-                a,
-                "TOKEN_RECUPERACION",
-                "configuracion",
-                "OK",
-                json!({}),
-            )?;
-            tx.commit()?;
-            Ok(())
-        })();
-        if result.is_err() {
-            let _ = e.delete_password();
-        }
-        result?;
+        let ruta = ruta_api(c)?
+            .or_else(|| ruta.map(str::to_owned))
+            .ok_or_else(|| err("Indique la URL del API de NubeFact."))?;
+        let actor = a.id.ok_or(AppError::PermisoDenegado)?;
+        facturacion::guardar_token(
+            c,
+            actor,
+            ModoToken::Recuperacion,
+            &ruta,
+            valor,
+            &AlmacenLocal,
+        )?;
         self.resumen(c)
     }
     pub fn conciliar(
@@ -452,36 +428,21 @@ impl BackupState {
         remoto: i64,
         refe: &str,
     ) -> R<Value> {
-        let refe = refe.trim();
-        if !flag(c)?
-            || !(0..99_999_999).contains(&remoto)
-            || !(5..=120).contains(&refe.chars().count())
-        {
-            return Err(err(
-                "Indique último número real y referencia de 5 a 120 caracteres.",
-            ));
+        if !flag(c)? {
+            return Err(err("No existe una recuperación pendiente."));
         }
         let tx = c.transaction()?;
         let restauracion = activa(&tx)?;
-        let (local,previo,real):(i64,i64,i64)=tx.query_row("SELECT max(correlativo_actual,coalesce((SELECT max(correlativo) FROM comprobantes WHERE id_serie=?1),0)),mayor_previo,ultimo_real_comprobado
-            FROM series_comprobante WHERE id_serie=?1 AND activa=1 AND requiere_conciliacion=1 AND ambiente=(SELECT ambiente_actual FROM configuracion WHERE id_config=1)",[serie],|r|Ok((r.get(0)?,r.get(1)?,r.get(2)?)))?;
-        let mayor = local.max(previo).max(remoto).max(real);
-        if mayor >= 99_999_999 {
-            return Err(err(
-                "La serie agotó su numeración; resuelva su configuración antes de continuar.",
-            ));
-        }
-        tx.execute("UPDATE series_comprobante SET correlativo_actual=?2,ultimo_real_comprobado=max(ultimo_real_comprobado,?3),
-            referencia_verificacion=?4,fecha_verificacion=datetime('now','-5 hours'),requiere_conciliacion=0 WHERE id_serie=?1",params![serie,mayor,remoto,refe])?;
-        tx.execute("INSERT INTO conciliaciones_series(id_operacion,id_restauracion,id_serie,mayor_local,mayor_previo,mayor_declarado_remoto,correlativo_conservado,evidencia,id_usuario)
-            VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9)",params![id(),restauracion,serie,local,previo,remoto,mayor,json!({"referencia":refe}).to_string(),a.id])?;
+        let actor = a.id.ok_or(AppError::PermisoDenegado)?;
+        let vista =
+            facturacion::ajustar(&tx, actor, serie, remoto, refe, None, Some(restauracion))?;
         auditar(
             &tx,
             a,
             "CONCILIAR_SERIE",
             "restauraciones",
             "OK",
-            json!({"serie":serie,"siguiente":mayor+1}),
+            json!({"serie":serie,"siguiente":vista["siguiente"]}),
         )?;
         tx.commit()?;
         self.resumen(c)

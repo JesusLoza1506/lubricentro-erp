@@ -7,7 +7,7 @@ pub mod nubefact;
 pub mod services;
 
 use commands::{
-    auth_commands::*, backup_commands::*, caja_commands::*, cliente_commands::*,
+    admin_commands::*, auth_commands::*, backup_commands::*, caja_commands::*, cliente_commands::*,
     comprobante_commands::*, dashboard_commands::*, inventario_commands::*, ordenes_commands::*,
     pos_commands::*,
 };
@@ -32,40 +32,13 @@ pub fn run() {
                 app_data_dir
             );
 
-            let ambiente =
-                std::env::var("LUBRICENTRO_AMBIENTE").unwrap_or_else(|_| "PRODUCCION".into());
-            let app_data_dir = match ambiente.as_str() {
-                "PRODUCCION" => app_data_dir,
-                "PRUEBA" => app_data_dir.join("entornos").join("prueba"),
-                _ => {
-                    return Err(errors::AppError::Validation(
-                        "LUBRICENTRO_AMBIENTE debe ser PRODUCCION o PRUEBA.".into(),
-                    )
-                    .into())
-                }
-            };
+            use services::admin_service::ambiente;
+            let seleccionado = ambiente::preferido(&app_data_dir)?;
+            let app_data_dir = ambiente::directorio(&app_data_dir, &seleccionado)?;
             let backup = services::backup_service::BackupState::new(&app_data_dir)?;
-            let arranque = (|| -> services::backup_service::R<rusqlite::Connection> {
-                let ruta = services::backup_service::ruta_activa(&app_data_dir)?;
-                let nueva = ruta == app_data_dir.join("lubricentro_secure.db") && !ruta.exists();
-                let conn = crate::db::abrir_db_ambiente(&ruta, nueva, &ambiente)?;
-                let encontrado: String = conn.query_row(
-                    "SELECT ambiente_actual FROM configuracion WHERE id_config=1",
-                    [],
-                    |r| r.get(0),
-                )?;
-                if encontrado != ambiente {
-                    return Err(errors::AppError::Validation(
-                        "La base activa no corresponde al ambiente seleccionado.".into(),
-                    ));
-                }
-                if ruta != app_data_dir.join("lubricentro_secure.db") {
-                    backup.validar_generacion_activa(&conn, &ruta)?;
-                }
-                backup.registrar_instalacion()?;
+            let arranque = ambiente::abrir(&app_data_dir, &seleccionado, &backup).inspect(|conn| {
                 let _ = conn.execute_batch("PRAGMA default_cache_size = 10000;");
-                Ok(conn)
-            })();
+            });
             let bloqueo = match arranque {
                 Ok(conn) => {
                     app.manage(Mutex::new(conn));
@@ -76,7 +49,7 @@ pub fn run() {
                     Some(e.to_string())
                 }
             };
-            app.manage(EstadoArranque::new(ambiente, bloqueo));
+            app.manage(EstadoArranque::new(seleccionado, bloqueo));
             app.manage(backup);
             app.manage(Mutex::new(SessionState::new()));
 
@@ -108,6 +81,8 @@ pub fn run() {
         })
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![
+            admin_operacion_cmd,
+            admin_cambiar_ambiente_cmd,
             pos_operacion_cmd,
             pos_archivo_local_cmd,
             crate::nubefact::pos_documento_cmd,

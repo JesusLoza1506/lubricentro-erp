@@ -20,6 +20,11 @@ import {
   type ContextoBackup,
 } from './pages/backup/backupService';
 
+import { FILTROS_USUARIOS_INICIALES, type FiltrosUsuarios } from './pages/administracion/adminApi';
+import type { PestanaAdmin } from './pages/administracion/AdministracionPage';
+const AdministracionPage = React.lazy(() =>
+  import('./pages/administracion/AdministracionPage').then((m) => ({ default: m.AdministracionPage }))
+);
 const CajaPage = React.lazy(() =>
   import('./pages/caja/CajaPage').then((m) => ({ default: m.CajaPage }))
 );
@@ -30,6 +35,7 @@ const PosPage = React.lazy(() =>
 const MainApp: React.FC = () => {
   const {
     usuario,
+    ambienteActual,
     estadoSesion,
     cargando,
     tienePermiso,
@@ -38,6 +44,14 @@ const MainApp: React.FC = () => {
   } = useAuth();
   const [otParaCobrar, setOtParaCobrar] = useState<number | null>(null);
   const [ventaParaConsultar, setVentaParaConsultar] = useState<number | null>(null);
+  const [pestanaAdmin, setPestanaAdmin] = useState<PestanaAdmin>('usuarios');
+  const [listadoAdmin, setListadoAdmin] = useState<{ alcance: string; filtros: FiltrosUsuarios } | null>(null);
+  const alcanceAdmin = JSON.stringify([
+    usuario?.session_id, usuario?.id_usuario, usuario?.rol, usuario?.ambiente_actual ?? ambienteActual,
+  ]);
+  useEffect(() => {
+    setListadoAdmin((previo) => previo?.alcance === alcanceAdmin ? previo : null);
+  }, [alcanceAdmin]);
   const [moduloActual, setModuloActual] = useState<string>('dashboard');
   const [placaSeleccionada, setPlacaSeleccionada] = useState<string>('');
   const [mostrarCambioClaveModal, setMostrarCambioClaveModal] = useState<boolean>(false);
@@ -49,6 +63,7 @@ const MainApp: React.FC = () => {
       setOtParaCobrar(null);
       setVentaParaConsultar(null);
       setMostrarCambioClaveModal(false);
+      setPestanaAdmin('usuarios');
       setHayCambiosSinGuardar(false);
     }
   }, [usuario?.id_usuario, estadoSesion, setHayCambiosSinGuardar]);
@@ -157,6 +172,19 @@ const MainApp: React.FC = () => {
         ) : (
           <DashboardPage setModuloActual={setModuloActual} />
         );
+      case 'administracion':
+        return usuario.rol === 'ADMINISTRADOR' && !bkp?.pendiente ? (
+          <React.Suspense fallback={<p role="status">Cargando Administración…</p>}>
+            <AdministracionPage
+              key={alcanceAdmin}
+              pestana={pestanaAdmin}
+              onPestana={setPestanaAdmin}
+              onNavegar={setModuloActual}
+              filtrosUsuarios={listadoAdmin?.alcance === alcanceAdmin ? listadoAdmin.filtros : FILTROS_USUARIOS_INICIALES}
+              onFiltrosUsuarios={(filtros) => setListadoAdmin({ alcance: alcanceAdmin, filtros })}
+            />
+          </React.Suspense>
+        ) : <DashboardPage setModuloActual={setModuloActual} />;
       case 'backup':
         return tienePermiso('BACKUP', 'ver') ? (
           <BackupPage

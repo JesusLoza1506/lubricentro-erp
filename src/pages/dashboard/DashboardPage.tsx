@@ -7,6 +7,7 @@ import {
   DatabaseBackup,
   Package,
   Receipt,
+  ShieldCheck,
   ShoppingCart,
   Wallet,
   Wrench,
@@ -64,6 +65,13 @@ const accesos = [
     icono: DatabaseBackup,
     titulo: 'Backup y Copias',
     descripcion: 'Genera, verifica y restaura respaldos.',
+  },
+  {
+    permiso: 'ADMIN',
+    destino: 'administracion',
+    icono: ShieldCheck,
+    titulo: 'Administración',
+    descripcion: 'Gestiona usuarios, empresa, facturación y taller.',
   },
 ] as const;
 
@@ -125,9 +133,11 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ setModuloActual })
     }
   }, [usuario]);
 
-  const visibles = accesos.filter(({ permiso }) =>
-    permiso === 'BACKUP' ? puedeVerBackup : tienePermiso(permiso, 'ver')
-  );
+  const visibles = accesos.filter(({ permiso }) => {
+    if (permiso === 'BACKUP') return puedeVerBackup;
+    if (permiso === 'ADMIN') return usuario?.rol === 'ADMINISTRADOR' && tienePermiso('ADMIN', 'ver');
+    return tienePermiso(permiso, 'ver');
+  });
   const respaldo = cargandoBackup ? 'Consultando respaldo…'
     : !estadoBackup ? 'Estado no disponible'
     : estadoBackup.recuperacion.pendiente ? 'Recuperación pendiente'

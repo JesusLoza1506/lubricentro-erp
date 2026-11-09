@@ -16,7 +16,7 @@
 ![Plataforma](https://img.shields.io/badge/Plataforma-Windows_11-2563EB?style=flat-square)
 ![Módulos](https://img.shields.io/badge/Alcance-10_m%C3%B3dulos-0F766E?style=flat-square)
 
-[Progreso](#estado) · [Login](#modulo-login-y-sesion) · [Ficha vehicular](#modulo-ficha-vehicular-e-historial) · [Taller](#modulo-ordenes-de-trabajo-taller) · [Inventario](#modulo-inventario-y-stock) · [POS](#modulo-punto-de-venta-pos) · [Caja Chica](#modulo-caja-chica) · [Backup y Copias](#modulo-backup-y-copias) · [Instalación](#instalacion) · [Documentación](#documentacion)
+[Progreso](#estado) · [Login](#modulo-login-y-sesion) · [Ficha vehicular](#modulo-ficha-vehicular-e-historial) · [Taller](#modulo-ordenes-de-trabajo-taller) · [Inventario](#modulo-inventario-y-stock) · [POS](#modulo-punto-de-venta-pos) · [Caja Chica](#modulo-caja-chica) · [Backup y Copias](#modulo-backup-y-copias) · [Administración](#modulo-administracion) · [Reportes](#modulo-reportes) · [Instalación](#instalacion) · [Documentación](#documentacion)
 
 </div>
 
@@ -43,9 +43,9 @@
 
 ## 2. Estado del proyecto
 
-Desarrollo secuencial, módulo por módulo, conforme al alcance funcional v7. **Login y Sesión (95/100)**, **Ficha Vehicular e Historial (93/100)**, **Órdenes de Trabajo Taller (93/100)**, **Inventario y Stock (95/100)**, **Punto de Venta POS (95/100)**, **Caja Chica (94/100)** y **Backup y Copias (94/100)** se encuentran en **ajustes finales**. Sus funciones principales ya están implementadas; los pendientes de cierre y la validación en escritorio se detallan en cada módulo.
+Desarrollo secuencial, módulo por módulo, conforme al alcance funcional v7. **Login y Sesión (95/100)**, **Ficha Vehicular e Historial (93/100)**, **Órdenes de Trabajo Taller (93/100)**, **Inventario y Stock (95/100)**, **Punto de Venta POS (95/100)**, **Caja Chica (94/100)**, **Backup y Copias (94/100)** y **Administración (96/100)** se encuentran en **ajustes finales**. Sus funciones principales ya están implementadas; los pendientes de cierre y la validación en escritorio se detallan en cada módulo.
 
-**El próximo módulo es Administración.** Su implementación está pendiente y abarcará la gestión autorizada de usuarios y la configuración de empresa, facturación y taller. Inicio Dashboard se desarrollará al final para reunir datos de los demás módulos.
+**El próximo módulo es Reportes.** Su implementación está pendiente y abarcará la consulta y exportación autorizadas de datos de los módulos anteriores. La integración final de Inicio Dashboard se mantiene para después de Reportes.
 
 | Orden | Módulo                                                             | Estado                                 | Evaluación |
 | ----- | ------------------------------------------------------------------ | -------------------------------------- | ---------- |
@@ -56,9 +56,9 @@ Desarrollo secuencial, módulo por módulo, conforme al alcance funcional v7. **
 | 05    | [Punto de Venta POS](#modulo-punto-de-venta-pos)                   | 🟢 Ajustes finales                     | 95/100     |
 | 06    | [Caja Chica](#modulo-caja-chica)                                   | 🟢 Ajustes finales                     | 94/100     |
 | 07    | [Backup y Copias](#modulo-backup-y-copias)                         | 🟢 Ajustes finales                     | 94/100     |
-| 08    | [Administración](#modulo-administracion)                           | ⚪ Pendiente · próximo módulo          | —          |
-| 09    | Reportes                                                           | ⚪ Pendiente                           | —          |
-| 10    | Inicio Dashboard                                                   | ⚪ Pendiente; se desarrollará al final | —          |
+| 08    | [Administración](#modulo-administracion)                         | 🟢 Ajustes finales                     | 96/100     |
+| 09    | [Reportes](#modulo-reportes)                                       | ⚪ Pendiente · próximo módulo          | —          |
+| 10    | Inicio Dashboard                                                   | ⚪ Pendiente de integración final      | —          |
 
 **Leyenda:** ⚪ Pendiente · 🟡 En curso · 🟢 Ajustes finales · ✅ Completado.
 
@@ -386,7 +386,7 @@ _Aviso de resultado de una operación_
 - **Cálculos deterministas:** dinero en céntimos, granel en mililitros y distribución controlada de descuentos, impuestos y diferencias de redondeo de las devoluciones.
 - **Historial protegido:** editar el catálogo no reescribe líneas confirmadas. Cobrar una OT no repite el consumo ni reabre el trabajo.
 - **Recuperación documental comprobada localmente:** una prueba cierra y reabre SQLite y comprueba que el intento interrumpido obliga a consultar antes de reenviar.
-- **19 pruebas de la suite de POS en Rust aprobadas**, incluida la integración con Caja Chica, además de pruebas de interfaz y recuperación documental.
+- **20 pruebas de la suite de POS en Rust aprobadas**, incluida la integración con Caja Chica, además de pruebas de interfaz y recuperación documental.
 - **Rendimiento del backend comprobado:** cinco muestras con **5.000 ventas en SQLite temporal en disco** promediaron **44,76 ms** en listado y **7,46 ms** en confirmación local. Todas quedaron por debajo de tres segundos. Falta medir el recorrido completo en escritorio.
 
 **Acceso por rol:**
@@ -550,7 +550,81 @@ _Aviso en Inicio cuando no hay una copia válida reciente_
 
 <a id="modulo-administracion"></a>
 
-**Próximo módulo: Administración — ⚪ Pendiente.** Se trabajará en la gestión de usuarios y en la configuración de empresa, facturación y taller.
+<details>
+<summary><b>08 · Administración</b> — 🟢 Ajustes finales · Evaluación: 96/100</summary>
+
+**Qué hace:** gestiona las cuentas del equipo y la configuración del negocio desde cuatro pestañas: **Usuarios, Empresa, Facturación y Taller**. Permite administrar accesos, datos fiscales, credenciales, series y zanjas, además de cambiar entre Prueba y Producción.
+
+**Funciones principales:**
+
+- **Consultar usuarios:** permite buscar por login o nombre, filtrar por rol y estado y recorrer **20 registros por página**. Muestra si la cuenta está bloqueada o exige cambiar la contraseña. Conserva búsqueda, filtros y página al regresar desde Caja o Taller y recarga los resultados.
+- **Crear cuentas:** normaliza el login, impide duplicados y asigna uno de los tres roles. Genera una contraseña temporal aleatoria de **12 caracteres**, visible solo durante la entrega, con cambio obligatorio al ingresar.
+- **Editar accesos:** reúne nombre, rol y estado en un formulario. Exige un motivo cuando cambia el rol o el estado, y bloquea cambios incompatibles con turnos u OT pendientes.
+- **Desbloquear, restablecer y reactivar:** desbloquear conserva la contraseña; restablecer genera otra temporal; reactivar conserva la contraseña y limpia el bloqueo. Protege la cuenta propia y evita dejar el sistema sin un administrador activo.
+- **Mantener los datos de empresa:** registra datos fiscales, teléfono y correo, valida el ubigeo contra un catálogo local y muestra una vista previa. El RUC queda fijo tras el primer comprobante local de Producción. Los documentos anteriores conservan sus datos.
+- **Configurar NubeFact:** guarda la ruta y protege el token por ambiente. Si el campo del token se deja vacío, conserva el vigente. Guardar la configuración no emite ni consulta comprobantes.
+- **Gestionar series:** permite registrar, activar, desactivar y elevar el piso de numeración con referencia cuando corresponde. Calcula el siguiente número considerando los máximos locales, conservados y comprobados, sin reutilizar números pendientes o rechazados.
+- **Ajustar zanjas:** permite configurar **de 1 a 6** posiciones, muestra su ocupación y bloquea retirar una posición ocupada. Conserva los identificadores históricos y la cola común de órdenes en espera.
+- **Cambiar de ambiente:** verifica requisitos, prepara la base de destino y contempla un reinicio con un nuevo inicio de sesión. Los datos y las credenciales se mantienen separados entre Prueba y Producción.
+- **Proteger capturas:** la X, Escape y Cancelar piden confirmación si hay cambios. Si se rechaza el descarte, el formulario conserva los valores. Los errores de ubigeo aparecen junto al campo sin borrar la captura.
+
+**Fortalezas de implementación:**
+
+- **Permisos en Rust:** valida la sesión y el rol administrativo en el backend, además de los controles de interfaz.
+- **Protección de contraseñas:** usa **Argon2id** y entrega las claves temporales una sola vez. El texto de la clave no se registra en auditorías ni en resultados persistentes.
+- **Integridad al guardar:** las transacciones, el control de versiones y la revalidación de dependencias previenen conflictos. Las pruebas comprobaron la reversión ante fallos de auditoría.
+- **Integración con POS y Backup:** comparte los servicios de token y numeración usados en la emisión y en la recuperación.
+- **Ubigeo sin internet:** valida contra **1.893 códigos distritales únicos**. El origen del catálogo está documentado en `UBIGEO.md`, junto al archivo de códigos.
+- **Contexto por sesión:** vincula el listado a la sesión, usuario, rol y ambiente para no arrastrar filtros de otra sesión.
+- **Cobertura automatizada:** **11 pruebas funcionales de Rust y 11 de frontend aprobadas** en Windows, además de la prueba de rendimiento ejecutada por separado.
+- **Rendimiento:** con **200 cuentas y 20 series** en SQLite en memoria, las **20 muestras de cada operación** quedaron por debajo de **2 segundos**. Cargar la primera página y las series tomó **0,51–1,05 ms**; guardar una cuenta con cálculo del hash tomó **404–600 ms**.
+
+**Acceso por rol:**
+
+| Rol           | Alcance                                                                 |
+| ------------- | ----------------------------------------------------------------------- |
+| Administrador | Gestiona usuarios, empresa, facturación, taller y cambio de ambiente.   |
+| Mecánico      | Sin acceso al módulo.                                                   |
+| Cajero        | Sin acceso al módulo.                                                   |
+
+**Capturas:**
+
+_Listado de usuarios con filtros por rol y estado_
+
+![Administración: listado de usuarios y filtros](docs/images/08-administracion-usuarios.png)
+
+_Formulario de edición de una cuenta_
+
+![Administración: edición de usuario](docs/images/08-administracion-editar-usuario.png)
+
+_Datos de empresa, contacto y ubigeo_
+
+![Administración: datos de empresa, contacto y ubigeo](docs/images/08-administracion-empresa.png)
+
+_Configuración de NubeFact y series de comprobantes_
+
+![Administración: configuración de facturación y series](docs/images/08-administracion-facturacion.png)
+
+_Configuración y ocupación de zanjas del taller_
+
+![Administración: configuración de zanjas](docs/images/08-administracion-taller.png)
+
+**Pendiente para cerrar:**
+
+- Validar el cambio de ambiente en escritorio: reinicio, nuevo inicio de sesión, destino fallido y tareas incompatibles activas.
+- Comprobar la configuración, el reemplazo y el fallo del token con el almacén de credenciales de Windows en un entorno aislado.
+- Ejecutar el recorrido integrado: alta del trabajador, cambio de contraseña temporal, configuración, venta en POS de Prueba y recuperación desde Backup.
+- Complementar el rendimiento con SQLite en disco y medir el recorrido de interfaz en el equipo de referencia.
+- Completar las pruebas en Tauri de teclado, foco, mensajes y vencimiento de sesión durante una edición.
+- Dejar una comprobación reproducible de procedencia e integridad para futuras actualizaciones del catálogo. El catálogo se cotejó con el endpoint oficial al incorporarlo; la última ejecución de pruebas en Windows no repitió ese cotejo.
+
+**Estado:** 🟢 **Ajustes finales · Evaluación: 96/100**. Se corrigieron el descarte sin confirmación, la pérdida de filtros y la validación parcial de ubigeo. Los tres cambios cuentan con pruebas permanentes. El cierre se concentra en escritorio, el almacén de credenciales de Windows y los recorridos de integración.
+
+</details>
+
+<a id="modulo-reportes"></a>
+
+**09 · Reportes — ⚪ Pendiente · Próximo módulo.** Integrará la consulta y la exportación autorizadas de información de los módulos anteriores. Todavía no tiene evaluación.
 
 <a id="roles"></a>
 
@@ -680,7 +754,7 @@ La configuración actual de Tauri invoca `npm run dev` antes del desarrollo y `n
 
 ### 8.1. Qué se verifica
 
-En Login: acceso, sesiones, permisos, bloqueo, recuperación, revocación y consistencia ante fallos. En Ficha Vehicular: registro, edición, identidad histórica, permisos, correcciones, consultas y paginación. En Taller: recepción, estados, responsable, zanjas, servicios, consumos, devoluciones, aceite, auditoría y avisos de resultado. En Inventario: DTO públicos sin costos, catálogos, proveedores, compras, conteos, valoración de granel, kardex, filtros y reintentos sin duplicación de efectos. En POS: ventas directas, cobro de OT sin duplicar insumos, pagos, devoluciones, comprobantes, idempotencia y recuperación documental local. En Caja Chica: apertura idempotente, privacidad entre cajeros, arqueo con control de versión, reversión, aclaración, cierre recuperado e integración con cobros y reintegros del POS. En Backup: copia consistente con WAL, protección local de la frase, archivos ausentes, retención, restauración por generaciones, recuperación de arranque y conciliación de series.
+En Login: acceso, sesiones, permisos, bloqueo, recuperación, revocación y consistencia ante fallos. En Ficha Vehicular: registro, edición, identidad histórica, permisos, correcciones, consultas y paginación. En Taller: recepción, estados, responsable, zanjas, servicios, consumos, devoluciones, aceite, auditoría y avisos de resultado. En Inventario: DTO públicos sin costos, catálogos, proveedores, compras, conteos, valoración de granel, kardex, filtros y reintentos sin duplicación de efectos. En POS: ventas directas, cobro de OT sin duplicar insumos, pagos, devoluciones, comprobantes, idempotencia y recuperación documental local. En Caja Chica: apertura idempotente, privacidad entre cajeros, arqueo con control de versión, reversión, aclaración, cierre recuperado e integración con cobros y reintegros del POS. En Backup: copia consistente con WAL, protección local de la frase, archivos ausentes, retención, restauración por generaciones, recuperación de arranque y conciliación de series. En Administración: permisos, cuentas y temporales, validación de ubigeo, control de versiones y dependencias, reversión ante fallos de auditoría, descarte de cambios y conservación de filtros por sesión.
 
 ### 8.2. Cómo ejecutarlas
 
@@ -696,36 +770,41 @@ cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings
 cargo test --manifest-path src-tauri/Cargo.toml
 ```
 
-Para repetir las mediciones del backend de POS y Caja Chica desde la raíz:
+Para repetir las mediciones del backend de POS, Caja Chica y Administración desde la raíz:
 
 ```powershell
 cargo test --manifest-path src-tauri/Cargo.toml --test pos_rendimiento_tests -- --ignored --nocapture
 cargo test --manifest-path src-tauri/Cargo.toml --test caja_rendimiento_tests -- --ignored --nocapture
+cargo test --manifest-path src-tauri/Cargo.toml --test administracion_tests rendimiento_administracion_200_cuentas_20_series -- --ignored --nocapture
 ```
 
 Las pruebas de integración externas deben usar datos y credenciales de Prueba. El flujo de [GitHub Actions](.github/workflows/ci.yml) define comprobaciones del frontend y backend; sus resultados se consultan en [Actions](https://github.com/JesusLoza1506/lubricentro-erp/actions).
 
 ### 8.3. Estado de la validación
 
-La última ejecución en Windows del **8 de noviembre de 2026** reportó:
+La ejecución general en Windows del **9 de noviembre de 2026** reportó los siguientes resultados. Las mediciones de rendimiento corresponden a ejecuciones por separado.
 
 | Comprobación                                      | Resultado reportado                                                                                                                                                    |
 | ------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Formato Rust, `cargo check` y Clippy              | Aprobados.                                                                                                                                                             |
 | TypeScript y compilación del frontend             | Aprobadas.                                                                                                                                                             |
-| Pruebas de frontend y servicios                   | **128 aprobadas** en **19 archivos**, incluidas **6 de Backup** y **3 de Caja Chica**.                                                                                 |
-| Suite general de Rust (`cargo test`)              | **136 aprobadas**, **0 fallidas** y **3 mediciones omitidas por defecto**.                                                                                             |
-| Suite Rust de POS                                 | **19 aprobadas**, incluida la integración con Caja Chica.                                                                                                              |
+| Pruebas de frontend y servicios                   | **141 aprobadas** en **20 archivos**, incluidas **11 de Administración**, **6 de Backup** y **3 de Caja Chica**. |
+| Suite general de Rust (`cargo test`)              | **148 aprobadas**, **0 fallidas** y **4 mediciones omitidas por defecto**. |
+| Suite Rust de POS                                 | **20 aprobadas**, incluida la integración con Caja Chica. |
 | Suite Rust de Caja Chica                          | **4 aprobadas**.                                                                                                                                                       |
 | Pruebas Rust de Backup y Copias                   | **10 aprobadas**, incluidas las de recuperación y de interrupción simulada.                                                                                            |
+| Suite funcional de Administración en Rust         | **11 aprobadas**. Incluye ubigeo, edición obsoleta, dependencias nuevas y reversión ante fallos de auditoría. |
 | Rendimiento de POS, ejecutado por separado        | **1 prueba aprobada** con cinco muestras y **5.000 ventas** en SQLite temporal en disco.                                                                               |
 | Rendimiento de Caja Chica, reportado por separado | **1 prueba aprobada** con **5.000 turnos y 100.000 movimientos** en SQLite temporal en disco. Las **20 muestras** por operación quedaron por debajo de **2 segundos**. |
+| Rendimiento de Administración, por separado       | **1 prueba aprobada** con **200 cuentas y 20 series** en SQLite en memoria; **20 de 20 muestras** por operación dentro de **2 segundos**. |
 
 **Rendimiento del POS:** el listado promedió **44,76 ms** (36,27–50,18 ms) y la confirmación local **7,46 ms** (4,47–14,98 ms). La prueba mide el backend local; todavía falta validar el tiempo visible en WebView y el recorrido con NubeFact de Prueba.
 
 **Rendimiento de Caja Chica:** la medición abarca el resumen, la primera página de movimientos y el cierre en Rust. Queda por medir el recorrido completo desde la interfaz en Tauri.
 
 **Rendimiento de Backup:** en la revisión anterior, generar y verificar tomó **31,66–37,34 s** y seleccionar y comprobar tomó **23,14–29,21 s** en cinco muestras con aproximadamente **100 MB de SQLite y 100 MB de archivos**. La medición se hizo en disco local con datos ficticios; queda pendiente medir USB y el recorrido completo en Tauri.
+
+**Rendimiento de Administración:** en Windows, la primera página más las series tomó **0,51–1,05 ms** y guardar con cálculo del hash tomó **404–600 ms**. La prueba mide el backend con SQLite en memoria. Quedan pendientes las mediciones con SQLite en disco y desde la interfaz en Tauri.
 
 **Evidencia previa de Inventario:** las consultas de catálogo, críticos y kardex con **1.000 productos y 10.000 movimientos** registraron aproximadamente **0,2–1,8 ms** en SQLite en memoria. Los tres casos de conteo reproducidos permanecen entre los pendientes de Inventario. Taller conserva como pendiente las cinco mediciones con **2.000 OT**.
 
@@ -749,7 +828,7 @@ El informe general y las diez especificaciones funcionales v7 son documentos de 
 
 ## 10. Hoja de ruta
 
-Se mantiene la siguiente secuencia de desarrollo. Los siete primeros módulos están en ajustes finales; **el siguiente módulo será Administración**.
+Los ocho primeros módulos están en ajustes finales; **el siguiente módulo será Reportes**.
 
 1. **Login y Sesión — ajustes finales (95/100):** completar recuperación del error inicial y evidencias de teclado, foco, salida y tiempos de ingreso.
 2. **Ficha Vehicular e Historial — ajustes finales (93/100):** activar cambios pendientes al modificar datos, consolidar pruebas de interfaz y completar mediciones de escritorio.
@@ -758,9 +837,9 @@ Se mantiene la siguiente secuencia de desarrollo. Los siete primeros módulos es
 5. **Punto de Venta POS — ajustes finales (95/100):** mostrar el último intento documental y completar las pruebas de NubeFact de Prueba, impresión, recorridos en Tauri y rendimiento visible.
 6. **Caja Chica — ajustes finales (94/100):** corregir la respuesta tardía al regresar al historial y completar las pruebas de interfaz, impresión, medianoche en Lima y rendimiento en escritorio.
 7. **Backup y Copias — ajustes finales (94/100):** estabilizar las pruebas de interfaz y completar las verificaciones de fallos, recuperación en Windows y guardado externo.
-8. **Administración — pendiente · próximo módulo:** implementar la gestión autorizada de usuarios y la configuración de empresa, facturación y taller.
-9. **Reportes:** integrar las consultas y exportaciones de los módulos anteriores.
-10. **Inicio Dashboard:** integrar al final los indicadores y resúmenes por rol con los datos de los demás módulos.
+8. **Administración — ajustes finales (96/100):** completar la validación en Tauri, el almacén de credenciales de Windows, los recorridos con POS y Backup y la medición con SQLite en disco.
+9. **Reportes — pendiente · próximo módulo:** integrar las consultas y exportaciones autorizadas de los módulos anteriores.
+10. **Inicio Dashboard — pendiente de integración final:** integrar los indicadores y resúmenes por rol después de Reportes.
 
 Cada módulo tendrá su detalle plegable, capturas y evidencias conforme avance. Pasar a la siguiente etapa no elimina los pendientes de los módulos anteriores. Este orden de desarrollo no modifica el flujo operativo del taller descrito en la sección 5.
 

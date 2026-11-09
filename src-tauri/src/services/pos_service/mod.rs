@@ -48,7 +48,7 @@ pub fn auditar(
     Ok(())
 }
 pub fn configuracion(conn: &Connection) -> Result<Value, AppError> {
-    Ok(conn.query_row("SELECT ambiente_actual,ruc,razon_social,direccion,ubigeo,nubefact_ruta_api,nubefact_token_ref,recuperacion_pendiente+revision_caja_pendiente+revision_token_pendiente+revision_series_pendiente FROM configuracion WHERE id_config=1",[],|r|Ok(json!({"ambiente":r.get::<_,String>(0)?,"ruc":r.get::<_,Option<String>>(1)?,"razon_social":r.get::<_,Option<String>>(2)?,"direccion":r.get::<_,Option<String>>(3)?,"ubigeo":r.get::<_,Option<String>>(4)?,"ruta":r.get::<_,Option<String>>(5)?,"token_ref":r.get::<_,Option<String>>(6)?,"recuperacion":r.get::<_,i64>(7)?})))?)
+    Ok(conn.query_row("SELECT ambiente_actual,ruc,razon_social,direccion,ubigeo,nubefact_ruta_api,nubefact_token_ref,recuperacion_pendiente+revision_caja_pendiente+revision_token_pendiente+revision_series_pendiente,nombre_comercial,telefono,correo FROM configuracion WHERE id_config=1",[],|r|Ok(json!({"ambiente":r.get::<_,String>(0)?,"ruc":r.get::<_,Option<String>>(1)?,"razon_social":r.get::<_,Option<String>>(2)?,"direccion":r.get::<_,Option<String>>(3)?,"ubigeo":r.get::<_,Option<String>>(4)?,"ruta":r.get::<_,Option<String>>(5)?,"token_ref":r.get::<_,Option<String>>(6)?,"recuperacion":r.get::<_,i64>(7)?,"nombre_comercial":r.get::<_,Option<String>>(8)?,"telefono":r.get::<_,Option<String>>(9)?,"correo":r.get::<_,Option<String>>(10)?})))?)
 }
 pub fn validar_config(c: &Value) -> Result<(), AppError> {
     for k in [

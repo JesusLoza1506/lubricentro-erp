@@ -1,6 +1,6 @@
 import '@testing-library/jest-dom/vitest';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { invoke } from '@tauri-apps/api/core';
 import { PosPage } from '../PosPage';
 import { DetalleVentaPos } from '../components/DetalleVentaPos';
@@ -91,9 +91,23 @@ beforeEach(() => {
   });
 });
 afterEach(cleanup);
+
+async function montarCatalogo() {
+  // Controla solo la carga diferida del catálogo, incluso si la suite se ejecuta en paralelo.
+  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+  try {
+    render(<PosPage />);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(200);
+    });
+  } finally {
+    vi.useRealTimers();
+  }
+}
+
 async function prepararCarrito() {
-  render(<PosPage />);
-  fireEvent.click(await screen.findByRole('button', { name: 'Agregar Filtro de aceite' }));
+  await montarCatalogo();
+  fireEvent.click(screen.getByRole('button', { name: 'Agregar Filtro de aceite' }));
   await waitFor(() =>
     expect(
       (screen.getByRole('button', { name: 'Cobrar venta' }) as HTMLButtonElement).disabled
@@ -142,8 +156,8 @@ it('permite retirar la captura cuando falla la cotización inicial', async () =>
     if ((a as any)?.accion === 'cotizar') throw 'VALIDATION_ERROR: Stock insuficiente';
     return original(c, a);
   });
-  render(<PosPage />);
-  fireEvent.click(await screen.findByRole('button', { name: 'Agregar Filtro de aceite' }));
+  await montarCatalogo();
+  fireEvent.click(screen.getByRole('button', { name: 'Agregar Filtro de aceite' }));
   await screen.findByText('Stock insuficiente');
   fireEvent.click(screen.getByRole('button', { name: 'Quitar Filtro de aceite' }));
   await waitFor(() =>
@@ -174,8 +188,8 @@ it.each([
       }
       return original(comando, args);
     });
-    render(<PosPage />);
-    fireEvent.click(await screen.findByRole('button', { name: 'Agregar Filtro de aceite' }));
+    await montarCatalogo();
+    fireEvent.click(screen.getByRole('button', { name: 'Agregar Filtro de aceite' }));
     const venta = within(screen.getByRole('complementary', { name: /Venta actual/ }));
     expect(await venta.findByText(motivo)).toBeInTheDocument();
     const resumen = within(venta.getByText('Total a cobrar').parentElement!);
@@ -291,8 +305,8 @@ it('conserva la cantidad rechazada de un servicio, bloquea el cobro y permite co
     }
     return original(cmd, args);
   });
-  render(<PosPage />);
-  fireEvent.click(await screen.findByRole('button', { name: 'Agregar Revisión de luces' }));
+  await montarCatalogo();
+  fireEvent.click(screen.getByRole('button', { name: 'Agregar Revisión de luces' }));
   const cobrar = await screen.findByRole('button', { name: 'Cobrar venta' });
   expect(cobrar).toBeEnabled();
   const cambiar = (value: string) => {

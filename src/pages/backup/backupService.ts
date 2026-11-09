@@ -15,7 +15,7 @@ export interface SerieRecuperada {
   previo: number;
   remoto: number;
   pendiente: 0 | 1;
-  siguiente: number;
+  siguiente: number | null;
 }
 export interface Recuperacion {
   pendiente: boolean;
@@ -102,10 +102,15 @@ export interface BackupArranque {
 }
 
 export const consultarArranqueBackup = () => invoke<BackupArranque>('backup_arranque_cmd');
-export const recuperarArranqueBackup = (req: { usuario: string; clave: string; frase: string; confirmado: boolean }) =>
-  invoke<void>('backup_recuperar_arranque_cmd', { req });
+export const recuperarArranqueBackup = (req: {
+  usuario: string;
+  clave: string;
+  frase: string;
+  confirmado: boolean;
+}) => invoke<void>('backup_recuperar_arranque_cmd', { req });
 
-export const progresoBackup = () => invoke<{ fase: number; no_cerrar: boolean }>('backup_progreso_cmd');
+export const progresoBackup = () =>
+  invoke<{ fase: number; no_cerrar: boolean }>('backup_progreso_cmd');
 
 export const etapasBackup: Record<number, string> = {
   1: 'Preparando y cifrando el respaldo…',

@@ -121,11 +121,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
     },
     {
       id: 'administracion',
-      moduloKey: 'ADMINISTRACION',
+      moduloKey: 'ADMIN',
       label: 'Administración',
       icon: Shield,
       siempreVisible: false,
-      enDesarrollo: true,
+      enDesarrollo: false,
     },
     {
       id: 'reportes',

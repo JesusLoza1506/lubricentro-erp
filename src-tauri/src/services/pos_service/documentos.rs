@@ -28,11 +28,8 @@ pub fn crear(
     receptor: &Value,
     totales: &Value,
 ) -> Result<i64, AppError> {
-    let (serie_id,serie,numero):(i64,String,i64)=conn.query_row("SELECT id_serie,serie,correlativo_actual+1 FROM series_comprobante WHERE ambiente=?1 AND tipo_comprobante=?2 AND activa=1 AND requiere_conciliacion=0",params![cfg["ambiente"].as_str(),tipo],|r|Ok((r.get(0)?,r.get(1)?,r.get(2)?))).map_err(|_|error("Configura una serie activa y conciliada para este tipo de comprobante."))?;
-    conn.execute(
-        "UPDATE series_comprobante SET correlativo_actual=?1 WHERE id_serie=?2",
-        params![numero, serie_id],
-    )?;
+    let (serie_id, serie, numero) =
+        crate::services::admin_service::facturacion::reservar(conn, tipo)?;
     let fecha: String = conn.query_row("SELECT datetime('now','-5 hours')", [], |r| r.get(0))?;
     let mut items = Vec::new();
     let sql = if devolucion.is_some() {
@@ -65,7 +62,7 @@ pub fn crear(
         payload["observaciones"] = json!(motivo);
     }
     let sha = IdempotenciaService::calcular_sha256(&payload)?;
-    let empresa = json!({"ruc":cfg["ruc"],"razon_social":cfg["razon_social"],"direccion":cfg["direccion"],"ubigeo":cfg["ubigeo"]});
+    let empresa = json!({"ruc":cfg["ruc"],"razon_social":cfg["razon_social"],"direccion":cfg["direccion"],"ubigeo":cfg["ubigeo"],"nombre_comercial":cfg["nombre_comercial"],"telefono":cfg["telefono"],"correo":cfg["correo"]});
     conn.execute("INSERT INTO comprobantes(id_operacion,id_venta,id_devolucion,id_documento_anterior,id_documento_referenciado,relacion,tipo_comprobante,ambiente,id_serie,correlativo,empresa_snapshot,receptor_snapshot,payload_json,payload_sha256,base_cent,igv_cent,total_cent,fecha_emision) VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18)",params![format!("{op}-documento"),venta,devolucion,anterior,original,relacion,tipo,cfg["ambiente"].as_str(),serie_id,numero,empresa.to_string(),receptor.to_string(),payload.to_string(),sha,totales["base_cent"].as_i64(),totales["igv_cent"].as_i64(),totales["total_cent"].as_i64(),fecha])?;
     let id = conn.last_insert_rowid();
     auditar(

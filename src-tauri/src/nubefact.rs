@@ -160,17 +160,10 @@ pub async fn pos_documento_cmd(
         let cfg = pos::configuracion(&conn)?;
         pos::validar_config(&cfg)?;
         let ruta = cfg["ruta"].as_str().unwrap_or("").to_string();
-        let url = reqwest::Url::parse(&ruta).map_err(|_| pos::error("Ruta NubeFact inválida."))?;
-        if url.scheme() != "https" || !url.username().is_empty() || url.password().is_some() {
-            return Err(pos::error(
-                "La integración requiere una ruta HTTPS sin credenciales en la URL.",
-            ));
-        }
-        let servicio = format!(
-            "lubricentro_erp_nubefact_{}",
-            cfg["ambiente"].as_str().unwrap_or("")
-        );
-        let token=keyring::Entry::new(&servicio,cfg["token_ref"].as_str().unwrap_or("")).map_err(|_|pos::error("No se pudo acceder al almacén de credenciales."))?.get_password().map_err(|_|pos::error("No se encontró el token protegido de este ambiente. Configúralo en Administración."))?;
+        let url = crate::services::admin_service::facturacion::url(&ruta)?;
+        let token = crate::services::admin_service::facturacion::credencial(
+            cfg["ambiente"].as_str().unwrap_or(""),cfg["token_ref"].as_str().unwrap_or("")
+        )?.get_password().map(zeroize::Zeroizing::new).map_err(|_|pos::error("No se encontró el token protegido de este ambiente. Configúralo en Administración."))?;
         let request = solicitud_documental(&payload, es_consulta);
         registrar_intento(
             &mut conn,
@@ -180,12 +173,12 @@ pub async fn pos_documento_cmd(
             &payload,
             es_consulta,
         )?;
-        (actor, ruta, token, request, payload, es_consulta)
+        (actor, url, token, request, payload, es_consulta)
     };
     let respuesta = async {
         let res = client
             .post(ruta)
-            .header("Authorization", format!("Token token={token}"))
+            .header("Authorization", format!("Token token={}", token.as_str()))
             .json(&request)
             .send()
             .await
