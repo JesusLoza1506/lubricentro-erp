@@ -527,8 +527,6 @@ La copia diaria se ejecuta como tarea del sistema. La recuperación de arranque 
 
 **Capturas:**
 
-Capturas de referencia compartidas durante el desarrollo. Corresponden a una versión anterior del diseño.
-
 _Estado del respaldo: programación, conservación e historial de copias locales_
 
 ![Backup y Copias: estado del respaldo e historial de copias locales](docs/images/07-backup-copias.png)
