@@ -47,18 +47,18 @@ Desarrollo secuencial, módulo por módulo, conforme al alcance funcional v7. **
 
 **El próximo módulo es Reportes.** Su implementación está pendiente y abarcará la consulta y exportación autorizadas de datos de los módulos anteriores. La integración final de Inicio Dashboard se mantiene para después de Reportes.
 
-| Orden | Módulo                                                             | Estado                                 | Evaluación |
-| ----- | ------------------------------------------------------------------ | -------------------------------------- | ---------- |
-| 01    | [Login y Sesión](#modulo-login-y-sesion)                           | 🟢 Ajustes finales                     | 95/100     |
-| 02    | [Ficha Vehicular e Historial](#modulo-ficha-vehicular-e-historial) | 🟢 Ajustes finales                     | 93/100     |
-| 03    | [Órdenes de Trabajo Taller](#modulo-ordenes-de-trabajo-taller)     | 🟢 Ajustes finales                     | 93/100     |
-| 04    | [Inventario y Stock](#modulo-inventario-y-stock)                   | 🟢 Ajustes finales                     | 95/100     |
-| 05    | [Punto de Venta POS](#modulo-punto-de-venta-pos)                   | 🟢 Ajustes finales                     | 95/100     |
-| 06    | [Caja Chica](#modulo-caja-chica)                                   | 🟢 Ajustes finales                     | 94/100     |
-| 07    | [Backup y Copias](#modulo-backup-y-copias)                         | 🟢 Ajustes finales                     | 94/100     |
-| 08    | [Administración](#modulo-administracion)                         | 🟢 Ajustes finales                     | 96/100     |
-| 09    | [Reportes](#modulo-reportes)                                       | ⚪ Pendiente · próximo módulo          | —          |
-| 10    | Inicio Dashboard                                                   | ⚪ Pendiente de integración final      | —          |
+| Orden | Módulo                                                             | Estado                            | Evaluación |
+| ----- | ------------------------------------------------------------------ | --------------------------------- | ---------- |
+| 01    | [Login y Sesión](#modulo-login-y-sesion)                           | 🟢 Ajustes finales                | 95/100     |
+| 02    | [Ficha Vehicular e Historial](#modulo-ficha-vehicular-e-historial) | 🟢 Ajustes finales                | 93/100     |
+| 03    | [Órdenes de Trabajo Taller](#modulo-ordenes-de-trabajo-taller)     | 🟢 Ajustes finales                | 93/100     |
+| 04    | [Inventario y Stock](#modulo-inventario-y-stock)                   | 🟢 Ajustes finales                | 95/100     |
+| 05    | [Punto de Venta POS](#modulo-punto-de-venta-pos)                   | 🟢 Ajustes finales                | 95/100     |
+| 06    | [Caja Chica](#modulo-caja-chica)                                   | 🟢 Ajustes finales                | 94/100     |
+| 07    | [Backup y Copias](#modulo-backup-y-copias)                         | 🟢 Ajustes finales                | 94/100     |
+| 08    | [Administración](#modulo-administracion)                           | 🟢 Ajustes finales                | 96/100     |
+| 09    | [Reportes](#modulo-reportes)                                       | ⚪ Pendiente · próximo módulo     | —          |
+| 10    | Inicio Dashboard                                                   | ⚪ Pendiente de integración final | —          |
 
 **Leyenda:** ⚪ Pendiente · 🟡 En curso · 🟢 Ajustes finales · ✅ Completado.
 
@@ -581,11 +581,11 @@ _Aviso en Inicio cuando no hay una copia válida reciente_
 
 **Acceso por rol:**
 
-| Rol           | Alcance                                                                 |
-| ------------- | ----------------------------------------------------------------------- |
-| Administrador | Gestiona usuarios, empresa, facturación, taller y cambio de ambiente.   |
-| Mecánico      | Sin acceso al módulo.                                                   |
-| Cajero        | Sin acceso al módulo.                                                   |
+| Rol           | Alcance                                                               |
+| ------------- | --------------------------------------------------------------------- |
+| Administrador | Gestiona usuarios, empresa, facturación, taller y cambio de ambiente. |
+| Mecánico      | Sin acceso al módulo.                                                 |
+| Cajero        | Sin acceso al módulo.                                                 |
 
 **Capturas:**
 
@@ -611,7 +611,7 @@ _Configuración y ocupación de zanjas del taller_
 
 **Pendiente para cerrar:**
 
-- Validar el cambio de ambiente en escritorio: reinicio, nuevo inicio de sesión, destino fallido y tareas incompatibles activas.
+- Validar el cambio de ambiente en escritorio: reinicios, nuevo inicio de sesión, destino fallido y tareas incompatibles activas.
 - Comprobar la configuración, el reemplazo y el fallo del token con el almacén de credenciales de Windows en un entorno aislado.
 - Ejecutar el recorrido integrado: alta del trabajador, cambio de contraseña temporal, configuración, venta en POS de Prueba y recuperación desde Backup.
 - Complementar el rendimiento con SQLite en disco y medir el recorrido de interfaz en el equipo de referencia.
@@ -788,15 +788,15 @@ La ejecución general en Windows del **9 de noviembre de 2026** reportó los sig
 | ------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Formato Rust, `cargo check` y Clippy              | Aprobados.                                                                                                                                                             |
 | TypeScript y compilación del frontend             | Aprobadas.                                                                                                                                                             |
-| Pruebas de frontend y servicios                   | **141 aprobadas** en **20 archivos**, incluidas **11 de Administración**, **6 de Backup** y **3 de Caja Chica**. |
-| Suite general de Rust (`cargo test`)              | **148 aprobadas**, **0 fallidas** y **4 mediciones omitidas por defecto**. |
-| Suite Rust de POS                                 | **20 aprobadas**, incluida la integración con Caja Chica. |
+| Pruebas de frontend y servicios                   | **141 aprobadas** en **20 archivos**, incluidas **11 de Administración**, **6 de Backup** y **3 de Caja Chica**.                                                       |
+| Suite general de Rust (`cargo test`)              | **148 aprobadas**, **0 fallidas** y **4 mediciones omitidas por defecto**.                                                                                             |
+| Suite Rust de POS                                 | **20 aprobadas**, incluida la integración con Caja Chica.                                                                                                              |
 | Suite Rust de Caja Chica                          | **4 aprobadas**.                                                                                                                                                       |
 | Pruebas Rust de Backup y Copias                   | **10 aprobadas**, incluidas las de recuperación y de interrupción simulada.                                                                                            |
-| Suite funcional de Administración en Rust         | **11 aprobadas**. Incluye ubigeo, edición obsoleta, dependencias nuevas y reversión ante fallos de auditoría. |
+| Suite funcional de Administración en Rust         | **11 aprobadas**. Incluye ubigeo, edición obsoleta, dependencias nuevas y reversión ante fallos de auditoría.                                                          |
 | Rendimiento de POS, ejecutado por separado        | **1 prueba aprobada** con cinco muestras y **5.000 ventas** en SQLite temporal en disco.                                                                               |
 | Rendimiento de Caja Chica, reportado por separado | **1 prueba aprobada** con **5.000 turnos y 100.000 movimientos** en SQLite temporal en disco. Las **20 muestras** por operación quedaron por debajo de **2 segundos**. |
-| Rendimiento de Administración, por separado       | **1 prueba aprobada** con **200 cuentas y 20 series** en SQLite en memoria; **20 de 20 muestras** por operación dentro de **2 segundos**. |
+| Rendimiento de Administración, por separado       | **1 prueba aprobada** con **200 cuentas y 20 series** en SQLite en memoria; **20 de 20 muestras** por operación dentro de **2 segundos**.                              |
 
 **Rendimiento del POS:** el listado promedió **44,76 ms** (36,27–50,18 ms) y la confirmación local **7,46 ms** (4,47–14,98 ms). La prueba mide el backend local; todavía falta validar el tiempo visible en WebView y el recorrido con NubeFact de Prueba.
 
