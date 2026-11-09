@@ -114,10 +114,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
     {
       id: 'backup',
       moduloKey: 'BACKUP',
-      label: 'Backup & Copias',
+      label: 'Backup y Copias',
       icon: Database,
       siempreVisible: false,
-      enDesarrollo: true,
+      enDesarrollo: false,
     },
     {
       id: 'administracion',

@@ -111,6 +111,7 @@ fn registrar_intento(
 
 #[tauri::command]
 pub async fn pos_documento_cmd(
+    backup_state: tauri::State<'_, crate::services::backup_service::BackupState>,
     db_state: State<'_, Mutex<Connection>>,
     session_state: State<'_, Mutex<SessionState>>,
     id_documento: i64,
@@ -118,6 +119,10 @@ pub async fn pos_documento_cmd(
     automatico: bool,
     token_envio: Option<String>,
 ) -> Result<Value, AppError> {
+    let _backup = backup_state
+        .envios
+        .try_read()
+        .map_err(|_| AppError::Validation("La restauración está en curso.".into()))?;
     let _guardia = GuardiaDocumento::nueva(id_documento)?;
     let client = reqwest::Client::builder()
         .timeout(Duration::from_secs(25))

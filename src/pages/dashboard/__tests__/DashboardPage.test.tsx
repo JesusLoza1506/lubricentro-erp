@@ -18,12 +18,21 @@ const metricas: DashboardDTO = {
   estado_caja: 'Abierta',
 };
 
+const respaldo = {
+  configurada: true,
+  ultima: '2026-11-06 23:00:00',
+  vencida: true,
+  recuperacion: { pendiente: false },
+};
+
 function permisos(...modulos: string[]) {
   return (modulo: string, accion: string) => accion === 'ver' && modulos.includes(modulo);
 }
 
 beforeEach(() => {
-  vi.mocked(invoke).mockReset().mockResolvedValue(metricas);
+  vi.mocked(invoke).mockReset().mockImplementation(async (cmd) =>
+    cmd === 'backup_operacion_cmd' ? respaldo : metricas
+  );
 });
 
 afterEach(() => {
@@ -46,10 +55,9 @@ describe('Dashboard de inicio', () => {
       })
     );
     let resolver!: (dto: DashboardDTO) => void;
-    vi.mocked(invoke).mockReturnValueOnce(
-      new Promise<DashboardDTO>((resolve) => {
-        resolver = resolve;
-      })
+    vi.mocked(invoke).mockImplementation((cmd) =>
+      cmd === 'backup_operacion_cmd' ? Promise.resolve(respaldo)
+        : new Promise<DashboardDTO>((resolve) => { resolver = resolve; })
     );
     const navegar = vi.fn();
     render(<DashboardPage setModuloActual={navegar} />);
@@ -58,7 +66,7 @@ describe('Dashboard de inicio', () => {
     const resumen = within(screen.getByRole('region', { name: 'Resumen de hoy' }));
     expect(resumen.getAllByText('Cargando…')).toHaveLength(4);
     expect(resumen.queryByText('S/ 0.00')).not.toBeInTheDocument();
-    expect(invoke).toHaveBeenCalledExactlyOnceWith('obtener_dashboard_cmd', { idUsuario: 7 });
+    expect(invoke).toHaveBeenCalledWith('obtener_dashboard_cmd', { idUsuario: 7 });
 
     await act(async () => resolver(metricas));
     expect(resumen.queryByText('Cargando…')).not.toBeInTheDocument();
@@ -92,7 +100,10 @@ describe('Dashboard de inicio', () => {
 
   it('si falla la consulta muestra datos no disponibles sin bloquear los accesos', async () => {
     vi.spyOn(console, 'error').mockImplementation(() => {});
-    vi.mocked(invoke).mockRejectedValueOnce(new Error('Sin respuesta'));
+    vi.mocked(invoke).mockImplementation(async (cmd) => {
+      if (cmd === 'obtener_dashboard_cmd') throw new Error('Sin respuesta');
+      return respaldo;
+    });
     vi.mocked(useAuth).mockReturnValue(
       authDePrueba({
         tienePermiso: permisos('BACKUP', 'COLA_SUNAT', 'INVENTARIO'),
@@ -106,4 +117,17 @@ describe('Dashboard de inicio', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Inventario y Stock' }));
     expect(navegar).toHaveBeenCalledExactlyOnceWith('inventario');
   });
+
+  it('muestra la fecha y el estado del respaldo y abre Backup desde Inicio', async () => {
+    vi.mocked(useAuth).mockReturnValue(authDePrueba({ tienePermiso: permisos('BACKUP') }));
+    const navegar = vi.fn();
+    render(<DashboardPage setModuloActual={navegar} />);
+    const acceso = within(screen.getByRole('button', { name: 'Backup y Copias' }));
+    expect(await acceso.findByText('Copia de más de 24 h')).toBeInTheDocument();
+    expect(acceso.getByText('Última copia válida: 06/11/2026 · 23:00 (Lima)')).toBeInTheDocument();
+    expect(invoke).toHaveBeenCalledWith('backup_operacion_cmd', { req: { accion: 'estado' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Backup y Copias' }));
+    expect(navegar).toHaveBeenCalledExactlyOnceWith('backup');
+  });
+
 });

@@ -1,8 +1,6 @@
 use crate::dto::dashboard_dto::{AlertaFidelizacionDto, DashboardDto};
 use crate::errors::AppError;
 use rusqlite::Connection;
-use std::fs;
-use std::path::PathBuf;
 
 pub struct DashboardService;
 
@@ -145,34 +143,6 @@ impl DashboardService {
         }
 
         Ok(alertas)
-    }
-
-    /// Genera un respaldo físico (copia de seguridad) de la base de datos SQLite
-    pub fn generar_backup_db(db_path: &PathBuf, destino_dir: &PathBuf) -> Result<String, AppError> {
-        if !db_path.exists() {
-            return Err(AppError::NotFound(
-                "La base de datos de origen no existe.".to_string(),
-            ));
-        }
-
-        if !destino_dir.exists() {
-            fs::create_dir_all(destino_dir).map_err(|e| {
-                AppError::Validation(format!("No se pudo crear el directorio de destino: {}", e))
-            })?;
-        }
-
-        let timestamp = chrono::Local::now().format("%Y%m%d_%H%M%S");
-        let nombre_backup = format!("backup_lubricentro_{}.db", timestamp);
-        let destino_path = destino_dir.join(nombre_backup);
-
-        fs::copy(db_path, &destino_path).map_err(|e| {
-            AppError::Validation(format!(
-                "Error al copiar el archivo de base de datos: {}",
-                e
-            ))
-        })?;
-
-        Ok(destino_path.to_string_lossy().into_owned())
     }
 }
 

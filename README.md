@@ -16,7 +16,7 @@
 ![Plataforma](https://img.shields.io/badge/Plataforma-Windows_11-2563EB?style=flat-square)
 ![Módulos](https://img.shields.io/badge/Alcance-10_m%C3%B3dulos-0F766E?style=flat-square)
 
-[Progreso](#estado) · [Login](#modulo-login-y-sesion) · [Ficha vehicular](#modulo-ficha-vehicular-e-historial) · [Taller](#modulo-ordenes-de-trabajo-taller) · [Inventario](#modulo-inventario-y-stock) · [POS](#modulo-punto-de-venta-pos) · [Caja Chica](#modulo-caja-chica) · [Instalación](#instalacion) · [Documentación](#documentacion)
+[Progreso](#estado) · [Login](#modulo-login-y-sesion) · [Ficha vehicular](#modulo-ficha-vehicular-e-historial) · [Taller](#modulo-ordenes-de-trabajo-taller) · [Inventario](#modulo-inventario-y-stock) · [POS](#modulo-punto-de-venta-pos) · [Caja Chica](#modulo-caja-chica) · [Backup y Copias](#modulo-backup-y-copias) · [Instalación](#instalacion) · [Documentación](#documentacion)
 
 </div>
 
@@ -43,9 +43,9 @@
 
 ## 2. Estado del proyecto
 
-Desarrollo secuencial, módulo por módulo, conforme al alcance funcional v7. **Login y Sesión (95/100)**, **Ficha Vehicular e Historial (93/100)**, **Órdenes de Trabajo Taller (93/100)**, **Inventario y Stock (95/100)**, **Punto de Venta POS (95/100)** y **Caja Chica (94/100)** se encuentran en **ajustes finales**. Sus funciones principales ya están implementadas; los pendientes de cierre y la validación en escritorio se detallan en cada módulo.
+Desarrollo secuencial, módulo por módulo, conforme al alcance funcional v7. **Login y Sesión (95/100)**, **Ficha Vehicular e Historial (93/100)**, **Órdenes de Trabajo Taller (93/100)**, **Inventario y Stock (95/100)**, **Punto de Venta POS (95/100)**, **Caja Chica (94/100)** y **Backup y Copias (94/100)** se encuentran en **ajustes finales**. Sus funciones principales ya están implementadas; los pendientes de cierre y la validación en escritorio se detallan en cada módulo.
 
-**El próximo módulo es Backup y Copias.** La siguiente etapa se centrará en crear y verificar respaldos y probar la restauración. Caja Chica sigue en ajustes finales mientras se completa su validación en escritorio. Inicio Dashboard se desarrollará al final para reunir datos de los demás módulos.
+**El próximo módulo es Administración.** Su implementación está pendiente y abarcará la gestión autorizada de usuarios y la configuración de empresa, facturación y taller. Inicio Dashboard se desarrollará al final para reunir datos de los demás módulos.
 
 | Orden | Módulo                                                             | Estado                                 | Evaluación |
 | ----- | ------------------------------------------------------------------ | -------------------------------------- | ---------- |
@@ -55,8 +55,8 @@ Desarrollo secuencial, módulo por módulo, conforme al alcance funcional v7. **
 | 04    | [Inventario y Stock](#modulo-inventario-y-stock)                   | 🟢 Ajustes finales                     | 95/100     |
 | 05    | [Punto de Venta POS](#modulo-punto-de-venta-pos)                   | 🟢 Ajustes finales                     | 95/100     |
 | 06    | [Caja Chica](#modulo-caja-chica)                                   | 🟢 Ajustes finales                     | 94/100     |
-| 07    | [Backup y Copias](#modulo-backup-y-copias)                         | ⚪ Pendiente · próximo módulo          | —          |
-| 08    | Administración                                                     | ⚪ Pendiente                           | —          |
+| 07    | [Backup y Copias](#modulo-backup-y-copias)                         | 🟢 Ajustes finales                     | 94/100     |
+| 08    | [Administración](#modulo-administracion)                           | ⚪ Pendiente · próximo módulo          | —          |
 | 09    | Reportes                                                           | ⚪ Pendiente                           | —          |
 | 10    | Inicio Dashboard                                                   | ⚪ Pendiente; se desarrollará al final | —          |
 
@@ -485,7 +485,74 @@ _Historial de turnos: filtros y cierres registrados_
 
 <a id="modulo-backup-y-copias"></a>
 
-**Próximo módulo: Backup y Copias — ⚪ Pendiente.** Se trabajará en la creación y verificación de copias de seguridad y en la restauración de datos.
+<details>
+<summary><b>07 · Backup y Copias</b> — 🟢 Ajustes finales · Evaluación: 94/100</summary>
+
+**Qué hace:** protege los datos del negocio mediante copias locales cifradas y verificadas. Permite guardar un respaldo fuera del equipo, restaurar los datos de una fecha anterior y completar la recuperación con controles de Caja, comprobantes y numeración.
+
+**Funciones principales:**
+
+- **Configurar la protección:** solicita una frase de 16 a 128 caracteres y su confirmación. Windows protege la frase local mediante DPAPI. Cancelar borra los campos sin guardar cambios.
+- **Generar una copia manual:** toma una fotografía consistente de SQLite y de los archivos locales referenciados. Publica el respaldo tras verificarlo. Puede ejecutarse con un turno de Caja abierto.
+- **Programar la copia diaria:** se ejecuta a las **23:00 de Lima** y contempla una ejecución pendiente si se omitieron días. Impide ejecutar dos tareas de Backup simultáneas.
+- **Consultar respaldos:** muestra la última copia válida, la próxima diaria y su resultado. El historial permite filtrar por tipo y consultar **20 registros por página**. Identifica los archivos ausentes e impide seleccionarlos.
+- **Seleccionar y comprobar:** abre el paquete en un espacio temporal sin sustituir los datos activos. Verifica autenticidad, esquema, empresa, ambiente, integridad de la base y archivos incluidos.
+- **Guardar fuera del equipo:** guarda el mismo paquete con un nombre único en la carpeta o USB elegido y compara tamaño y huella. Si el guardado externo falla, conserva la copia local.
+- **Conservar copias:** mantiene las últimas **14 copias rutinarias**, protege las previas y los archivos en uso y permite eliminar previas con autorización.
+- **Restaurar información:** verifica los requisitos y el espacio disponible. Para sustituir una instalación existente exige cerrar el turno actual y genera una copia previa. Al terminar, requiere volver a iniciar sesión.
+- **Completar la recuperación:** guía el cierre del turno recuperado, la configuración del token cuando falta y la conciliación de series. Conserva los máximos conocidos para impedir que la numeración retroceda.
+- **Recuperar un arranque bloqueado:** permite volver mediante una copia previa registrada y verificada, con autenticación de un administrador incluido en ella. Evita crear silenciosamente una base vacía si falta la activa.
+- **Mantener el contexto y mostrar el progreso:** conserva filtro, página y selección al volver desde Caja y revalida su vigencia. Muestra la etapa en curso y bloquea el cierre normal de la ventana durante el intercambio de la restauración.
+
+**Fortalezas de implementación:**
+
+- **Protección del paquete:** cifrado autenticado **AES-256-GCM** con clave derivada mediante **Argon2id**. La frase local se protege con DPAPI fuera de SQLite.
+- **Fotografía consistente:** usa la **API de backup de SQLite** para incluir los cambios confirmados aunque la base use WAL. Comprueba integridad, relaciones, esquema y huellas.
+- **Restauración por generaciones:** prepara la base y sus archivos como un conjunto, activa la nueva generación mediante un registro externo y conserva el conjunto anterior.
+- **Permisos en Rust:** la gestión exige autorización administrativa. La selección se vincula al usuario, la sesión y su período de vigencia.
+- **Coordinación con POS:** espera los envíos en curso y exige consultar los comprobantes recuperados con resultado incierto antes de reenviarlos.
+- **Cobertura automatizada:** **10 pruebas de Rust y 6 de frontend aprobadas** en la última ejecución en Windows. Incluyen tres puntos de interrupción simulada, arranque con previa, archivos ausentes, referencias, retención y navegación desde Caja. La revisión anterior reportó inestabilidad de la suite de interfaz; queda por estabilizarla.
+- **Conciliación comprobada en una revisión anterior:** una copia en **120** y un máximo conocido de **135** dieron **136** como siguiente número.
+- **Rendimiento local:** en la revisión anterior, las **cinco muestras** con aproximadamente **100 MB de base y 100 MB de archivos** quedaron por debajo de **120 s** tanto al generar y verificar como al seleccionar y comprobar.
+
+**Acceso por rol:**
+
+| Rol           | Alcance                                                                                                 |
+| ------------- | ------------------------------------------------------------------------------------------------------- |
+| Administrador | Configura la protección, comprueba, exporta y restaura copias y completa los controles de recuperación. |
+| Mecánico      | Sin acceso al módulo.                                                                                   |
+| Cajero        | Sin acceso al módulo.                                                                                   |
+
+La copia diaria se ejecuta como tarea del sistema. La recuperación de arranque exige las credenciales de un administrador incluido en la previa.
+
+**Capturas:**
+
+Capturas de referencia compartidas durante el desarrollo. Corresponden a una versión anterior del diseño.
+
+_Estado del respaldo: programación, conservación e historial de copias locales_
+
+![Backup y Copias: estado del respaldo e historial de copias locales](docs/images/07-backup-copias.png)
+
+_Aviso en Inicio cuando no hay una copia válida reciente_
+
+![Inicio: aviso de copia no reciente y acceso a Backup y Copias](docs/images/07-backup-aviso-inicio.png)
+
+**Pendiente para cerrar:**
+
+- Estabilizar las pruebas de frontend separando las consultas de progreso de las operaciones bajo prueba.
+- Ampliar los escenarios de espacio insuficiente, fallo al crear la previa y desconexión del destino externo.
+- Complementar las interrupciones simuladas con terminación y reapertura del proceso en Tauri, incluyendo archivos oficiales asociados.
+- Ampliar las pruebas de la copia diaria: días omitidos, otra tarea en curso y fallo visible sin repetición indefinida.
+- Ejecutar una recuperación completa en otro perfil o equipo Windows: Caja, token, series y retorno a POS.
+- Completar los recorridos de teclado, selectores, progreso y bloqueo del cierre de ventana. Medir el guardado y la lectura desde USB por separado.
+
+**Estado:** 🟢 **Ajustes finales · Evaluación: 94/100**. Los principales pendientes funcionales de la revisión anterior quedaron resueltos. Quedan por estabilizar las pruebas de interfaz y completar la evidencia de recuperación ante fallos y en escritorio.
+
+</details>
+
+<a id="modulo-administracion"></a>
+
+**Próximo módulo: Administración — ⚪ Pendiente.** Se trabajará en la gestión de usuarios y en la configuración de empresa, facturación y taller.
 
 <a id="roles"></a>
 
@@ -523,7 +590,9 @@ Las autorizaciones se validan en Rust. Los costos y las notas internas se restri
 
 **Comprobante electrónico:** el envío ocurre después del guardado local. Si el resultado es incierto, el administrador consulta el documento original antes de reenviarlo; si es rechazado, la reemisión usa otro número vinculado sin registrar otra venta ni otro cobro. Devolver exige que el original y las notas de crédito anteriores estén aceptados.
 
-**Cierre de turno:** Caja Chica guarda el arqueo y permite consultarlo desde el historial. La creación, verificación y restauración de copias corresponde a Backup y Copias, el próximo módulo.
+**Cierre de turno:** Caja Chica guarda el arqueo y permite consultarlo desde el historial.
+
+**Respaldo y recuperación:** el administrador puede generar y verificar copias con Caja abierta. Para restaurar una instalación existente debe cerrar el turno actual; antes de reanudar la operación se completan los controles de recuperación que correspondan.
 
 <a id="arquitectura"></a>
 
@@ -613,7 +682,7 @@ La configuración actual de Tauri invoca `npm run dev` antes del desarrollo y `n
 
 ### 8.1. Qué se verifica
 
-En Login: acceso, sesiones, permisos, bloqueo, recuperación, revocación y consistencia ante fallos. En Ficha Vehicular: registro, edición, identidad histórica, permisos, correcciones, consultas y paginación. En Taller: recepción, estados, responsable, zanjas, servicios, consumos, devoluciones, aceite, auditoría y avisos de resultado. En Inventario: DTO públicos sin costos, catálogos, proveedores, compras, conteos, valoración de granel, kardex, filtros y reintentos sin duplicación de efectos. En POS: ventas directas, cobro de OT sin duplicar insumos, pagos, devoluciones, comprobantes, idempotencia y recuperación documental local. En Caja Chica: apertura idempotente, privacidad entre cajeros, arqueo con control de versión, reversión, aclaración, cierre recuperado e integración con cobros y reintegros del POS.
+En Login: acceso, sesiones, permisos, bloqueo, recuperación, revocación y consistencia ante fallos. En Ficha Vehicular: registro, edición, identidad histórica, permisos, correcciones, consultas y paginación. En Taller: recepción, estados, responsable, zanjas, servicios, consumos, devoluciones, aceite, auditoría y avisos de resultado. En Inventario: DTO públicos sin costos, catálogos, proveedores, compras, conteos, valoración de granel, kardex, filtros y reintentos sin duplicación de efectos. En POS: ventas directas, cobro de OT sin duplicar insumos, pagos, devoluciones, comprobantes, idempotencia y recuperación documental local. En Caja Chica: apertura idempotente, privacidad entre cajeros, arqueo con control de versión, reversión, aclaración, cierre recuperado e integración con cobros y reintegros del POS. En Backup: copia consistente con WAL, protección local de la frase, archivos ausentes, retención, restauración por generaciones, recuperación de arranque y conciliación de series.
 
 ### 8.2. Cómo ejecutarlas
 
@@ -640,22 +709,25 @@ Las pruebas de integración externas deben usar datos y credenciales de Prueba. 
 
 ### 8.3. Estado de la validación
 
-La última ejecución en Windows del **7 de noviembre de 2026** reportó:
+La última ejecución en Windows del **8 de noviembre de 2026** reportó:
 
 | Comprobación                                      | Resultado reportado                                                                                                                                                    |
 | ------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Formato Rust, `cargo check` y Clippy              | Aprobados.                                                                                                                                                             |
 | TypeScript y compilación del frontend             | Aprobadas.                                                                                                                                                             |
-| Pruebas de frontend y servicios                   | **121 aprobadas** en **17 archivos**, incluidas **3 de Caja Chica**.                                                                                                   |
-| Suite general de Rust (`cargo test`)              | **126 aprobadas**, **0 fallidas** y **3 mediciones omitidas por defecto**.                                                                                             |
+| Pruebas de frontend y servicios                   | **128 aprobadas** en **19 archivos**, incluidas **6 de Backup** y **3 de Caja Chica**.                                                                                 |
+| Suite general de Rust (`cargo test`)              | **136 aprobadas**, **0 fallidas** y **3 mediciones omitidas por defecto**.                                                                                             |
 | Suite Rust de POS                                 | **19 aprobadas**, incluida la integración con Caja Chica.                                                                                                              |
 | Suite Rust de Caja Chica                          | **4 aprobadas**.                                                                                                                                                       |
+| Pruebas Rust de Backup y Copias                   | **10 aprobadas**, incluidas las de recuperación y de interrupción simulada.                                                                                            |
 | Rendimiento de POS, ejecutado por separado        | **1 prueba aprobada** con cinco muestras y **5.000 ventas** en SQLite temporal en disco.                                                                               |
 | Rendimiento de Caja Chica, reportado por separado | **1 prueba aprobada** con **5.000 turnos y 100.000 movimientos** en SQLite temporal en disco. Las **20 muestras** por operación quedaron por debajo de **2 segundos**. |
 
 **Rendimiento del POS:** el listado promedió **44,76 ms** (36,27–50,18 ms) y la confirmación local **7,46 ms** (4,47–14,98 ms). La prueba mide el backend local; todavía falta validar el tiempo visible en WebView y el recorrido con NubeFact de Prueba.
 
 **Rendimiento de Caja Chica:** la medición abarca el resumen, la primera página de movimientos y el cierre en Rust. Queda por medir el recorrido completo desde la interfaz en Tauri.
+
+**Rendimiento de Backup:** en la revisión anterior, generar y verificar tomó **31,66–37,34 s** y seleccionar y comprobar tomó **23,14–29,21 s** en cinco muestras con aproximadamente **100 MB de SQLite y 100 MB de archivos**. La medición se hizo en disco local con datos ficticios; queda pendiente medir USB y el recorrido completo en Tauri.
 
 **Evidencia previa de Inventario:** las consultas de catálogo, críticos y kardex con **1.000 productos y 10.000 movimientos** registraron aproximadamente **0,2–1,8 ms** en SQLite en memoria. Los tres casos de conteo reproducidos permanecen entre los pendientes de Inventario. Taller conserva como pendiente las cinco mediciones con **2.000 OT**.
 
@@ -679,7 +751,7 @@ El informe general y las diez especificaciones funcionales v7 son documentos de 
 
 ## 10. Hoja de ruta
 
-Se mantiene la siguiente secuencia de desarrollo. Los seis primeros módulos están en ajustes finales; **el siguiente módulo será Backup y Copias**.
+Se mantiene la siguiente secuencia de desarrollo. Los siete primeros módulos están en ajustes finales; **el siguiente módulo será Administración**.
 
 1. **Login y Sesión — ajustes finales (95/100):** completar recuperación del error inicial y evidencias de teclado, foco, salida y tiempos de ingreso.
 2. **Ficha Vehicular e Historial — ajustes finales (93/100):** activar cambios pendientes al modificar datos, consolidar pruebas de interfaz y completar mediciones de escritorio.
@@ -687,8 +759,8 @@ Se mantiene la siguiente secuencia de desarrollo. Los seis primeros módulos est
 4. **Inventario y Stock — ajustes finales (95/100):** resolver los casos particulares de conteo y costos, proteger capturas modificadas y completar pruebas y mediciones en escritorio.
 5. **Punto de Venta POS — ajustes finales (95/100):** mostrar el último intento documental y completar las pruebas de NubeFact de Prueba, impresión, recorridos en Tauri y rendimiento visible.
 6. **Caja Chica — ajustes finales (94/100):** corregir la respuesta tardía al regresar al historial y completar las pruebas de interfaz, impresión, medianoche en Lima y rendimiento en escritorio.
-7. **Backup y Copias — pendiente · próximo módulo:** implementar la creación, verificación y restauración de copias de seguridad.
-8. **Administración:** completar la configuración y gestión autorizada.
+7. **Backup y Copias — ajustes finales (94/100):** estabilizar las pruebas de interfaz y completar las verificaciones de fallos, recuperación en Windows y guardado externo.
+8. **Administración — pendiente · próximo módulo:** implementar la gestión autorizada de usuarios y la configuración de empresa, facturación y taller.
 9. **Reportes:** integrar las consultas y exportaciones de los módulos anteriores.
 10. **Inicio Dashboard:** integrar al final los indicadores y resúmenes por rol con los datos de los demás módulos.
 

@@ -250,3 +250,27 @@
     transform: none;
   }
 }
+
+.inicio-acceso-estados { display: flex; flex-wrap: wrap; gap: 4px 6px; margin-top: 4px; }
+
+.inicio-acceso-estado {
+  display: inline-block;
+  padding: 2px 7px;
+  border: 1px solid var(--gt-border);
+  border-radius: 6px;
+  color: var(--gt-muted);
+  font-size: 11px;
+  font-weight: 650;
+}
+
+.inicio-acceso-estado[data-tono='aviso'] {
+  color: var(--gt-amber);
+  background: #2d261c;
+  border-color: #705a35;
+}
+
+.inicio-acceso-estado[data-tono='exito'] {
+  color: var(--gt-green);
+  background: #1c3029;
+  border-color: #37634d;
+}

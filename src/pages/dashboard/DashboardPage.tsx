@@ -4,6 +4,7 @@ import {
   Car,
   ClipboardList,
   Clock,
+  DatabaseBackup,
   Package,
   Receipt,
   ShoppingCart,
@@ -13,6 +14,7 @@ import {
 import { useAuth } from '../../context/AuthContext';
 import { obtenerDatosDashboard } from '../../services/dashboardService';
 import type { DashboardDTO } from '../../services/dashboardService';
+import { backup, fechaBackup, type EstadoBackup } from '../backup/backupService';
 import '../../styles/gloriaTaller.css';
 import './dashboardVisual.css';
 
@@ -56,6 +58,13 @@ const accesos = [
     titulo: 'Caja Chica',
     descripcion: 'Abre tu turno, consulta movimientos y guarda el arqueo.',
   },
+  {
+    permiso: 'BACKUP',
+    destino: 'backup',
+    icono: DatabaseBackup,
+    titulo: 'Backup y Copias',
+    descripcion: 'Genera, verifica y restaura respaldos.',
+  },
 ] as const;
 
 interface IndicadorProps {
@@ -83,6 +92,22 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ setModuloActual })
   const { usuario, tienePermiso } = useAuth();
   const [metrics, setMetrics] = useState<DashboardDTO | null>(null);
   const [cargandoMetrics, setCargandoMetrics] = useState(false);
+  const [estadoBackup, setEstadoBackup] = useState<EstadoBackup | null>(null);
+  const [cargandoBackup, setCargandoBackup] = useState(true);
+  const puedeVerBackup = usuario?.rol === 'ADMINISTRADOR' && tienePermiso('BACKUP', 'ver');
+  const sesionBackup = usuario?.session_id;
+
+  useEffect(() => {
+    if (!puedeVerBackup || !sesionBackup) return;
+    let vigente = true;
+    setEstadoBackup(null);
+    setCargandoBackup(true);
+    void backup<EstadoBackup>('estado')
+      .then((datos) => { if (vigente) setEstadoBackup(datos); })
+      .catch(() => { if (vigente) setEstadoBackup(null); })
+      .finally(() => { if (vigente) setCargandoBackup(false); });
+    return () => { vigente = false; };
+  }, [puedeVerBackup, sesionBackup]);
 
   const puedeVerKPIsGlobales = tienePermiso('BACKUP', 'ver') && tienePermiso('COLA_SUNAT', 'ver');
   const esOperativoTallerOnly = tienePermiso('OT', 'ver') && !tienePermiso('POS', 'ver');
@@ -100,7 +125,19 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ setModuloActual })
     }
   }, [usuario]);
 
-  const visibles = accesos.filter(({ permiso }) => tienePermiso(permiso, 'ver'));
+  const visibles = accesos.filter(({ permiso }) =>
+    permiso === 'BACKUP' ? puedeVerBackup : tienePermiso(permiso, 'ver')
+  );
+  const respaldo = cargandoBackup ? 'Consultando respaldo…'
+    : !estadoBackup ? 'Estado no disponible'
+    : estadoBackup.recuperacion.pendiente ? 'Recuperación pendiente'
+    : !estadoBackup.configurada ? 'Protección sin configurar'
+    : !estadoBackup.ultima ? 'Sin copia válida'
+    : estadoBackup.vencida ? 'Copia de más de 24 h'
+    : 'Copia al día';
+  const tonoRespaldo = cargandoBackup || !estadoBackup ? undefined
+    : !estadoBackup.configurada || !estadoBackup.ultima || estadoBackup.vencida || estadoBackup.recuperacion.pendiente
+      ? 'aviso' : 'exito';
   const nombre = usuario?.nombre_completo.trim().split(/\s+/)[0];
   const estadoCaja = metrics?.estado_caja?.trim();
   const cajaNormalizada = estadoCaja?.toLowerCase();
@@ -221,7 +258,18 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ setModuloActual })
                     >
                       {destino === 'taller' && esOperativoTallerOnly
                         ? 'Revisa tus servicios asignados y tu zanja.'
-                        : descripcion}
+                        : destino === 'backup' && estadoBackup?.ultima
+                          ? `Última copia válida: ${fechaBackup(estadoBackup.ultima)} (Lima)`
+                          : descripcion}
+                      {destino === 'backup' && (
+                        <span className="inicio-acceso-estados">
+                          <span className="inicio-acceso-estado" data-tono={tonoRespaldo}>{respaldo}</span>
+                          {!cargandoBackup && estadoBackup?.ultima && estadoBackup.vencida &&
+                            respaldo !== 'Copia de más de 24 h' && (
+                              <span className="inicio-acceso-estado" data-tono="aviso">Copia de más de 24 h</span>
+                            )}
+                        </span>
+                      )}
                     </span>
                   </span>
                   <ArrowRight className="inicio-acceso-flecha" size={19} aria-hidden="true" />

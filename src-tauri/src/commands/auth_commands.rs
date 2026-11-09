@@ -63,6 +63,16 @@ pub fn iniciar_sesion_local(
 
     // 2. Autenticar credenciales
     let (mut res, usuario_version) = AuthService::login(conn, req)?;
+    let recuperacion: bool = conn.query_row(
+        "SELECT recuperacion_pendiente FROM configuracion WHERE id_config=1",
+        [],
+        |r| r.get(0),
+    )?;
+    if recuperacion && res.rol != "ADMINISTRADOR" {
+        return Err(AppError::AccessDenied(
+            "Un administrador debe completar la recuperación antes de ingresar.".into(),
+        ));
+    }
     res.ambiente_actual = ambiente;
 
     // 3. Abrir sesión en memoria

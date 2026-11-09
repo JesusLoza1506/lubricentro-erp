@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { invoke } from '@tauri-apps/api/core';
 import { openUrl } from '@tauri-apps/plugin-opener';
 import type {
   CredencialesPos,
@@ -248,8 +249,11 @@ export function DetalleVentaPos({
                           key={k}
                           onClick={() => {
                             const url = d[k];
-                            if (url?.startsWith('https://'))
-                              void openUrl(url).catch((e) => Serror(mensajePos(e)));
+                            if (!url) return;
+                            const abrir = url.startsWith('https://')
+                              ? openUrl(url)
+                              : invoke('pos_archivo_local_cmd', { idDocumento: d.id, tipo: k });
+                            void abrir.catch((e) => Serror(mensajePos(e)));
                           }}
                         >
                           {k.toUpperCase()} oficial

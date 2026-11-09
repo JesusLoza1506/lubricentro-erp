@@ -7,8 +7,9 @@ pub mod nubefact;
 pub mod services;
 
 use commands::{
-    auth_commands::*, caja_commands::*, cliente_commands::*, comprobante_commands::*,
-    dashboard_commands::*, inventario_commands::*, ordenes_commands::*, pos_commands::*,
+    auth_commands::*, backup_commands::*, caja_commands::*, cliente_commands::*,
+    comprobante_commands::*, dashboard_commands::*, inventario_commands::*, ordenes_commands::*,
+    pos_commands::*,
 };
 use services::session_manager::SessionState;
 use std::sync::Mutex;
@@ -31,23 +32,84 @@ pub fn run() {
                 app_data_dir
             );
 
-            let conn = crate::db::init_db(app_data_dir.clone())
-                .expect("Error al inicializar la base de datos");
-
-            let _ = conn.execute_batch(
-                "
-                PRAGMA default_cache_size = 10000;
-                ",
-            );
-
-            app.manage(Mutex::new(conn));
+            let ambiente =
+                std::env::var("LUBRICENTRO_AMBIENTE").unwrap_or_else(|_| "PRODUCCION".into());
+            let app_data_dir = match ambiente.as_str() {
+                "PRODUCCION" => app_data_dir,
+                "PRUEBA" => app_data_dir.join("entornos").join("prueba"),
+                _ => {
+                    return Err(errors::AppError::Validation(
+                        "LUBRICENTRO_AMBIENTE debe ser PRODUCCION o PRUEBA.".into(),
+                    )
+                    .into())
+                }
+            };
+            let backup = services::backup_service::BackupState::new(&app_data_dir)?;
+            let arranque = (|| -> services::backup_service::R<rusqlite::Connection> {
+                let ruta = services::backup_service::ruta_activa(&app_data_dir)?;
+                let nueva = ruta == app_data_dir.join("lubricentro_secure.db") && !ruta.exists();
+                let conn = crate::db::abrir_db_ambiente(&ruta, nueva, &ambiente)?;
+                let encontrado: String = conn.query_row(
+                    "SELECT ambiente_actual FROM configuracion WHERE id_config=1",
+                    [],
+                    |r| r.get(0),
+                )?;
+                if encontrado != ambiente {
+                    return Err(errors::AppError::Validation(
+                        "La base activa no corresponde al ambiente seleccionado.".into(),
+                    ));
+                }
+                if ruta != app_data_dir.join("lubricentro_secure.db") {
+                    backup.validar_generacion_activa(&conn, &ruta)?;
+                }
+                backup.registrar_instalacion()?;
+                let _ = conn.execute_batch("PRAGMA default_cache_size = 10000;");
+                Ok(conn)
+            })();
+            let bloqueo = match arranque {
+                Ok(conn) => {
+                    app.manage(Mutex::new(conn));
+                    None
+                }
+                Err(e) => {
+                    tracing::error!("Arranque de la base bloqueado: {e}");
+                    Some(e.to_string())
+                }
+            };
+            app.manage(EstadoArranque::new(ambiente, bloqueo));
+            app.manage(backup);
             app.manage(Mutex::new(SessionState::new()));
 
+            let handle = app.handle().clone();
+            tauri::async_runtime::spawn(async move {
+                loop {
+                    let app = handle.clone();
+                    let _ = tauri::async_runtime::spawn_blocking(move || {
+                        let b = app.state::<services::backup_service::BackupState>();
+                        if let Some(db) = app.try_state::<Mutex<rusqlite::Connection>>() {
+                            let _ = b.automatico(&db);
+                        }
+                    })
+                    .await;
+                    tokio::time::sleep(std::time::Duration::from_secs(30)).await;
+                }
+            });
             Ok(())
+        })
+        .on_window_event(|window, event| {
+            if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                if window
+                    .try_state::<services::backup_service::BackupState>()
+                    .is_some_and(|b| b.cierre_bloqueado())
+                {
+                    api.prevent_close();
+                }
+            }
         })
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![
             pos_operacion_cmd,
+            pos_archivo_local_cmd,
             crate::nubefact::pos_documento_cmd,
             // Auth & Sesión V7.0
             obtener_ambiente_inicial,
@@ -129,7 +191,12 @@ pub fn run() {
             // Dashboard, Fidelización & Backups
             obtener_dashboard_cmd,
             listar_alertas_fidelizacion_cmd,
-            generar_backup_cmd,
+            backup_arranque_cmd,
+            backup_recuperar_arranque_cmd,
+            backup_progreso_cmd,
+            backup_contexto_cmd,
+            backup_elegir_cmd,
+            backup_operacion_cmd,
         ])
         .run(tauri::generate_context!())
         .expect("Error al ejecutar la aplicación Tauri");

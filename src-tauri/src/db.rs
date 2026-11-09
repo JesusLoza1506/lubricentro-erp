@@ -32,7 +32,24 @@ pub fn init_db(app_data_dir: PathBuf) -> Result<Connection> {
     }
 
     let db_path = app_data_dir.join("lubricentro_secure.db");
-    let mut conn = Connection::open(&db_path)?;
+    abrir_db(&db_path, true)
+}
+
+pub fn abrir_db(db_path: &std::path::Path, inicializar: bool) -> Result<Connection> {
+    abrir_db_ambiente(db_path, inicializar, "PRODUCCION")
+}
+
+pub fn abrir_db_ambiente(
+    db_path: &std::path::Path,
+    inicializar: bool,
+    ambiente: &str,
+) -> Result<Connection> {
+    let flags = if inicializar {
+        rusqlite::OpenFlags::SQLITE_OPEN_READ_WRITE | rusqlite::OpenFlags::SQLITE_OPEN_CREATE
+    } else {
+        rusqlite::OpenFlags::SQLITE_OPEN_READ_WRITE
+    };
+    let mut conn = Connection::open_with_flags(db_path, flags)?;
 
     let key = get_or_create_encryption_key();
     let _ = conn.execute(&format!("PRAGMA key = '{}';", key), []);
@@ -50,11 +67,21 @@ pub fn init_db(app_data_dir: PathBuf) -> Result<Connection> {
         .query_row("PRAGMA user_version;", [], |row| row.get(0))
         .unwrap_or(0);
 
+    if !inicializar && user_version != 700 {
+        return Err(rusqlite::Error::InvalidQuery);
+    }
     if user_version < 700 {
         // Ejecución atómica del Esquema V7.0 dentro de una transacción
         let tx = conn.transaction()?;
         let initial_schema = include_str!("../migrations/0001_initial_schema_v7.sql");
-        tx.execute_batch(initial_schema)?;
+        if ambiente == "PRUEBA" {
+            tx.execute_batch(&initial_schema.replace(
+                "INSERT INTO configuracion(id_config,ambiente_actual) VALUES(1,'PRODUCCION');",
+                "INSERT INTO configuracion(id_config,ambiente_actual) VALUES(1,'PRUEBA');",
+            ))?;
+        } else {
+            tx.execute_batch(initial_schema)?;
+        }
         tx.commit()?;
     }
 

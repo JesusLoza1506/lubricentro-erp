@@ -1,5 +1,6 @@
 pub mod auditoria_service;
 pub mod auth_service;
+pub mod backup_service;
 pub mod caja_service;
 pub mod cliente_service;
 pub mod comprobante_service;

@@ -8,6 +8,17 @@ import { InventarioPage } from './pages/inventario/InventarioPage';
 import { FichaVehicularPage } from './pages/vehiculo/FichaVehicularPage';
 import { OrdenesPage } from './pages/ordenes/OrdenesPage';
 import { CambioClaveModal } from './components/CambioClaveModal';
+import { RecuperarArranque } from './pages/backup/BackupArranque';
+import { BackupPage } from './pages/backup/BackupPage';
+import {
+  consultarArranqueBackup,
+  contextoBackup,
+  errorBackup,
+  type BackupArranque,
+  type ContextoDesdeCaja,
+  sincronizarCapturasBackup,
+  type ContextoBackup,
+} from './pages/backup/backupService';
 
 const CajaPage = React.lazy(() =>
   import('./pages/caja/CajaPage').then((m) => ({ default: m.CajaPage }))
@@ -42,7 +53,34 @@ const MainApp: React.FC = () => {
     }
   }, [usuario?.id_usuario, estadoSesion, setHayCambiosSinGuardar]);
 
-  if (cargando) {
+  const [bkp, setBkp] = useState<ContextoBackup | null>(null);
+  const [contextoListo, setContextoListo] = useState<string | null>(null);
+  const identidadSesion = usuario?.session_id ?? 'sin-sesion';
+  const [regresoBackup, setRegresoBackup] = useState<{ sesion: string; datos: ContextoDesdeCaja } | null>(null);
+  const volverABackup = regresoBackup?.sesion === identidadSesion;
+  const [restauracionInicial, setRestauracionInicial] = useState(false);
+  useEffect(() => {
+    if (cargando || estadoSesion === 'CAMBIO_OBLIGATORIO') return;
+    let viva = true;
+    void contextoBackup()
+      .then((datos) => {
+        if (!viva) return;
+        sincronizarCapturasBackup(datos);
+        setBkp(datos);
+        if (datos.pendiente) setModuloActual('backup');
+      })
+      .catch(() => {
+        if (viva) setBkp(null);
+      })
+      .finally(() => {
+        if (viva) setContextoListo(identidadSesion);
+      });
+    return () => {
+      viva = false;
+    };
+  }, [cargando, usuario?.session_id, usuario?.rol, estadoSesion, identidadSesion]);
+
+  if (cargando || (estadoSesion === 'NORMAL' && contextoListo !== identidadSesion)) {
     return (
       <div className="gloria-theme gt-boot" role="status">
         <LoaderCircle className="gt-boot-spinner" size={18} aria-hidden="true" />
@@ -52,7 +90,23 @@ const MainApp: React.FC = () => {
   }
 
   if (estadoSesion === 'SIN_SESION' || estadoSesion === 'CAMBIO_OBLIGATORIO' || !usuario) {
-    return <LoginPage />;
+    if (restauracionInicial && !usuario && bkp?.inicial) {
+      return (
+        <div className="bkp-login">
+          <BackupPage inicial onVolver={() => setRestauracionInicial(false)} />
+        </div>
+      );
+    }
+    return (
+      <>
+        <LoginPage />
+        {!usuario && bkp?.inicial && (
+          <button className="gloria-theme gt-button gt-button--primary bkp-entrada" onClick={() => setRestauracionInicial(true)}>
+            Restaurar una copia
+          </button>
+        )}
+      </>
+    );
   }
 
   const navegarAFichaVehicular = (placa?: string) => {
@@ -103,12 +157,25 @@ const MainApp: React.FC = () => {
         ) : (
           <DashboardPage setModuloActual={setModuloActual} />
         );
+      case 'backup':
+        return tienePermiso('BACKUP', 'ver') ? (
+          <BackupPage
+            contextoCaja={volverABackup ? regresoBackup?.datos : undefined}
+            onCaja={(datos) => {
+              setRegresoBackup({ sesion: identidadSesion, datos });
+              setModuloActual('caja');
+            }}
+            onFinalizar={() => setBkp((prev) => ({ ...prev, pendiente: false }))}
+          />
+        ) : (
+          <DashboardPage setModuloActual={setModuloActual} />
+        );
       case 'caja':
         return tienePermiso('CAJA', 'ver') ? (
           <React.Suspense fallback={<p role="status">Cargando Caja Chica…</p>}>
             <CajaPage
               onVenta={(id) => {
-                if (!tienePermiso('POS', 'ver')) return;
+                if (bkp?.pendiente || !tienePermiso('POS', 'ver')) return;
                 setVentaParaConsultar(id);
                 setModuloActual('pos');
               }}
@@ -162,10 +229,21 @@ const MainApp: React.FC = () => {
     >
       <Sidebar
         moduloActual={moduloActual}
-        setModuloActual={setModuloActual}
+        setModuloActual={(destino) => {
+          if (bkp?.pendiente && destino !== 'backup' && destino !== 'caja') return;
+          if (destino !== 'backup' && destino !== 'caja') setRegresoBackup(null);
+          setModuloActual(destino);
+        }}
         onAbrirCambioClave={() => setMostrarCambioClaveModal(true)}
       />
       <main style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        {(bkp?.pendiente || volverABackup) && moduloActual === 'caja' && (
+          <div className="gloria-theme bkp-aviso">
+            <button className="gt-button gt-button--quiet" onClick={() => setModuloActual('backup')}>
+              {bkp?.pendiente ? 'Volver a completar recuperación' : 'Volver a Backup y Copias'}
+            </button>
+          </div>
+        )}
         {renderModulo()}
       </main>
 
@@ -177,11 +255,27 @@ const MainApp: React.FC = () => {
 };
 
 export const App: React.FC = () => {
-  return (
-    <AuthProvider>
-      <MainApp />
-    </AuthProvider>
+  const [arranque, setArranque] = useState<BackupArranque | null>(null);
+  const [error, setError] = useState('');
+  const [intento, setIntento] = useState(0);
+  useEffect(() => {
+    let vigente = true;
+    consultarArranqueBackup()
+      .then((datos) => { if (vigente) setArranque(datos); })
+      .catch((e) => { if (vigente) setError(errorBackup(e)); });
+    return () => { vigente = false; };
+  }, [intento]);
+
+  if (!arranque) return (
+    <div className="gloria-theme gt-boot">
+      {error ? <div className="gt-notice gt-notice--error" role="alert">
+        No se pudo comprobar el arranque: {error}
+        <button className="gt-button" onClick={() => { setError(''); setIntento((i) => i + 1); }}>Reintentar</button>
+      </div> : <p role="status">Comprobando la base activa…</p>}
+    </div>
   );
+  if (arranque.bloqueado) return <RecuperarArranque datos={arranque} />;
+  return <AuthProvider><MainApp /></AuthProvider>;
 };
 
 export default App;
