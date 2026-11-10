@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 pub struct DashboardDto {
     pub rol: String,
     pub ventas_del_dia: f64,
+    pub ventas_confirmadas: i64,
     pub comprobantes_emitidos: i64,
     pub ots_activas: i64,
     pub productos_stock_critico: i64,

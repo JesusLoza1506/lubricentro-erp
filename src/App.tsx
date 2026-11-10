@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { LoaderCircle } from 'lucide-react';
+import { ArrowLeft, LoaderCircle } from 'lucide-react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { LoginPage } from './pages/auth/LoginPage';
 import { Sidebar } from './components/Sidebar';
@@ -21,12 +21,16 @@ import {
 } from './pages/backup/backupService';
 
 import { FILTROS_USUARIOS_INICIALES, type FiltrosUsuarios } from './pages/administracion/adminApi';
+import type { Origen as OrigenReporte } from './pages/reportes/reportesApi';
 import type { PestanaAdmin } from './pages/administracion/AdministracionPage';
 const AdministracionPage = React.lazy(() =>
   import('./pages/administracion/AdministracionPage').then((m) => ({ default: m.AdministracionPage }))
 );
 const CajaPage = React.lazy(() =>
   import('./pages/caja/CajaPage').then((m) => ({ default: m.CajaPage }))
+);
+const ReportesPage = React.lazy(() =>
+  import('./pages/reportes/ReportesPage').then((m) => ({ default: m.ReportesPage }))
 );
 const PosPage = React.lazy(() =>
   import('./pages/pos/PosPage').then((m) => ({ default: m.PosPage }))
@@ -52,6 +56,7 @@ const MainApp: React.FC = () => {
   useEffect(() => {
     setListadoAdmin((previo) => previo?.alcance === alcanceAdmin ? previo : null);
   }, [alcanceAdmin]);
+  const [origenReporte, setOrigenReporte] = useState<OrigenReporte | null>(null);
   const [moduloActual, setModuloActual] = useState<string>('dashboard');
   const [placaSeleccionada, setPlacaSeleccionada] = useState<string>('');
   const [mostrarCambioClaveModal, setMostrarCambioClaveModal] = useState<boolean>(false);
@@ -61,6 +66,7 @@ const MainApp: React.FC = () => {
       setModuloActual('dashboard');
       setPlacaSeleccionada('');
       setOtParaCobrar(null);
+      setOrigenReporte(null);
       setVentaParaConsultar(null);
       setMostrarCambioClaveModal(false);
       setPestanaAdmin('usuarios');
@@ -131,13 +137,35 @@ const MainApp: React.FC = () => {
     setModuloActual('ficha_vehicular');
   };
 
+  const puedeReportes = usuario.rol === 'ADMINISTRADOR' && !bkp?.pendiente;
+  const abrirOrigenReporte = (origen: OrigenReporte) => {
+    if (!puedeReportes) return;
+    if (origen.destino === 'pos') {
+      setOtParaCobrar(null);
+      setVentaParaConsultar(origen.id);
+    }
+    if (origen.destino === 'administracion') setPestanaAdmin('usuarios');
+    setOrigenReporte(origen);
+    setModuloActual(origen.destino);
+  };
+  const regresarAReportes = () => {
+    if (hayCambiosSinGuardar && !window.confirm('¿Descartar los cambios y volver a Reportes?')) return;
+    setHayCambiosSinGuardar(false);
+    setOrigenReporte(null);
+    setVentaParaConsultar(null);
+    setModuloActual('reportes');
+    requestAnimationFrame(() => document.getElementById('host-reportes')?.focus());
+  };
   const renderModulo = () => {
     switch (moduloActual) {
+      case 'reportes':
+        return puedeReportes ? null : <DashboardPage setModuloActual={setModuloActual} />;
       case 'ordenes':
       case 'taller':
       case 'ot':
         return tienePermiso('OT', 'ver') || tienePermiso('ORDENES', 'ver') ? (
           <OrdenesPage
+            idOrigenReporte={origenReporte?.destino === 'taller' ? origenReporte.id : undefined}
             onNavegarAFichaVehicular={navegarAFichaVehicular}
             onNavegarAPos={(id) => {
               setOtParaCobrar(id);
@@ -177,6 +205,7 @@ const MainApp: React.FC = () => {
           <React.Suspense fallback={<p role="status">Cargando Administración…</p>}>
             <AdministracionPage
               key={alcanceAdmin}
+              idOrigenReporte={origenReporte?.destino === 'administracion' ? origenReporte.id : undefined}
               pestana={pestanaAdmin}
               onPestana={setPestanaAdmin}
               onNavegar={setModuloActual}
@@ -188,6 +217,7 @@ const MainApp: React.FC = () => {
       case 'backup':
         return tienePermiso('BACKUP', 'ver') ? (
           <BackupPage
+            idOrigenReporte={origenReporte?.destino === 'backup' ? origenReporte.id : undefined}
             contextoCaja={volverABackup ? regresoBackup?.datos : undefined}
             onCaja={(datos) => {
               setRegresoBackup({ sesion: identidadSesion, datos });
@@ -202,6 +232,7 @@ const MainApp: React.FC = () => {
         return tienePermiso('CAJA', 'ver') ? (
           <React.Suspense fallback={<p role="status">Cargando Caja Chica…</p>}>
             <CajaPage
+              idOrigenReporte={origenReporte?.destino === 'caja' ? origenReporte.id : undefined}
               onVenta={(id) => {
                 if (bkp?.pendiente || !tienePermiso('POS', 'ver')) return;
                 setVentaParaConsultar(id);
@@ -214,7 +245,7 @@ const MainApp: React.FC = () => {
         );
       case 'inventario':
         return tienePermiso('INVENTARIO', 'ver') ? (
-          <InventarioPage />
+          <InventarioPage origenReporte={origenReporte?.destino === 'inventario' ? origenReporte.producto : undefined} />
         ) : (
           <DashboardPage setModuloActual={setModuloActual} />
         );
@@ -260,6 +291,8 @@ const MainApp: React.FC = () => {
         setModuloActual={(destino) => {
           if (bkp?.pendiente && destino !== 'backup' && destino !== 'caja') return;
           if (destino !== 'backup' && destino !== 'caja') setRegresoBackup(null);
+          setOrigenReporte(null);
+          setVentaParaConsultar(null);
           setModuloActual(destino);
         }}
         onAbrirCambioClave={() => setMostrarCambioClaveModal(true)}
@@ -270,6 +303,21 @@ const MainApp: React.FC = () => {
             <button className="gt-button gt-button--quiet" onClick={() => setModuloActual('backup')}>
               {bkp?.pendiente ? 'Volver a completar recuperación' : 'Volver a Backup y Copias'}
             </button>
+          </div>
+        )}
+        {origenReporte && moduloActual !== 'reportes' && puedeReportes && (
+          <div className="gloria-theme rep-retorno">
+            <button className="gt-button gt-button--quiet" type="button" onClick={regresarAReportes}>
+              <ArrowLeft size={16} aria-hidden="true" /> Volver a Reportes
+            </button>
+            <span>Registro vigente · tu reporte conserva el corte anterior</span>
+          </div>
+        )}
+        {puedeReportes && (moduloActual === 'reportes' || origenReporte) && (
+          <div className="rep-host" id="host-reportes" tabIndex={-1} hidden={moduloActual !== 'reportes'}>
+            <React.Suspense fallback={<p role="status">Cargando Reportes…</p>}>
+              <ReportesPage key={alcanceAdmin} onOrigen={abrirOrigenReporte} />
+            </React.Suspense>
           </div>
         )}
         {renderModulo()}

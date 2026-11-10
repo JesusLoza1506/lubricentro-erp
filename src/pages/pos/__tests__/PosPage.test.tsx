@@ -107,7 +107,7 @@ async function montarCatalogo() {
 
 async function prepararCarrito() {
   await montarCatalogo();
-  fireEvent.click(screen.getByRole('button', { name: 'Agregar Filtro de aceite' }));
+  fireEvent.click(await screen.findByRole('button', { name: 'Agregar Filtro de aceite' }));
   await waitFor(() =>
     expect(
       (screen.getByRole('button', { name: 'Cobrar venta' }) as HTMLButtonElement).disabled
@@ -157,7 +157,7 @@ it('permite retirar la captura cuando falla la cotización inicial', async () =>
     return original(c, a);
   });
   await montarCatalogo();
-  fireEvent.click(screen.getByRole('button', { name: 'Agregar Filtro de aceite' }));
+  fireEvent.click(await screen.findByRole('button', { name: 'Agregar Filtro de aceite' }));
   await screen.findByText('Stock insuficiente');
   fireEvent.click(screen.getByRole('button', { name: 'Quitar Filtro de aceite' }));
   await waitFor(() =>
@@ -189,7 +189,7 @@ it.each([
       return original(comando, args);
     });
     await montarCatalogo();
-    fireEvent.click(screen.getByRole('button', { name: 'Agregar Filtro de aceite' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Agregar Filtro de aceite' }));
     const venta = within(screen.getByRole('complementary', { name: /Venta actual/ }));
     expect(await venta.findByText(motivo)).toBeInTheDocument();
     const resumen = within(venta.getByText('Total a cobrar').parentElement!);

@@ -740,3 +740,157 @@ fn editar_empresa_con_comprobante_pendiente_conserva_ruc_y_foto_anterior() {
         ("Av. Principal 123", "PENDIENTE")
     );
 }
+
+#[test]
+fn reportes_usan_venta_cobro_y_recuperacion_fisica_del_pos() {
+    use lubricentro_erp_lib::services::{
+        dashboard_service::DashboardService,
+        reportes_service::{ahora_lima, consultar, Filtros, Periodo, Reporte},
+    };
+    let (_d, mut c, _) = preparar(false);
+    let id = InventarioService::registrar_producto(
+        &mut c,
+        CrearProductoDto {
+            codigo: "REP-POS".into(),
+            nombre: "Producto del ejemplo de Reportes".into(),
+            descripcion: None,
+            categoria: "FILTRO".into(),
+            unidad_medida: "UND".into(),
+            stock_minimo: 0,
+            precio_venta_cent: 1000,
+            cantidad_inicial: Some(10.0),
+            costo_unitario_inicial_micro: Some(5_000_000),
+            referencia_inicial: None,
+        },
+        1,
+    )
+    .unwrap();
+    let mut q = solicitud(id, 10);
+    q.descuento_bp = 1000;
+    q.motivo = "Descuento de prueba autorizado".into();
+    q.lineas[0].precio_esperado_cent = 1000;
+    q.pagos[0].monto_cent = 6000;
+    q.pagos[0].recibido_cent = Some(10000);
+    q.pagos.push(PagoPos {
+        medio: "YAPE".into(),
+        monto_cent: 3000,
+        recibido_cent: None,
+        referencia: None,
+    });
+    let v = ventas::confirmar(&mut c, 2, Some(1), &q).unwrap();
+    aceptar(&c, v["id_documento"].as_i64().unwrap());
+    let linea = n(&c, "SELECT id_detalle FROM detalle_venta");
+    devoluciones::devolver(&mut c, 2, Some(1), &retorno(&v, linea, 3, 2)).unwrap();
+    let ventas = |r| {
+        let corte = consultar(
+            &c,
+            r,
+            Filtros {
+                periodo: Periodo::Hoy,
+                ..Default::default()
+            },
+            "PRODUCCION",
+            ahora_lima(),
+        )
+        .unwrap();
+        serde_json::to_value(corte.pagina(1).unwrap()).unwrap()
+    };
+    let tot = |p: &Value, nombre: &str| {
+        p["totales"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|t| t[0] == nombre)
+            .unwrap()[1]["valor"]
+            .as_str()
+            .unwrap()
+            .to_owned()
+    };
+    let r01 = ventas(Reporte::R01);
+    assert_eq!(tot(&r01, "Ventas"), "1");
+    assert_eq!(tot(&r01, "Bruto (S/)"), "100.00");
+    assert_eq!(tot(&r01, "Descuentos (S/)"), "10.00");
+    assert_eq!(tot(&r01, "Vendido (S/)"), "90.00");
+    assert_eq!(tot(&r01, "Devuelto (S/)"), "27.00");
+    assert_eq!(tot(&r01, "Neto (S/)"), "63.00");
+    let r02 = ventas(Reporte::R02);
+    assert_eq!(tot(&r02, "Movimientos"), "3");
+    assert_eq!(tot(&r02, "Neto (S/)"), "63.00");
+    let r03 = ventas(Reporte::R03);
+    assert_eq!(tot(&r03, "Cantidad (UND)"), "7");
+    assert_eq!(tot(&r03, "Subtotal Top 10 sin IGV (S/)"), "53.39");
+    assert_eq!(tot(&r03, "Costo reconocido (S/)"), "40.00");
+    assert_eq!(tot(&r03, "Margen (S/)"), "13.39");
+    assert_eq!(ventas(Reporte::R07)["total_filas"], 2);
+    assert_eq!(n(&c,"SELECT count(*) FROM movimientos_caja m JOIN ventas v USING(id_venta) WHERE m.fecha_operacion=v.fecha_venta"),2);
+    assert_eq!(n(&c,"SELECT count(*) FROM movimientos_caja m JOIN devoluciones d USING(id_devolucion) WHERE m.fecha_operacion=d.fecha_operacion"),1);
+    let dash = DashboardService::obtener_dashboard(&c, 1).unwrap();
+    assert_eq!(dash.ventas_del_dia, 63.0);
+    assert_eq!(dash.ventas_confirmadas, 1);
+}
+
+#[test]
+#[ignore = "Genera 20.000 ventas confirmadas reales de POS en SQLite temporal en disco"]
+fn rendimiento_reportes_con_20000_ventas() {
+    use lubricentro_erp_lib::services::reportes_service::{
+        ahora_lima, consultar, Filtros, Periodo, Reporte,
+    };
+    use std::time::{Duration, Instant};
+    let (_d, mut c, _) = preparar(false);
+    let id = InventarioService::registrar_producto(
+        &mut c,
+        CrearProductoDto {
+            codigo: "REP-VOLUMEN".into(),
+            nombre: "Producto de volumen de Reportes".into(),
+            descripcion: None,
+            categoria: "FILTRO".into(),
+            unidad_medida: "UND".into(),
+            stock_minimo: 0,
+            precio_venta_cent: 1000,
+            cantidad_inicial: Some(20_000.0),
+            costo_unitario_inicial_micro: Some(5_000_000),
+            referencia_inicial: None,
+        },
+        1,
+    )
+    .unwrap();
+    let mut q = solicitud(id, 1);
+    q.lineas[0].precio_esperado_cent = 1000;
+    q.pagos[0].monto_cent = 1000;
+    q.pagos[0].recibido_cent = Some(1000);
+    for i in 0..20_000 {
+        if i % 5_000 == 0 {
+            println!("Preparación: {i} de 20000 ventas");
+        }
+        q.id_operacion = uuid::Uuid::new_v4().to_string();
+        ventas::confirmar(&mut c, 2, None, &q).unwrap();
+    }
+    assert_eq!(
+        n(
+            &c,
+            "SELECT count(*) FROM ventas WHERE estado_registro='CONFIRMADA'"
+        ),
+        20_000
+    );
+    let mut aptas = 0;
+    for i in 1..=20 {
+        let inicio = Instant::now();
+        let corte = consultar(
+            &c,
+            Reporte::R01,
+            Filtros {
+                periodo: Periodo::EsteMes,
+                ..Default::default()
+            },
+            "PRODUCCION",
+            ahora_lima(),
+        )
+        .unwrap();
+        let datos = serde_json::to_value(corte.pagina(1).unwrap()).unwrap();
+        let duracion = inicio.elapsed();
+        println!("Consulta R01 {i}: {duracion:?}");
+        assert_eq!(datos["totales"][0][1]["valor"], "20000");
+        aptas += usize::from(duracion <= Duration::from_secs(3));
+    }
+    assert!(aptas >= 19, "{aptas}/20 consultas cumplieron");
+}

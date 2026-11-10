@@ -21,12 +21,14 @@ export function AdministracionPage({
   pestana,
   onPestana,
   filtrosUsuarios,
+  idOrigenReporte,
   onFiltrosUsuarios,
 }: {
   onNavegar: (destino: string) => void;
   pestana: PestanaAdmin;
   onPestana: (destino: PestanaAdmin) => void;
   filtrosUsuarios: FiltrosUsuarios;
+  idOrigenReporte?: number;
   onFiltrosUsuarios: (filtros: FiltrosUsuarios) => void;
 }) {
   const { usuario, ambienteActual, hayCambiosSinGuardar, setHayCambiosSinGuardar } = useAuth();
@@ -129,6 +131,7 @@ export function AdministracionPage({
             marcar={setHayCambiosSinGuardar}
             navegar={navegar}
             filtros={filtrosUsuarios}
+            idOrigenReporte={idOrigenReporte}
             onFiltros={onFiltrosUsuarios}
           />
         )}

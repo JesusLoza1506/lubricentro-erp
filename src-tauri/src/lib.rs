@@ -9,7 +9,7 @@ pub mod services;
 use commands::{
     admin_commands::*, auth_commands::*, backup_commands::*, caja_commands::*, cliente_commands::*,
     comprobante_commands::*, dashboard_commands::*, inventario_commands::*, ordenes_commands::*,
-    pos_commands::*,
+    pos_commands::*, reportes_commands::*,
 };
 use services::session_manager::SessionState;
 use std::sync::Mutex;
@@ -51,6 +51,7 @@ pub fn run() {
             };
             app.manage(EstadoArranque::new(seleccionado, bloqueo));
             app.manage(backup);
+            app.manage(services::reportes_service::EstadoReportes::default());
             app.manage(Mutex::new(SessionState::new()));
 
             let handle = app.handle().clone();
@@ -172,6 +173,7 @@ pub fn run() {
             backup_contexto_cmd,
             backup_elegir_cmd,
             backup_operacion_cmd,
+            reportes_operacion_cmd,
         ])
         .run(tauri::generate_context!())
         .expect("Error al ejecutar la aplicación Tauri");

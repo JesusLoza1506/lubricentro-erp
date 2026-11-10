@@ -9,6 +9,7 @@ pub mod dashboard_service;
 pub mod fidelizacion_service;
 pub mod inventario_service;
 pub mod ordenes_service;
+pub mod reportes_service;
 pub mod session_manager;
 
 pub use inventario_service::{

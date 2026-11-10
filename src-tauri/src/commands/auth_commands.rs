@@ -118,16 +118,21 @@ pub fn recuperar_acceso_admin(
 pub fn obtener_sesion(
     db_state: State<'_, Mutex<Connection>>,
     session_state: State<'_, Mutex<SessionState>>,
+    reportes: State<'_, crate::services::reportes_service::EstadoReportes>,
 ) -> Result<SesionResumenDto, AppError> {
     let mut session = session_state.lock().map_err(|_| AppError::DbLock)?;
 
     let conn = db_state.lock().map_err(|_| AppError::DbLock)?;
 
     if session.verificar_inactividad_con_auditoria(Some(&conn)) {
+        reportes.limpiar()?;
         return Err(AppError::NoAutenticado);
     }
 
-    let id_usuario = session.usuario_id.ok_or(AppError::NoAutenticado)?;
+    let Some(id_usuario) = session.usuario_id else {
+        reportes.limpiar()?;
+        return Err(AppError::NoAutenticado);
+    };
     let estado_str = session.estado_sesion.as_str().to_string();
 
     let mut res =
@@ -204,6 +209,7 @@ pub fn registrar_actividad(
 pub fn cerrar_sesion(
     db_state: State<'_, Mutex<Connection>>,
     session_state: State<'_, Mutex<SessionState>>,
+    reportes: State<'_, crate::services::reportes_service::EstadoReportes>,
 ) -> Result<(), AppError> {
     let mut session = session_state.lock().map_err(|_| AppError::DbLock)?;
 
@@ -223,6 +229,7 @@ pub fn cerrar_sesion(
     }
 
     session.cerrar_sesion();
+    reportes.limpiar()?;
     Ok(())
 }
 

@@ -16,7 +16,7 @@
 ![Plataforma](https://img.shields.io/badge/Plataforma-Windows_11-2563EB?style=flat-square)
 ![Módulos](https://img.shields.io/badge/Alcance-10_m%C3%B3dulos-0F766E?style=flat-square)
 
-[Progreso](#estado) · [Login](#modulo-login-y-sesion) · [Ficha vehicular](#modulo-ficha-vehicular-e-historial) · [Taller](#modulo-ordenes-de-trabajo-taller) · [Inventario](#modulo-inventario-y-stock) · [POS](#modulo-punto-de-venta-pos) · [Caja Chica](#modulo-caja-chica) · [Backup y Copias](#modulo-backup-y-copias) · [Administración](#modulo-administracion) · [Reportes](#modulo-reportes) · [Instalación](#instalacion) · [Documentación](#documentacion)
+[Progreso](#estado) · [Login](#modulo-login-y-sesion) · [Ficha vehicular](#modulo-ficha-vehicular-e-historial) · [Taller](#modulo-ordenes-de-trabajo-taller) · [Inventario](#modulo-inventario-y-stock) · [POS](#modulo-punto-de-venta-pos) · [Caja Chica](#modulo-caja-chica) · [Backup y Copias](#modulo-backup-y-copias) · [Administración](#modulo-administracion) · [Reportes](#modulo-reportes) · [Inicio Dashboard](#modulo-inicio-dashboard) · [Instalación](#instalacion) · [Documentación](#documentacion)
 
 </div>
 
@@ -43,9 +43,9 @@
 
 ## 2. Estado del proyecto
 
-Desarrollo secuencial, módulo por módulo, conforme al alcance funcional v7. **Login y Sesión (95/100)**, **Ficha Vehicular e Historial (93/100)**, **Órdenes de Trabajo Taller (93/100)**, **Inventario y Stock (95/100)**, **Punto de Venta POS (95/100)**, **Caja Chica (94/100)**, **Backup y Copias (94/100)** y **Administración (96/100)** se encuentran en **ajustes finales**. Sus funciones principales ya están implementadas; los pendientes de cierre y la validación en escritorio se detallan en cada módulo.
+Desarrollo secuencial, módulo por módulo, conforme al alcance funcional v7. **Login y Sesión (95/100)**, **Ficha Vehicular e Historial (93/100)**, **Órdenes de Trabajo Taller (93/100)**, **Inventario y Stock (95/100)**, **Punto de Venta POS (95/100)**, **Caja Chica (94/100)**, **Backup y Copias (94/100)**, **Administración (96/100)** y **Reportes (96/100)** se encuentran en **ajustes finales**. Sus funciones principales ya están implementadas; los pendientes de cierre y la validación en escritorio se detallan en cada módulo.
 
-**El próximo módulo es Reportes.** Su implementación está pendiente y abarcará la consulta y exportación autorizadas de datos de los módulos anteriores. La integración final de Inicio Dashboard se mantiene para después de Reportes.
+**El próximo módulo es Inicio Dashboard.** Ya existe una pantalla base de Inicio. Queda pendiente completar la integración de indicadores y accesos por rol, y validar sus cifras con los módulos de origen.
 
 | Orden | Módulo                                                             | Estado                            | Evaluación |
 | ----- | ------------------------------------------------------------------ | --------------------------------- | ---------- |
@@ -57,8 +57,8 @@ Desarrollo secuencial, módulo por módulo, conforme al alcance funcional v7. **
 | 06    | [Caja Chica](#modulo-caja-chica)                                   | 🟢 Ajustes finales                | 94/100     |
 | 07    | [Backup y Copias](#modulo-backup-y-copias)                         | 🟢 Ajustes finales                | 94/100     |
 | 08    | [Administración](#modulo-administracion)                           | 🟢 Ajustes finales                | 96/100     |
-| 09    | [Reportes](#modulo-reportes)                                       | ⚪ Pendiente · próximo módulo     | —          |
-| 10    | Inicio Dashboard                                                   | ⚪ Pendiente de integración final | —          |
+| 09    | [Reportes](#modulo-reportes)                                       | 🟢 Ajustes finales                | 96/100     |
+| 10    | [Inicio Dashboard](#modulo-inicio-dashboard)                       | ⚪ Pendiente · próximo módulo     | —          |
 
 **Leyenda:** ⚪ Pendiente · 🟡 En curso · 🟢 Ajustes finales · ✅ Completado.
 
@@ -624,7 +624,78 @@ _Configuración y ocupación de zanjas del taller_
 
 <a id="modulo-reportes"></a>
 
-**09 · Reportes — ⚪ Pendiente · Próximo módulo.** Integrará la consulta y la exportación autorizadas de información de los módulos anteriores. Todavía no tiene evaluación.
+<details>
+<summary><b>09 · Reportes</b> — 🟢 Ajustes finales · Evaluación: 96/100</summary>
+
+**Qué hace:** reúne los resultados del negocio en ocho reportes para el administrador. Permite consultar cifras, revisar su detalle, abrir el registro de origen y exportar el resultado completo a PDF o Excel.
+
+**Funciones principales:**
+
+- **R01 · Ventas por periodo:** muestra ventas confirmadas, importe bruto, descuentos, devoluciones, neto, base e IGV. Cada devolución se incluye según su propia fecha, aunque la venta sea anterior.
+- **R02 · Cobros y devoluciones:** agrupa cobros y reintegros por efectivo, tarjeta, Yape, Plin y transferencia. Usa el importe aplicado sin duplicar el vuelto ni incluir aportes o gastos manuales de Caja.
+- **R03 · Productos y margen:** ofrece **Top 10 o Todos**, ordenados por ingreso neto sin IGV. Usa costos históricos y revierte el costo solo por productos recuperados físicamente. En servicios, costo y margen muestran **«No aplica»**.
+- **R04 · Stock actual y crítico:** permite buscar y filtrar productos, consultar existencias, mínimos, faltantes y valoración. Incluye inactivos con stock y considera crítico un producto activo justo en el mínimo.
+- **R05 · Cierres de caja:** filtra por fecha de cierre, responsable y diferencias. Muestra efectivo esperado y contado, diferencia, fondo siguiente, retiro, aclaraciones y resumen de medios digitales.
+- **R06 · Trabajo del taller:** distingue **Recibidas** por fecha de ingreso y **Finalizadas** por fecha de finalización. Muestra responsable, zanja y duración cuando las fechas son válidas.
+- **R07 · Comprobantes:** consulta documentos, estados y vínculos entre originales, reemisiones y notas de crédito. Los intentos de envío no suman ventas.
+- **R08 · Auditoría:** muestra actor, módulo, acción, referencia, resultado y motivo. Protege los datos sensibles y evita duplicar eventos de restauración.
+- **Filtros, detalle y origen:** abre en ventas del mes, distingue los filtros editados de los aplicados y muestra **20 filas por página**. Si una consulta falla, conserva identificado el resultado anterior. Permite abrir el registro operativo y regresar a la consulta.
+- **Exportación:** el PDF y el XLSX incluyen todas las filas del resultado consultado, aunque en pantalla se vea una sola página.
+
+**Fortalezas de implementación:**
+
+- **Permisos en Rust:** consulta y exportación reservadas al administrador con sesión vigente.
+- **Un mismo corte para pantalla, detalle y archivo:** las operaciones posteriores no alteran el resultado hasta consultar de nuevo. SQLite no mantiene abierta una transacción mientras el usuario lo revisa.
+- **Cálculos históricos:** utiliza importes y costos de las operaciones registradas, con precisión interna y totales separados por unidad.
+- **Guardado de archivos:** genera un temporal y publica el archivo final cuando termina. Las pruebas verifican que un reemplazo fallido no deje un archivo final incompleto.
+- **Formatos:** el PDF usa fuentes Unicode, ajusta el texto y repite encabezados; XLSX conserva valores numéricos y guarda textos externos como texto literal.
+- **Trazabilidad:** las consultas no modifican operaciones comerciales y el resultado de la exportación se registra en auditoría.
+- **Rendimiento:** en la revisión separada, **20 de 20 consultas** sobre **100.000 eventos** quedaron por debajo de **3 segundos** y **5 de 5 exportaciones por formato** de **10.000 filas** quedaron por debajo de **30 segundos**. Las mediciones corresponden al backend con SQLite temporal en disco.
+
+**Acceso por rol:**
+
+| Rol           | Alcance                                                     |
+| ------------- | ----------------------------------------------------------- |
+| Administrador | Consulta, detalle, navegación al origen y exportación.     |
+| Mecánico      | Sin acceso al módulo.                                      |
+| Cajero        | Sin acceso al módulo.                                      |
+
+**Capturas:**
+
+_R01 · Ventas del mes, filtros y resultado_
+
+![Reportes: ventas del mes y filtros](docs/images/09-reportes-ventas.png)
+
+_R03 · Productos y margen con selector Top 10 o Todos_
+
+![Reportes: productos y margen](docs/images/09-reportes-productos-margen.png)
+
+_Detalle de un resultado con acceso al registro de origen_
+
+![Reportes: detalle y acceso al origen](docs/images/09-reportes-detalle.png)
+
+_Reporte exportado en PDF con encabezados y nombres acentuados_
+
+![Reportes: exportación PDF](docs/images/09-reportes-exportacion-pdf.png)
+
+_Reporte exportado en Excel con importes numéricos_
+
+![Reportes: exportación XLSX](docs/images/09-reportes-exportacion-xlsx.png)
+
+**Pendiente para cerrar:**
+
+- Integrar cuatro casos de `src-tauri/tests/pos/reportes.rs` a Cargo y sustituir la llamada a la función inexistente `preparar_en`. Pasaron con un adaptador temporal, pero aún no forman parte de la suite permanente.
+- Validar la exportación desde Tauri en Windows: cancelar el selector, confirmar reemplazos, probar un archivo abierto y un destino sin permisos, y comprobar qué ocurre si la sesión vence mientras se genera el archivo.
+- Recorrer los ocho reportes en escritorio: apertura del registro de origen y retorno, conservación de filtros, página y corte, teclado, foco y legibilidad de las exportaciones con textos largos.
+- Registrar la evidencia de esos recorridos junto con los resultados automatizados.
+
+**Estado:** 🟢 **Ajustes finales · Evaluación: 96/100** en la última revisión. La prueba de extracción del PDF aprobó en Windows y confirmó la conservación de los caracteres Unicode evaluados. Queda conectar los cuatro casos pendientes y completar la validación en escritorio.
+
+</details>
+
+<a id="modulo-inicio-dashboard"></a>
+
+**10 · Inicio Dashboard — ⚪ Pendiente · Próximo módulo.** La pantalla base ya existe. Queda completar y validar los indicadores, resúmenes y accesos rápidos por rol, contrastando las cifras con los módulos de origen. Todavía no se asigna una evaluación al cierre del módulo.
 
 <a id="roles"></a>
 
@@ -663,6 +734,8 @@ Las autorizaciones se validan en Rust. Los costos y las notas internas se restri
 **Comprobante electrónico:** el envío ocurre después del guardado local. Si el resultado es incierto, el administrador consulta el documento original antes de reenviarlo; si es rechazado, la reemisión usa otro número vinculado sin registrar otra venta ni otro cobro. Devolver exige que el original y las notas de crédito anteriores estén aceptados.
 
 **Cierre de turno:** Caja Chica guarda el arqueo y permite consultarlo desde el historial.
+
+**Consulta de gestión:** el administrador puede revisar los resultados en Reportes, abrir registros de origen y exportar el corte consultado.
 
 **Respaldo y recuperación:** el administrador puede generar y verificar copias con Caja abierta. Para restaurar una instalación existente debe cerrar el turno actual; antes de reanudar la operación se completan los controles de recuperación que correspondan.
 
@@ -754,7 +827,7 @@ La configuración actual de Tauri invoca `npm run dev` antes del desarrollo y `n
 
 ### 8.1. Qué se verifica
 
-En Login: acceso, sesiones, permisos, bloqueo, recuperación, revocación y consistencia ante fallos. En Ficha Vehicular: registro, edición, identidad histórica, permisos, correcciones, consultas y paginación. En Taller: recepción, estados, responsable, zanjas, servicios, consumos, devoluciones, aceite, auditoría y avisos de resultado. En Inventario: DTO públicos sin costos, catálogos, proveedores, compras, conteos, valoración de granel, kardex, filtros y reintentos sin duplicación de efectos. En POS: ventas directas, cobro de OT sin duplicar insumos, pagos, devoluciones, comprobantes, idempotencia y recuperación documental local. En Caja Chica: apertura idempotente, privacidad entre cajeros, arqueo con control de versión, reversión, aclaración, cierre recuperado e integración con cobros y reintegros del POS. En Backup: copia consistente con WAL, protección local de la frase, archivos ausentes, retención, restauración por generaciones, recuperación de arranque y conciliación de series. En Administración: permisos, cuentas y temporales, validación de ubigeo, control de versiones y dependencias, reversión ante fallos de auditoría, descarte de cambios y conservación de filtros por sesión.
+En Login: acceso, sesiones, permisos, bloqueo, recuperación, revocación y consistencia ante fallos. En Ficha Vehicular: registro, edición, identidad histórica, permisos, correcciones, consultas y paginación. En Taller: recepción, estados, responsable, zanjas, servicios, consumos, devoluciones, aceite, auditoría y avisos de resultado. En Inventario: DTO públicos sin costos, catálogos, proveedores, compras, conteos, valoración de granel, kardex, filtros y reintentos sin duplicación de efectos. En POS: ventas directas, cobro de OT sin duplicar insumos, pagos, devoluciones, comprobantes, idempotencia y recuperación documental local. En Caja Chica: apertura idempotente, privacidad entre cajeros, arqueo con control de versión, reversión, aclaración, cierre recuperado e integración con cobros y reintegros del POS. En Backup: copia consistente con WAL, protección local de la frase, archivos ausentes, retención, restauración por generaciones, recuperación de arranque y conciliación de series. En Administración: permisos, cuentas y temporales, validación de ubigeo, control de versiones y dependencias, reversión ante fallos de auditoría, descarte de cambios y conservación de filtros por sesión. En Reportes: permisos, fechas de Lima, cifras históricas, filtros, corte multipágina, navegación al origen, conservación de Unicode en PDF y publicación segura de archivos.
 
 ### 8.2. Cómo ejecutarlas
 
@@ -770,27 +843,36 @@ cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings
 cargo test --manifest-path src-tauri/Cargo.toml
 ```
 
-Para repetir las mediciones del backend de POS, Caja Chica y Administración desde la raíz:
+Si en Windows aparecen errores de compilación relacionados con archivos `rlib`, la suite se verificó con una carpeta de compilación separada. Desde la raíz, reutiliza esa carpeta entre ejecuciones:
+
+```powershell
+$targetPruebas = Join-Path $env:TEMP 'lubricentro-test'
+cargo test --locked --manifest-path src-tauri/Cargo.toml --target-dir "$targetPruebas" -j 1
+```
+
+Para repetir las mediciones del backend de POS, Caja Chica, Administración y Reportes desde la raíz:
 
 ```powershell
 cargo test --manifest-path src-tauri/Cargo.toml --test pos_rendimiento_tests -- --ignored --nocapture
 cargo test --manifest-path src-tauri/Cargo.toml --test caja_rendimiento_tests -- --ignored --nocapture
 cargo test --manifest-path src-tauri/Cargo.toml --test administracion_tests rendimiento_administracion_200_cuentas_20_series -- --ignored --nocapture
+cargo test --manifest-path src-tauri/Cargo.toml --lib rendimiento_reportes_auditoria_y_exportacion -- --ignored --nocapture
+cargo test --manifest-path src-tauri/Cargo.toml --test pos_tests rendimiento_reportes_con_20000_ventas -- --ignored --nocapture
 ```
 
 Las pruebas de integración externas deben usar datos y credenciales de Prueba. El flujo de [GitHub Actions](.github/workflows/ci.yml) define comprobaciones del frontend y backend; sus resultados se consultan en [Actions](https://github.com/JesusLoza1506/lubricentro-erp/actions).
 
 ### 8.3. Estado de la validación
 
-La ejecución general en Windows del **9 de noviembre de 2026** reportó los siguientes resultados. Las mediciones de rendimiento corresponden a ejecuciones por separado.
+La ejecución general en Windows del **10 de noviembre de 2026** reportó los siguientes resultados. La suite de Rust aprobó dos veces con una carpeta de compilación separada y `-j 1`. Las mediciones de rendimiento corresponden a ejecuciones por separado.
 
 | Comprobación                                      | Resultado reportado                                                                                                                                                    |
 | ------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Formato Rust, `cargo check` y Clippy              | Aprobados.                                                                                                                                                             |
 | TypeScript y compilación del frontend             | Aprobadas.                                                                                                                                                             |
-| Pruebas de frontend y servicios                   | **141 aprobadas** en **20 archivos**, incluidas **11 de Administración**, **6 de Backup** y **3 de Caja Chica**.                                                       |
-| Suite general de Rust (`cargo test`)              | **148 aprobadas**, **0 fallidas** y **4 mediciones omitidas por defecto**.                                                                                             |
-| Suite Rust de POS                                 | **20 aprobadas**, incluida la integración con Caja Chica.                                                                                                              |
+| Pruebas de frontend y servicios                   | **144 aprobadas** en **21 archivos**, incluidas **3 de Reportes**, **11 de Administración**, **6 de Backup** y **3 de Caja Chica**.                                                       |
+| Suite general de Rust (`cargo test`)              | **162 aprobadas**, **0 fallidas** y **6 pruebas de rendimiento omitidas por defecto**.                                                                                             |
+| Suite Rust de POS                                 | **21 aprobadas**, incluida la integración con Caja Chica y Reportes.                                                                                                              |
 | Suite Rust de Caja Chica                          | **4 aprobadas**.                                                                                                                                                       |
 | Pruebas Rust de Backup y Copias                   | **10 aprobadas**, incluidas las de recuperación y de interrupción simulada.                                                                                            |
 | Suite funcional de Administración en Rust         | **11 aprobadas**. Incluye ubigeo, edición obsoleta, dependencias nuevas y reversión ante fallos de auditoría.                                                          |
@@ -805,6 +887,8 @@ La ejecución general en Windows del **9 de noviembre de 2026** reportó los sig
 **Rendimiento de Backup:** en la revisión anterior, generar y verificar tomó **31,66–37,34 s** y seleccionar y comprobar tomó **23,14–29,21 s** en cinco muestras con aproximadamente **100 MB de SQLite y 100 MB de archivos**. La medición se hizo en disco local con datos ficticios; queda pendiente medir USB y el recorrido completo en Tauri.
 
 **Rendimiento de Administración:** en Windows, la primera página más las series tomó **0,51–1,05 ms** y guardar con cálculo del hash tomó **404–600 ms**. La prueba mide el backend con SQLite en memoria. Quedan pendientes las mediciones con SQLite en disco y desde la interfaz en Tauri.
+
+**Rendimiento de Reportes:** en la revisión con SQLite temporal en disco, las **20 consultas de R01** con **20.000 ventas** y las **20 de R08** con **100.000 eventos** cumplieron el límite de **3 segundos**. Las **cinco exportaciones por formato**, con **10.000 filas**, cumplieron el límite de **30 segundos**. Falta medir y documentar el recorrido de exportación en escritorio.
 
 **Evidencia previa de Inventario:** las consultas de catálogo, críticos y kardex con **1.000 productos y 10.000 movimientos** registraron aproximadamente **0,2–1,8 ms** en SQLite en memoria. Los tres casos de conteo reproducidos permanecen entre los pendientes de Inventario. Taller conserva como pendiente las cinco mediciones con **2.000 OT**.
 
@@ -828,7 +912,7 @@ El informe general y las diez especificaciones funcionales v7 son documentos de 
 
 ## 10. Hoja de ruta
 
-Los ocho primeros módulos están en ajustes finales; **el siguiente módulo será Reportes**.
+Los nueve primeros módulos están en ajustes finales; **el próximo módulo por cerrar es Inicio Dashboard**.
 
 1. **Login y Sesión — ajustes finales (95/100):** completar recuperación del error inicial y evidencias de teclado, foco, salida y tiempos de ingreso.
 2. **Ficha Vehicular e Historial — ajustes finales (93/100):** activar cambios pendientes al modificar datos, consolidar pruebas de interfaz y completar mediciones de escritorio.
@@ -838,8 +922,8 @@ Los ocho primeros módulos están en ajustes finales; **el siguiente módulo ser
 6. **Caja Chica — ajustes finales (94/100):** corregir la respuesta tardía al regresar al historial y completar las pruebas de interfaz, impresión, medianoche en Lima y rendimiento en escritorio.
 7. **Backup y Copias — ajustes finales (94/100):** estabilizar las pruebas de interfaz y completar las verificaciones de fallos, recuperación en Windows y guardado externo.
 8. **Administración — ajustes finales (96/100):** completar la validación en Tauri, el almacén de credenciales de Windows, los recorridos con POS y Backup y la medición con SQLite en disco.
-9. **Reportes — pendiente · próximo módulo:** integrar las consultas y exportaciones autorizadas de los módulos anteriores.
-10. **Inicio Dashboard — pendiente de integración final:** integrar los indicadores y resúmenes por rol después de Reportes.
+9. **Reportes — ajustes finales (96/100):** incorporar a Cargo los cuatro casos pendientes y completar la validación de navegación y exportación en Tauri.
+10. **Inicio Dashboard — pendiente · próximo módulo:** completar los indicadores, resúmenes y accesos por rol, conciliar sus cifras con los módulos de origen y validar el recorrido en Tauri.
 
 Cada módulo tendrá su detalle plegable, capturas y evidencias conforme avance. Pasar a la siguiente etapa no elimina los pendientes de los módulos anteriores. Este orden de desarrollo no modifica el flujo operativo del taller descrito en la sección 5.
 

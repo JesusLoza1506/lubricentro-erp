@@ -42,6 +42,11 @@ sha2 = "0.11.1"
 ring = "0.17"
 zeroize = "1"
 tempfile = "3.8"
+rust_xlsxwriter = "0.92"
+krilla = { version = "0.6.0", default-features = false }
+rustybuzz = "0.20.1"
+unicode-segmentation = "1.12"
+unicode-bidi = "0.3"
 
 [target.'cfg(unix)'.dependencies]
 libc = "0.2"
@@ -55,3 +60,7 @@ strip = true
 
 [lints.rust]
 unexpected_cfgs = { level = "allow", check-cfg = ['cfg(tarpaulin_include)'] }
+
+[dev-dependencies]
+lopdf = { version = "0.47", default-features = false }
+zip = { version = "7.4", default-features = false, features = ["deflate"] }

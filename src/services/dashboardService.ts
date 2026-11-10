@@ -2,6 +2,7 @@ import { invoke } from '@tauri-apps/api/core';
 
 export interface DashboardDTO {
   ventas_del_dia: number;
+  ventas_confirmadas?: number;
   comprobantes_emitidos: number;
   ots_activas: number;
   productos_stock_critico: number;

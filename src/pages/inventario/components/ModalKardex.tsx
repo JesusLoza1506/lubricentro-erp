@@ -6,7 +6,7 @@ import { ModalOrigenKardex, dineroMicro } from './ModalOrigenKardex';
 
 interface ModalKardexProps {
   abierto: boolean;
-  producto: Producto | null;
+  producto: Pick<Producto, 'id_producto' | 'codigo' | 'nombre' | 'unidad_medida'> | null;
   onClose: () => void;
 }
 

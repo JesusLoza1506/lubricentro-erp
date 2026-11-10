@@ -6,8 +6,25 @@ pub fn elegir_ruta(_carpeta: bool) -> R<Option<String>> {
     Err(err("El selector de respaldos está disponible en Windows."))
 }
 
+#[cfg(not(windows))]
+pub fn elegir_guardado(_nombre: &str, _ext: &str, _ventana: isize) -> R<Option<String>> {
+    Err(err(
+        "El selector para guardar reportes está disponible en Windows.",
+    ))
+}
+
+#[cfg(windows)]
+pub fn elegir_guardado(nombre: &str, ext: &str, ventana: isize) -> R<Option<String>> {
+    elegir(false, Some((nombre, ext)), ventana)
+}
+
 #[cfg(windows)]
 pub fn elegir_ruta(carpeta: bool) -> R<Option<String>> {
+    elegir(carpeta, None, 0)
+}
+
+#[cfg(windows)]
+fn elegir(carpeta: bool, guardar: Option<(&str, &str)>, ventana: isize) -> R<Option<String>> {
     use std::{ffi::c_void, mem, ptr};
     type Ptr = *mut c_void;
     #[repr(C)]
@@ -50,6 +67,7 @@ pub fn elegir_ruta(carpeta: bool) -> R<Option<String>> {
     #[link(name = "comdlg32")]
     unsafe extern "system" {
         fn GetOpenFileNameW(config: *mut OpenFileName) -> i32;
+        fn GetSaveFileNameW(config: *mut OpenFileName) -> i32;
         fn CommDlgExtendedError() -> u32;
     }
     #[link(name = "shell32")]
@@ -108,22 +126,51 @@ pub fn elegir_ruta(carpeta: bool) -> R<Option<String>> {
         .join()
         .map_err(|_| err("No se pudo abrir el selector de carpetas."))?;
     }
-    let title = wide("Seleccione un respaldo de Lubricentro");
-    let filter = wide("Respaldo de Lubricentro (*.lgbackup)\0*.lgbackup\0");
+    let (title, filter, extension) = if let Some((nombre, ext)) = guardar {
+        let sugerido = wide(nombre);
+        if sugerido.len() >= path.len() {
+            return Err(err("El nombre sugerido es demasiado largo."));
+        }
+        path[..sugerido.len()].copy_from_slice(&sugerido);
+        (
+            wide("Guardar reporte"),
+            wide(&format!("Reporte (*.{ext})\0*.{ext}\0")),
+            Some(wide(ext)),
+        )
+    } else {
+        (
+            wide("Seleccione un respaldo de Lubricentro"),
+            wide("Respaldo de Lubricentro (*.lgbackup)\0*.lgbackup\0"),
+            None,
+        )
+    };
     // A null hook and zeroed optional fields match the Win32 API contract.
     let mut config: OpenFileName = unsafe { mem::zeroed() };
     config.size = mem::size_of::<OpenFileName>() as u32;
+    config.owner = ventana as Ptr;
     config.filter = filter.as_ptr();
     config.index = 1;
     config.file = path.as_mut_ptr();
     config.max_file = path.len() as u32;
     config.title = title.as_ptr();
-    config.flags = 0x00000008 | 0x00001000 | 0x00000800 | 0x00080000;
-    if unsafe { GetOpenFileNameW(&mut config) } == 0 {
+    config.flags = 0x00000008 | 0x00000800 | 0x00080000;
+    let resultado = if let Some(ext) = extension.as_ref() {
+        config.default_extension = ext.as_ptr();
+        config.flags |= 0x00000002; // Confirmar el reemplazo en el selector.
+        unsafe { GetSaveFileNameW(&mut config) }
+    } else {
+        config.flags |= 0x00001000;
+        unsafe { GetOpenFileNameW(&mut config) }
+    };
+    if resultado == 0 {
         if unsafe { CommDlgExtendedError() } == 0 {
             return Ok(None);
         }
-        return Err(err("No se pudo abrir el selector de respaldos."));
+        return Err(err(if guardar.is_some() {
+            "No se pudo abrir el selector para guardar el reporte."
+        } else {
+            "No se pudo abrir el selector de respaldos."
+        }));
     }
     Ok(Some(String::from_utf16_lossy(
         &path[..path.iter().position(|c| *c == 0).unwrap_or(path.len())],

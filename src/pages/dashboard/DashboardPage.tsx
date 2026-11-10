@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import {
   ArrowRight,
   Car,
+  ChartNoAxesCombined,
   ClipboardList,
   Clock,
   DatabaseBackup,
@@ -73,6 +74,13 @@ const accesos = [
     titulo: 'Administración',
     descripcion: 'Gestiona usuarios, empresa, facturación y taller.',
   },
+  {
+    permiso: 'REPORTES',
+    destino: 'reportes',
+    icono: ChartNoAxesCombined,
+    titulo: 'Reportes',
+    descripcion: 'Consulta ventas, stock, caja, taller y auditoría por periodo.',
+  },
 ] as const;
 
 interface IndicadorProps {
@@ -135,6 +143,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ setModuloActual })
 
   const visibles = accesos.filter(({ permiso }) => {
     if (permiso === 'BACKUP') return puedeVerBackup;
+    if (permiso === 'REPORTES') return usuario?.rol === 'ADMINISTRADOR' && tienePermiso('REPORTES', 'ver');
     if (permiso === 'ADMIN') return usuario?.rol === 'ADMINISTRADOR' && tienePermiso('ADMIN', 'ver');
     return tienePermiso(permiso, 'ver');
   });
@@ -180,11 +189,15 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ setModuloActual })
             <h3 id="inicio-hoy-titulo">Resumen de hoy</h3>
             <dl className="inicio-indicadores" aria-busy={cargandoMetrics}>
               <Indicador
-                titulo="Ventas del día"
+                titulo="Ventas netas del día"
                 icono={Receipt}
                 valor={valor(`S/ ${(metrics?.ventas_del_dia ?? 0).toFixed(2)}`)}
                 detalle={detalle(
-                  metrics?.comprobantes_emitidos === 1
+                  metrics?.ventas_confirmadas != null
+                    ? metrics.ventas_confirmadas === 1
+                      ? '1 venta confirmada'
+                      : `${metrics.ventas_confirmadas} ventas confirmadas`
+                    : metrics?.comprobantes_emitidos === 1
                     ? '1 comprobante emitido'
                     : `${metrics?.comprobantes_emitidos ?? 0} comprobantes emitidos`
                 )}

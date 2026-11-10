@@ -62,7 +62,8 @@ const prodInicial: ProductoForm = {
   referencia_inicial: '',
 };
 
-export const InventarioPage: React.FC = () => {
+type ProductoKardex = Pick<Producto, 'id_producto' | 'codigo' | 'nombre' | 'unidad_medida'>;
+export const InventarioPage: React.FC<{ origenReporte?: ProductoKardex }> = ({ origenReporte }) => {
   const { usuario, ambienteActual } = useAuth();
   if (usuario)
     configurarContextoInventario(
@@ -110,9 +111,9 @@ export const InventarioPage: React.FC = () => {
     motivo: string;
   }>({ abierto: false, servicio: null, motivo: '' });
 
-  const [modalKardex, setModalKardex] = useState<{ abierto: boolean; producto: Producto | null }>({
-    abierto: false,
-    producto: null,
+  const [modalKardex, setModalKardex] = useState<{ abierto: boolean; producto: ProductoKardex | null }>({
+    abierto: !!origenReporte,
+    producto: origenReporte ?? null,
   });
 
   const [modalAjuste, setModalAjuste] = useState<{

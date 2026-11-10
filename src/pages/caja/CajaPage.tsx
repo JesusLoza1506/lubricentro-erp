@@ -26,11 +26,11 @@ const exito: Record<AccionCaja, string> = {
   aclarar: 'Aclaración guardada.',
 };
 
-export function CajaPage({ onVenta }: { onVenta: (id: number) => void }) {
+export function CajaPage({ onVenta, idOrigenReporte }: { onVenta: (id: number) => void; idOrigenReporte?: number }) {
   const { usuario, ambienteActual, setHayCambiosSinGuardar } = useAuth();
   const id = usuario?.id_usuario ?? 0;
   const admin = usuario?.rol === 'ADMINISTRADOR';
-  const [vista, setVista] = useState<'mi' | 'historial'>('mi');
+  const [vista, setVista] = useState<'mi' | 'historial'>(idOrigenReporte ? 'historial' : 'mi');
   const [inicio, setInicio] = useState<CajaInicio | null>(null);
   const [detalle, setDetalle] = useState<CajaDetalle | null>(null);
   const [revision, setRevision] = useState(0);
@@ -71,13 +71,17 @@ export function CajaPage({ onVenta }: { onVenta: (id: number) => void }) {
     }
   }, []);
   useEffect(() => {
-    void actualizar();
+    let vigente = true;
+    void actualizar().then(() => {
+      if (vigente && idOrigenReporte && admin) void ver(idOrigenReporte);
+    });
     leerPendiente();
     return () => {
+      vigente = false;
       lectura.current++;
       setHayCambiosSinGuardar(false);
     };
-  }, [actualizar, leerPendiente, setHayCambiosSinGuardar]);
+  }, [actualizar, leerPendiente, setHayCambiosSinGuardar, idOrigenReporte, admin]);
 
   async function ver(idCaja: number, conservar = false) {
     const marca = ++lectura.current;

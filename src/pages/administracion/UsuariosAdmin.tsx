@@ -48,8 +48,21 @@ function formularioModificado(form: Formulario) {
     || form.rol !== rol || form.activo !== activo;
 }
 
-export function UsuariosAdmin({ marcar, navegar, filtros, onFiltros }: EdicionLocal & {
+function CuentaDesdeReporte({ id }: { id: number }) {
+  const cargar = useCallback(() => admin<DetalleUsuario>('detalle_usuario', { id }), [id]);
+  const consulta = useConsulta(cargar);
+  const u = consulta.datos?.usuario;
+  return <section className="adm-panel" aria-label="Cuenta vinculada al reporte">
+    <h2>Cuenta vinculada al reporte</h2>
+    <EstadoAdmin error={consulta.error} />
+    {u ? <p><strong>{u.nombre}</strong> · {u.login} · {roles[u.rol]} · {u.activo ? 'Activa' : 'Inactiva'}</p>
+      : !consulta.error && <p role="status">Consultando la cuenta…</p>}
+  </section>;
+}
+
+export function UsuariosAdmin({ marcar, navegar, filtros, onFiltros, idOrigenReporte }: EdicionLocal & {
   filtros: FiltrosUsuarios;
+  idOrigenReporte?: number;
   onFiltros: (filtros: FiltrosUsuarios) => void;
 }) {
   const { busqueda: filtro, rol, estado, pagina } = filtros;
@@ -116,6 +129,7 @@ export function UsuariosAdmin({ marcar, navegar, filtros, onFiltros }: EdicionLo
   };
   return (
     <>
+      {idOrigenReporte && <CuentaDesdeReporte id={idOrigenReporte} />}
       <section className="adm-panel" aria-labelledby="usuarios-titulo">
         <div className="adm-fila">
           <div>

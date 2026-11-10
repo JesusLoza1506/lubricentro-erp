@@ -6,6 +6,11 @@ import { sincronizarCapturasBackup } from '../backupService';
 
 vi.mock('@tauri-apps/api/core', () => ({ invoke: vi.fn() }));
 const llamar = vi.mocked(invoke);
+function operaciones(accion: string) {
+  return llamar.mock.calls.filter(([cmd, args]) =>
+    cmd === 'backup_operacion_cmd' &&
+    (args as { req?: { accion?: string } } | undefined)?.req?.accion === accion);
+}
 afterEach(() => {
   cleanup();
   llamar.mockReset();
@@ -21,9 +26,16 @@ it('permite corregir la frase y no restaura al comprobar o cancelar la confirmac
       tipo: 'MANUAL', autor: 'Prueba', archivos: [{ nombre: 'base.sqlite' }],
     },
   };
-  llamar.mockResolvedValueOnce('C:/Respaldos/prueba.lgbackup')
-    .mockRejectedValueOnce('VALIDATION: La frase es incorrecta.')
-    .mockResolvedValueOnce(vista);
+  llamar.mockImplementation(async (cmd, args) => {
+    if (cmd === 'backup_elegir_cmd') return 'C:/Respaldos/prueba.lgbackup';
+    if (cmd === 'backup_progreso_cmd') return { fase: 0, no_cerrar: false };
+    const req = (args as { req?: { accion: string; frase?: string } } | undefined)?.req;
+    if (cmd === 'backup_operacion_cmd' && req?.accion === 'comprobar') {
+      if (req.frase === 'incorrecta') throw 'VALIDATION: La frase es incorrecta.';
+      return vista;
+    }
+    throw new Error(`Comando inesperado: ${cmd}/${req?.accion}`);
+  });
   render(<BackupPage inicial />);
   fireEvent.click(screen.getByRole('button', { name: /abrir.*copia/i }));
   const frase = await screen.findByLabelText('Frase original de la copia');
@@ -33,12 +45,14 @@ it('permite corregir la frase y no restaura al comprobar o cancelar la confirmac
   fireEvent.change(screen.getByLabelText('Frase original de la copia'), { target: { value: 'otra frase de prueba' } });
   fireEvent.click(screen.getByRole('button', { name: 'Comprobar copia' }));
   await screen.findByRole('heading', { name: 'Copia verificada' });
-  expect(llamar).toHaveBeenCalledTimes(3);
+  expect(operaciones('comprobar')).toHaveLength(2);
+  expect(operaciones('restaurar')).toHaveLength(0);
   fireEvent.click(screen.getByRole('button', { name: 'Restaurar copia' }));
   expect(await screen.findByRole('dialog')).toBeTruthy();
   fireEvent.click(screen.getByRole('button', { name: 'Cancelar' }));
   await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
-  expect(llamar).toHaveBeenCalledTimes(3);
+  expect(operaciones('comprobar')).toHaveLength(2);
+  expect(operaciones('restaurar')).toHaveLength(0);
 });
 
 it('elimina solo capturas del ambiente restaurado y conserva las de la nueva generación', () => {
@@ -105,7 +119,7 @@ it('cancelar protección borra la frase sin invocar el guardado', async () => {
   fireEvent.change(screen.getByLabelText('Frase nueva'), { target: { value: 'secreto temporal' } });
   fireEvent.change(screen.getByLabelText('Repetir frase'), { target: { value: 'secreto temporal' } });
   fireEvent.click(screen.getByRole('button', { name: 'Cancelar' }));
-  expect(llamar).toHaveBeenCalledTimes(1);
+  expect(operaciones('configurar')).toHaveLength(0);
   fireEvent.click(screen.getByRole('button', { name: 'Configurar protección' }));
   expect((screen.getByLabelText('Frase nueva') as HTMLInputElement).value).toBe('');
   expect((screen.getByLabelText('Repetir frase') as HTMLInputElement).value).toBe('');

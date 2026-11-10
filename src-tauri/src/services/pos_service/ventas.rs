@@ -298,7 +298,7 @@ pub fn confirmar(
             None
         };
         let vuelto = recibido.map(|r| r - p.monto_cent);
-        tx.execute("INSERT INTO movimientos_caja(id_operacion,id_caja,id_usuario,tipo,medio_pago,monto_cent,signo,id_venta,recibido_cent,vuelto_cent,concepto,referencia) VALUES(?1,?2,?3,'COBRO',?4,?5,1,?6,?7,?8,?9,?10)",params![format!("{}-pago-{i}",req.id_operacion),caja,actor,p.medio,p.monto_cent,id,recibido,vuelto,format!("Cobro venta {id}"),p.referencia])?;
+        tx.execute("INSERT INTO movimientos_caja(id_operacion,id_caja,id_usuario,tipo,medio_pago,monto_cent,signo,id_venta,recibido_cent,vuelto_cent,concepto,referencia,fecha_operacion) VALUES(?1,?2,?3,'COBRO',?4,?5,1,?6,?7,?8,?9,?10,(SELECT fecha_venta FROM ventas WHERE id_venta=?6))",params![format!("{}-pago-{i}",req.id_operacion),caja,actor,p.medio,p.monto_cent,id,recibido,vuelto,format!("Cobro venta {id}"),p.referencia])?;
     }
     tx.execute(
         "UPDATE ventas SET estado_registro='CONFIRMADA' WHERE id_venta=?1",

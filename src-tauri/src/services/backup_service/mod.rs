@@ -1,5 +1,5 @@
 mod selector;
-pub use selector::elegir_ruta;
+pub use selector::{elegir_guardado, elegir_ruta};
 mod espacio;
 mod paquete;
 mod proteccion;

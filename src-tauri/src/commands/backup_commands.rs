@@ -23,6 +23,7 @@ pub struct SolicitudBackup {
     tipo: Option<String>,
     pagina: Option<i64>,
     id_backup: Option<i64>,
+    id_restauracion: Option<i64>,
     ruta: Option<String>,
     frase: Option<String>,
     seleccion: Option<String>,
@@ -152,7 +153,7 @@ pub async fn backup_operacion_cmd(app: AppHandle, req: SolicitudBackup) -> R<Val
         let ss = app.state::<Mutex<SessionState>>();
         let b = app.state::<BackupState>();
         // Consultar el historial no modifica respaldos ni necesita el bloqueo de escritura.
-        let _trabajo = if req.accion == "estado" {
+        let _trabajo = if matches!(req.accion.as_str(), "estado" | "detalle_restauracion") {
             None
         } else {
             Some(b.ocupacion()?)
@@ -189,6 +190,18 @@ pub async fn backup_operacion_cmd(app: AppHandle, req: SolicitudBackup) -> R<Val
         };
         match req.accion.as_str() {
             "estado" => b.estado(&c, req.tipo.as_deref(), req.pagina.unwrap_or(1)),
+            "detalle_restauracion" => {
+                if inicial { return Err(AppError::PermisoDenegado); }
+                let id = req.id_restauracion.ok_or_else(|| invalid("Indica la restauración."))?;
+                Ok(c.query_row(
+                    "SELECT nombre_copia_snapshot,actor_snapshot,fecha_inicio,fecha_fin,estado FROM restauraciones
+                     WHERE id_restauracion=?1 AND ambiente=(SELECT ambiente_actual FROM configuracion WHERE id_config=1)",
+                    [id], |r| Ok(serde_json::json!({
+                        "nombre":r.get::<_,String>(0)?, "actor":r.get::<_,String>(1)?,
+                        "inicio":r.get::<_,String>(2)?, "fin":r.get::<_,Option<String>>(3)?, "estado":r.get::<_,String>(4)?,
+                    }))
+                )?)
+            }
             "configurar" => b.configurar(&c, &a, secreto()?),
             "generar" => {
                 drop(c);
@@ -235,6 +248,9 @@ pub async fn backup_operacion_cmd(app: AppHandle, req: SolicitudBackup) -> R<Val
                     .restaurar(&mut c, &a, s.session_id.as_deref(), seleccion()?)
                     .map_err(|e| invalid(&format!("{e} La base activa no se cambió.")))?;
                 *s = SessionState::new();
+                if let Err(e) = app.state::<crate::services::reportes_service::EstadoReportes>().limpiar() {
+                    tracing::warn!("No se pudo liberar el corte de Reportes tras restaurar: {e}");
+                }
                 Ok(data)
             }
             "token" => b.guardar_token(&mut c, &a, secreto()?, req.ruta.as_deref()),

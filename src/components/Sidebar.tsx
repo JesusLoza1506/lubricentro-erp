@@ -133,12 +133,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
       label: 'Reportes',
       icon: BarChart2,
       siempreVisible: false,
-      enDesarrollo: true,
+      enDesarrollo: false,
     },
   ];
 
   const opcionesPermitidas = menuItems.filter(
-    (item) => item.siempreVisible || tienePermiso(item.moduloKey, 'ver')
+    (item) => (item.id !== 'reportes' || usuario?.rol === 'ADMINISTRADOR') &&
+      (item.siempreVisible || tienePermiso(item.moduloKey, 'ver'))
   );
 
   const handleNavegarModulo = (item: MenuItem) => {

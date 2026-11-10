@@ -24,11 +24,12 @@ import { ModalCrearOT } from './components/ModalCrearOT';
 import { ModalDetalleOT } from './components/ModalDetalleOT';
 
 interface OrdenesPageProps {
+  idOrigenReporte?: number;
   onNavegarAPos?: (id: number) => void;
   onNavegarAFichaVehicular?: (placa?: string) => void;
 }
 
-export const OrdenesPage: React.FC<OrdenesPageProps> = ({ onNavegarAPos }) => {
+export const OrdenesPage: React.FC<OrdenesPageProps> = ({ onNavegarAPos, idOrigenReporte }) => {
   const { usuario, tienePermiso } = useAuth();
   const { aviso, notificar, cerrar } = useAvisosOT();
   const [errorTablero, setErrorTablero] = useState('');
@@ -134,6 +135,17 @@ export const OrdenesPage: React.FC<OrdenesPageProps> = ({ onNavegarAPos }) => {
     cargarTablero();
     cargarMecanicos();
   }, [usuario]);
+
+  useEffect(() => {
+    if (!idOrigenReporte || !idUsuario || rol !== 'ADMINISTRADOR') return;
+    let vigente = true;
+    void ordenesService.obtenerOtPorId(idOrigenReporte, idUsuario, rol).then((ot) => {
+      if (vigente) setOtSeleccionada(ot);
+    }).catch((e) => {
+      if (vigente) notificar(mensajeErrorOT(e, 'No se pudo abrir la orden.'), 'ERROR');
+    });
+    return () => { vigente = false; };
+  }, [idOrigenReporte, idUsuario, rol, notificar]);
 
   useEffect(() => {
     if (vistaActiva === 'HISTORIAL_PAGINADO') {

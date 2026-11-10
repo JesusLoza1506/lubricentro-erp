@@ -75,7 +75,7 @@ pub fn devolver(
             )?;
         }
     }
-    tx.execute("INSERT INTO movimientos_caja(id_operacion,id_caja,id_usuario,tipo,medio_pago,monto_cent,signo,id_devolucion,concepto,referencia,motivo) VALUES(?1,?2,?3,'REINTEGRO',?4,?5,-1,?6,?7,?8,?9)",params![format!("{}-reintegro",req.id_operacion),caja,actor,req.medio,total,id,format!("Devolución venta {}",req.id_venta),req.referencia,req.motivo])?;
+    tx.execute("INSERT INTO movimientos_caja(id_operacion,id_caja,id_usuario,tipo,medio_pago,monto_cent,signo,id_devolucion,concepto,referencia,motivo,fecha_operacion) VALUES(?1,?2,?3,'REINTEGRO',?4,?5,-1,?6,?7,?8,?9,(SELECT fecha_operacion FROM devoluciones WHERE id_devolucion=?6))",params![format!("{}-reintegro",req.id_operacion),caja,actor,req.medio,total,id,format!("Devolución venta {}",req.id_venta),req.referencia,req.motivo])?;
     tx.execute(
         "UPDATE devoluciones SET estado_registro='CONFIRMADA' WHERE id_devolucion=?1",
         [id],

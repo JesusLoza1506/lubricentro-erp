@@ -41,23 +41,30 @@ impl DashboardService {
             )
             .unwrap_or(0);
 
-        // 3. Ventas y Comprobantes (Omitidos para MECANICO por seguridad)
-        let (ventas_del_dia, comprobantes_emitidos) = if rol == "MECANICO" {
-            (0.0, 0)
+        // La misma fuente económica de R01: ventas confirmadas y devoluciones por fecha propia.
+        let (ventas_del_dia, ventas_confirmadas, comprobantes_emitidos) = if rol == "MECANICO" {
+            (0.0, 0, 0)
         } else {
-            let (ventas_centimos, count): (i64, i64) = conn
-                .query_row(
-                    "SELECT 
-                    COALESCE(SUM(monto_total), 0), 
-                    COUNT(*) 
-                 FROM comprobantes 
-                 WHERE date(fecha_emision) = date('now') AND tipo_comprobante != 'PROFORMA'",
-                    [],
-                    |row| Ok((row.get(0)?, row.get(1)?)),
-                )
-                .unwrap_or((0, 0));
-
-            (ventas_centimos as f64 / 100.0, count)
+            let hoy = crate::services::reportes_service::ahora_lima().date();
+            let desde = format!("{hoy} 00:00:00");
+            let hasta = format!("{} 00:00:00", hoy.succ_opt().expect("fecha de hoy válida"));
+            let alcance = (rol == "CAJERO").then_some(id_usuario);
+            let (neto, cantidad): (i64, i64) = conn.query_row(
+                "SELECT coalesce(sum(total_cent),0),coalesce(sum(tipo='VENTA'),0)
+                 FROM v_operaciones_comerciales
+                 WHERE ambiente=(SELECT ambiente_actual FROM configuracion WHERE id_config=1)
+                 AND fecha_operacion>=?1 AND fecha_operacion<?2 AND (?3 IS NULL OR id_usuario=?3)",
+                (&desde, &hasta, alcance),
+                |r| Ok((r.get(0)?, r.get(1)?)),
+            )?;
+            let comprobantes: i64 = conn.query_row(
+                "SELECT count(*) FROM comprobantes c JOIN ventas v ON v.id_venta=c.id_venta
+                 WHERE c.ambiente=(SELECT ambiente_actual FROM configuracion WHERE id_config=1)
+                 AND fecha_emision>=?1 AND fecha_emision<?2 AND (?3 IS NULL OR v.id_emisor=?3)",
+                (&desde, &hasta, alcance),
+                |r| r.get(0),
+            )?;
+            (neto as f64 / 100.0, cantidad, comprobantes)
         };
 
         // 4. Estado de caja (Filtrado por usuario para CAJERO, global para ADMIN, N/A para MECANICO)
@@ -96,6 +103,7 @@ impl DashboardService {
         Ok(DashboardDto {
             rol,
             ventas_del_dia,
+            ventas_confirmadas,
             comprobantes_emitidos,
             ots_activas,
             productos_stock_critico,

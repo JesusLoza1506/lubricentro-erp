@@ -77,18 +77,41 @@ type Confirmacion =
   | { tipo: 'restaurar' }
   | { tipo: 'eliminar_previa'; id_backup: number; nombre: string; fecha: string };
 
+function RestauracionDesdeReporte({ id }: { id: number }) {
+  type Datos = { nombre: string; actor: string; inicio: string; fin: string | null; estado: string };
+  const [datos, setDatos] = useState<Datos | null>(null);
+  const [error, setError] = useState('');
+  useEffect(() => {
+    let vigente = true;
+    void backup<Datos>('detalle_restauracion', { id_restauracion: id })
+      .then((r) => { if (vigente) setDatos(r); })
+      .catch((e) => { if (vigente) setError(errorBackup(e)); });
+    return () => { vigente = false; };
+  }, [id]);
+  return <div className="bkp-restauracion" aria-label="Restauración vinculada al reporte">
+    <History size={16} aria-hidden="true" />
+    {error ? <span role="alert">{error}</span> : datos ? <span>
+      <strong>Restauración #{id}:</strong> {datos.nombre} · {datos.actor} · {fechaBackup(datos.inicio)} ·{' '}
+      {datos.estado === 'COMPLETA' ? 'Completa' : 'Controles pendientes'}
+      {datos.fin && ` · Fin: ${fechaBackup(datos.fin)}`}
+    </span> : <span role="status">Consultando restauración…</span>}
+  </div>;
+}
+
 export function BackupPage({
   inicial = false,
   onVolver,
   onCaja,
   onFinalizar,
   contextoCaja,
+  idOrigenReporte,
 }: {
   inicial?: boolean;
   onVolver?: () => void;
   onCaja?: (datos: ContextoDesdeCaja) => void;
   onFinalizar?: () => void;
   contextoCaja?: ContextoDesdeCaja;
+  idOrigenReporte?: number;
 }) {
   const [estado, setEstado] = useState<EstadoBackup | null>(null);
   const [tipo, setTipo] = useState(contextoCaja?.tipo ?? '');
@@ -313,6 +336,7 @@ export function BackupPage({
                 detalle="La limpieza automática conserva las previas."
               />
             </dl>
+            {idOrigenReporte && <RestauracionDesdeReporte id={idOrigenReporte} />}
             {estado?.ultima_restauracion && (
               <p className="bkp-restauracion">
                 <History size={16} aria-hidden="true" />
