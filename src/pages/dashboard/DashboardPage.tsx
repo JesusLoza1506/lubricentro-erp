@@ -1,309 +1,344 @@
-import React, { useEffect, useState } from 'react';
-import {
-  ArrowRight,
-  Car,
-  ChartNoAxesCombined,
-  ClipboardList,
-  Clock,
-  DatabaseBackup,
-  Package,
-  Receipt,
-  ShieldCheck,
-  ShoppingCart,
-  Wallet,
-  Wrench,
-} from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { ClipboardList, Clock, RefreshCw, Wallet, Wrench } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
-import { obtenerDatosDashboard } from '../../services/dashboardService';
-import type { DashboardDTO } from '../../services/dashboardService';
-import { backup, fechaBackup, type EstadoBackup } from '../backup/backupService';
-import '../../styles/gloriaTaller.css';
+import { esErrorNoAutenticado } from '../../services/authService';
+import { obtenerDatosDashboard, type DashboardDTO } from '../../services/dashboardService';
+import { fechaInicio, GraficoColumnas, GraficoGrupos, monedaInicio } from './GraficosInicio';
 import './dashboardVisual.css';
 
-interface DashboardPageProps {
-  setModuloActual: (modulo: string) => void;
-}
-
-const accesos = [
-  {
-    permiso: 'OT',
-    destino: 'taller',
-    icono: Wrench,
-    titulo: 'Órdenes de Trabajo',
-    descripcion: 'Revisa las zanjas y las órdenes del taller.',
-  },
-  {
-    permiso: 'POS',
-    destino: 'pos',
-    icono: ShoppingCart,
-    titulo: 'Punto de Venta',
-    descripcion: 'Registra ventas y consulta comprobantes.',
-  },
-  {
-    permiso: 'FICHA_VEHICULAR',
-    destino: 'ficha_vehicular',
-    icono: Car,
-    titulo: 'Ficha Vehicular',
-    descripcion: 'Busca por placa y consulta el historial del vehículo.',
-  },
-  {
-    permiso: 'INVENTARIO',
-    destino: 'inventario',
-    icono: Package,
-    titulo: 'Inventario y Stock',
-    descripcion: 'Consulta productos y existencias.',
-  },
-  {
-    permiso: 'CAJA',
-    destino: 'caja',
-    icono: Wallet,
-    titulo: 'Caja Chica',
-    descripcion: 'Abre tu turno, consulta movimientos y guarda el arqueo.',
-  },
-  {
-    permiso: 'BACKUP',
-    destino: 'backup',
-    icono: DatabaseBackup,
-    titulo: 'Backup y Copias',
-    descripcion: 'Genera, verifica y restaura respaldos.',
-  },
-  {
-    permiso: 'ADMIN',
-    destino: 'administracion',
-    icono: ShieldCheck,
-    titulo: 'Administración',
-    descripcion: 'Gestiona usuarios, empresa, facturación y taller.',
-  },
-  {
-    permiso: 'REPORTES',
-    destino: 'reportes',
-    icono: ChartNoAxesCombined,
-    titulo: 'Reportes',
-    descripcion: 'Consulta ventas, stock, caja, taller y auditoría por periodo.',
-  },
-] as const;
-
-interface IndicadorProps {
+type Tarjeta = {
   titulo: string;
-  icono: typeof Wallet;
-  valor: string;
+  valor: string | number;
   detalle: string;
-  tono?: 'aviso' | 'exito';
+  icono: typeof Clock;
+  destacado?: boolean;
+};
+const cantidad = (n: number, singular: string, plural: string) =>
+  `${n} ${n === 1 ? singular : plural}`;
+const trabajos = (n: number) => cantidad(n, 'trabajo', 'trabajos');
+
+function duracion(seg: number | null) {
+  if (seg === null) return 'No disponible';
+  if (seg < 60) return `${seg} s`;
+  const min = Math.floor(seg / 60);
+  const h = Math.floor(min / 60);
+  return h ? `${h} h${min % 60 ? ` ${min % 60} min` : ''}` : `${min} min`;
 }
 
-function Indicador({ titulo, icono: Icono, valor, detalle, tono }: IndicadorProps) {
+function tarjetas(d: DashboardDTO): Tarjeta[] {
+  switch (d.rol) {
+    case 'ADMINISTRADOR':
+      return [
+        {
+          titulo: 'Ventas netas hoy',
+          valor: monedaInicio(d.ventas_netas_hoy_cent),
+          detalle: 'Después de descuentos y reintegros',
+          icono: Wallet,
+        },
+        {
+          titulo: 'Trabajos terminados hoy',
+          valor: d.trabajos_terminados_hoy,
+          detalle: 'Órdenes finalizadas en Taller',
+          icono: Wrench,
+        },
+        {
+          titulo: 'Tiempo habitual hasta el cobro',
+          valor: duracion(d.mediana_cobro_seg),
+          detalle: 'Mediana de las OT cobradas en 7 días',
+          icono: Clock,
+        },
+      ];
+    case 'MECANICO':
+      return [
+        {
+          titulo: 'Trabajos que terminé hoy',
+          valor: d.trabajos_terminados_hoy,
+          detalle: 'Órdenes propias finalizadas',
+          icono: Wrench,
+        },
+        {
+          titulo: 'Mis trabajos abiertos',
+          valor: d.trabajos_abiertos,
+          detalle: 'En espera o en proceso',
+          icono: ClipboardList,
+        },
+        {
+          titulo: 'Tiempo habitual de mis trabajos',
+          valor: duracion(d.mediana_trabajo_seg),
+          detalle: 'Mediana de mis OT finalizadas en 7 días',
+          icono: Clock,
+        },
+      ];
+    case 'CAJERO': {
+      const turno = d.turno;
+      const propio = turno.estado === 'PROPIO';
+      const detalleTurno = propio
+        ? `Desde las ${turno.apertura.slice(11, 16)}${turno.apertura.slice(0, 10) === d.fecha ? '' : ` del ${turno.apertura.slice(8, 10)}/${turno.apertura.slice(5, 7)}`} · Lima`
+        : turno.estado === 'AJENO'
+          ? 'Caja a cargo de otro usuario'
+          : 'No hay un turno abierto';
+      return [
+        {
+          titulo: 'Mi turno',
+          valor: propio ? 'Abierto' : turno.estado === 'AJENO' ? 'Caja ajena' : 'Sin caja',
+          detalle: detalleTurno,
+          icono: Wallet,
+          destacado: propio,
+        },
+        {
+          titulo: 'Cobros que hice en mi turno',
+          valor: d.actividad_turno?.cobros ?? 'No aplica',
+          detalle: 'Operaciones confirmadas en mi turno',
+          icono: ClipboardList,
+        },
+        {
+          titulo: 'Mayor espera por cobrar',
+          valor:
+            d.pendientes.total === 0 ? 'Sin pendientes' : duracion(d.pendientes.mayor_espera_seg),
+          detalle: 'Desde que Taller finalizó la OT',
+          icono: Clock,
+        },
+      ];
+    }
+  }
+}
+
+function Graficos({ d }: { d: DashboardDTO }) {
+  if (d.rol === 'ADMINISTRADOR')
+    return (
+      <>
+        <GraficoColumnas
+          titulo="Ventas netas de los últimos 7 días"
+          subtitulo="Soles por día"
+          puntos={d.ventas_por_dia}
+          hoy={d.fecha}
+          formato={monedaInicio}
+          dinero
+        />
+        <GraficoColumnas
+          titulo="Trabajos terminados por hora"
+          subtitulo="Órdenes finalizadas hoy · Lima"
+          puntos={d.trabajos_por_hora}
+          hoy={d.fecha}
+          formato={trabajos}
+          horas
+        />
+      </>
+    );
+  if (d.rol === 'MECANICO')
+    return (
+      <>
+        <GraficoGrupos
+          titulo="Mi jornada por estado"
+          subtitulo="Solo órdenes propias"
+          segmentado
+          vacio="No tienes órdenes para mostrar."
+          grupos={[
+            { nombre: 'En espera', valor: d.por_estado.en_espera, color: 'ambar' },
+            { nombre: 'En proceso', valor: d.por_estado.en_proceso, color: 'azul' },
+            { nombre: 'Finalizadas hoy', valor: d.por_estado.finalizadas_hoy, color: 'verde' },
+          ]}
+        />
+        <GraficoColumnas
+          titulo="Mis trabajos terminados por día"
+          subtitulo="Últimos 7 días · órdenes propias finalizadas"
+          puntos={d.trabajos_por_dia}
+          hoy={d.fecha}
+          formato={trabajos}
+        />
+      </>
+    );
   return (
-    <div className="inicio-indicador" data-tono={tono}>
-      <dt className="inicio-indicador-label">
-        {titulo}
-        <Icono size={17} aria-hidden="true" />
-      </dt>
-      <dd className="inicio-indicador-valor">{valor}</dd>
-      <dd className="inicio-indicador-detalle">{detalle}</dd>
-    </div>
+    <>
+      <GraficoGrupos
+        titulo="Trabajos pendientes por tiempo de espera"
+        subtitulo="Desde que Taller finalizó la orden"
+        vacio={
+          d.pendientes.total
+            ? 'No hay fechas válidas para calcular la espera.'
+            : 'No hay trabajos pendientes por cobrar.'
+        }
+        grupos={[
+          { nombre: 'Menos de 30 min', valor: d.pendientes.menos_30 },
+          { nombre: 'De 30 a 60 min', valor: d.pendientes.entre_30_y_60 },
+          { nombre: 'Más de 1 hora', valor: d.pendientes.mas_60, color: 'ambar' },
+        ]}
+      />
+      {d.actividad_turno ? (
+        <GraficoColumnas
+          titulo="Mis cobros por hora"
+          subtitulo="Operaciones de mi turno · Lima"
+          puntos={d.actividad_turno.cobros_por_hora}
+          hoy={d.fecha}
+          formato={(n) => cantidad(n, 'cobro', 'cobros')}
+          horas
+        />
+      ) : (
+        <section className="inicio-grafico" aria-label="Mis cobros por hora">
+          <h4>Mis cobros por hora</h4>
+          <p className="inicio-subtitulo">Operaciones de mi turno · Lima</p>
+          <p className="inicio-grafico-vacio">No aplica sin un turno propio abierto.</p>
+        </section>
+      )}
+    </>
   );
 }
 
-export const DashboardPage: React.FC<DashboardPageProps> = ({ setModuloActual }) => {
-  const { usuario, tienePermiso } = useAuth();
-  const [metrics, setMetrics] = useState<DashboardDTO | null>(null);
-  const [cargandoMetrics, setCargandoMetrics] = useState(false);
-  const [estadoBackup, setEstadoBackup] = useState<EstadoBackup | null>(null);
-  const [cargandoBackup, setCargandoBackup] = useState(true);
-  const puedeVerBackup = usuario?.rol === 'ADMINISTRADOR' && tienePermiso('BACKUP', 'ver');
-  const sesionBackup = usuario?.session_id;
+const roles: Record<string, string> = {
+  ADMINISTRADOR: 'Administrador',
+  MECANICO: 'Mecánico',
+  CAJERO: 'Cajero',
+};
+
+function InicioSesion({
+  sessionId,
+  nombre,
+  rol,
+  ambiente,
+}: {
+  sessionId: string;
+  nombre: string;
+  rol: string;
+  ambiente: string;
+}) {
+  const { verificarSesion } = useAuth();
+  const [lectura, setLectura] = useState<DashboardDTO | null>(null);
+  const [cargando, setCargando] = useState(true);
+  const [error, setError] = useState(false);
+  const [intento, setIntento] = useState(0);
 
   useEffect(() => {
-    if (!puedeVerBackup || !sesionBackup) return;
     let vigente = true;
-    setEstadoBackup(null);
-    setCargandoBackup(true);
-    void backup<EstadoBackup>('estado')
-      .then((datos) => { if (vigente) setEstadoBackup(datos); })
-      .catch(() => { if (vigente) setEstadoBackup(null); })
-      .finally(() => { if (vigente) setCargandoBackup(false); });
-    return () => { vigente = false; };
-  }, [puedeVerBackup, sesionBackup]);
+    // Evita enviar la primera consulta del montaje simulado de StrictMode.
+    void Promise.resolve().then(async () => {
+      if (!vigente) return;
+      try {
+        const datos = await obtenerDatosDashboard(sessionId);
+        if (!vigente) return;
+        if (datos.rol !== rol || datos.ambiente !== ambiente) {
+          setLectura(null);
+          setError(true);
+          return;
+        }
+        setLectura(datos);
+        setError(false);
+      } catch (e) {
+        if (!vigente) return;
+        if (esErrorNoAutenticado(e)) {
+          setLectura(null);
+          void verificarSesion();
+        }
+        setError(true);
+      } finally {
+        if (vigente) setCargando(false);
+      }
+    });
+    return () => {
+      vigente = false;
+    };
+  }, [sessionId, ambiente, rol, intento, verificarSesion]);
 
-  const puedeVerKPIsGlobales = tienePermiso('BACKUP', 'ver') && tienePermiso('COLA_SUNAT', 'ver');
-  const esOperativoTallerOnly = tienePermiso('OT', 'ver') && !tienePermiso('POS', 'ver');
-
-  useEffect(() => {
-    if (usuario) {
-      setCargandoMetrics(true);
-      obtenerDatosDashboard(usuario.id_usuario)
-        .then((data) => setMetrics(data))
-        .catch((err) => {
-          setMetrics(null);
-          console.error('Error al cargar métricas del dashboard:', err);
-        })
-        .finally(() => setCargandoMetrics(false));
-    }
-  }, [usuario]);
-
-  const visibles = accesos.filter(({ permiso }) => {
-    if (permiso === 'BACKUP') return puedeVerBackup;
-    if (permiso === 'REPORTES') return usuario?.rol === 'ADMINISTRADOR' && tienePermiso('REPORTES', 'ver');
-    if (permiso === 'ADMIN') return usuario?.rol === 'ADMINISTRADOR' && tienePermiso('ADMIN', 'ver');
-    return tienePermiso(permiso, 'ver');
-  });
-  const respaldo = cargandoBackup ? 'Consultando respaldo…'
-    : !estadoBackup ? 'Estado no disponible'
-    : estadoBackup.recuperacion.pendiente ? 'Recuperación pendiente'
-    : !estadoBackup.configurada ? 'Protección sin configurar'
-    : !estadoBackup.ultima ? 'Sin copia válida'
-    : estadoBackup.vencida ? 'Copia de más de 24 h'
-    : 'Copia al día';
-  const tonoRespaldo = cargandoBackup || !estadoBackup ? undefined
-    : !estadoBackup.configurada || !estadoBackup.ultima || estadoBackup.vencida || estadoBackup.recuperacion.pendiente
-      ? 'aviso' : 'exito';
-  const nombre = usuario?.nombre_completo.trim().split(/\s+/)[0];
-  const estadoCaja = metrics?.estado_caja?.trim();
-  const cajaNormalizada = estadoCaja?.toLowerCase();
-  const ots = metrics?.ots_activas ?? 0;
-  const stockCritico = metrics?.productos_stock_critico ?? 0;
-  const valor = (texto: string) => (cargandoMetrics || !metrics ? '—' : texto);
-  const detalle = (texto: string) =>
-    cargandoMetrics ? 'Cargando…' : metrics ? texto : 'Dato no disponible';
+  const actualizar = () => {
+    if (cargando) return;
+    setCargando(true);
+    setIntento((n) => n + 1);
+  };
 
   return (
     <div className="gloria-theme inicio-page">
-      <div className="inicio-content gt-stage">
+      <div className="inicio-content">
         <header className="inicio-bienvenida">
-          <div className="inicio-bienvenida-texto">
-            <p className="inicio-kicker">Resumen del taller</p>
-            <h2>{nombre ? `Hola, ${nombre}` : 'Inicio'}</h2>
-            <p className="inicio-descripcion">
-              {puedeVerKPIsGlobales
-                ? 'Consulta la actividad del día y entra a tus módulos de trabajo.'
-                : esOperativoTallerOnly
-                  ? 'Consulta tus órdenes activas y entra al taller.'
-                  : 'Entra a tus módulos de trabajo desde aquí.'}
-            </p>
+          <div>
+            <p className="inicio-kicker">Resumen de jornada</p>
+            <h2>Hola, {nombre.trim().split(/\s+/)[0]}</h2>
+            <p className="inicio-subtitulo">Consulta el ritmo de tu jornada.</p>
           </div>
-          {usuario?.rol && <span className="inicio-rol">{usuario.rol}</span>}
+          <div className="inicio-meta">
+            <span className="inicio-rol">{roles[rol] ?? rol}</span>
+            <span>
+              {ambiente === 'PRUEBA'
+                ? 'Prueba'
+                : ambiente === 'PRODUCCION'
+                  ? 'Producción'
+                  : 'Ambiente no disponible'}
+            </span>
+            {lectura && <span>{fechaInicio(lectura.fecha)} · Lima</span>}
+          </div>
         </header>
-
-        {puedeVerKPIsGlobales && (
-          <section className="inicio-seccion" aria-labelledby="inicio-hoy-titulo">
-            <h3 id="inicio-hoy-titulo">Resumen de hoy</h3>
-            <dl className="inicio-indicadores" aria-busy={cargandoMetrics}>
-              <Indicador
-                titulo="Ventas netas del día"
-                icono={Receipt}
-                valor={valor(`S/ ${(metrics?.ventas_del_dia ?? 0).toFixed(2)}`)}
-                detalle={detalle(
-                  metrics?.ventas_confirmadas != null
-                    ? metrics.ventas_confirmadas === 1
-                      ? '1 venta confirmada'
-                      : `${metrics.ventas_confirmadas} ventas confirmadas`
-                    : metrics?.comprobantes_emitidos === 1
-                    ? '1 comprobante emitido'
-                    : `${metrics?.comprobantes_emitidos ?? 0} comprobantes emitidos`
-                )}
-              />
-              <Indicador
-                titulo="Órdenes activas"
-                icono={ClipboardList}
-                valor={valor(String(ots))}
-                detalle={detalle('Órdenes en taller')}
-              />
-              <Indicador
-                titulo="Stock crítico"
-                icono={Package}
-                valor={valor(String(stockCritico))}
-                detalle={detalle(
-                  stockCritico === 1 ? '1 producto en umbral mínimo' : 'Productos en umbral mínimo'
-                )}
-                tono={!cargandoMetrics && stockCritico > 0 ? 'aviso' : undefined}
-              />
-              <Indicador
-                titulo="Estado de caja"
-                icono={Wallet}
-                valor={valor(estadoCaja || '—')}
-                detalle={detalle(
-                  cajaNormalizada === 'abierta'
-                    ? 'Turno en curso'
-                    : cajaNormalizada === 'cerrada'
-                      ? 'Sin turno abierto'
-                      : estadoCaja
-                        ? 'Estado registrado'
-                        : 'Dato no disponible'
-                )}
-                tono={!cargandoMetrics && cajaNormalizada === 'abierta' ? 'exito' : undefined}
-              />
-            </dl>
-          </section>
-        )}
-
-        {esOperativoTallerOnly && (
-          <section className="inicio-seccion" aria-labelledby="inicio-ordenes-titulo">
-            <h3 id="inicio-ordenes-titulo">Mis órdenes activas</h3>
-            <div className="inicio-ordenes" aria-busy={cargandoMetrics}>
-              <span className="inicio-icono">
-                <Clock size={20} aria-hidden="true" />
-              </span>
-              <div>
-                <p className="inicio-ordenes-cifra">{valor(String(ots))}</p>
-                <p className="inicio-ordenes-texto">
-                  {detalle(
-                    ots > 0 ? 'Órdenes activas asignadas' : 'No tienes órdenes activas asignadas.'
-                  )}
+        <section aria-labelledby="inicio-resumen" aria-busy={cargando}>
+          <div className="inicio-cabecera">
+            <div>
+              <h3 id="inicio-resumen">Resumen de hoy</h3>
+              {lectura && (
+                <p className="inicio-subtitulo">
+                  Actualizado a las {lectura.actualizado_en.slice(11, 19)} · Lima
                 </p>
-              </div>
+              )}
+            </div>
+            <button
+              className="gt-button gt-button--quiet"
+              type="button"
+              onClick={actualizar}
+              disabled={cargando}
+            >
+              <RefreshCw size={16} aria-hidden="true" />{' '}
+              {error && !lectura ? 'Reintentar' : 'Actualizar'}
+            </button>
+          </div>
+          {cargando && (
+            <p className="inicio-mensaje" role="status">
+              {lectura ? 'Actualizando resumen…' : 'Cargando resumen…'}
+            </p>
+          )}
+          {error && !cargando && (
+            <p className="inicio-mensaje inicio-error" role="alert">
+              {lectura
+                ? 'Sin actualizar. Se conserva la última lectura.'
+                : 'No se pudo cargar Inicio.'}
+            </p>
+          )}
+          {lectura && (
+            <dl className="inicio-tarjetas">
+              {tarjetas(lectura).map(({ titulo, valor, detalle, icono: Icono, destacado }) => (
+                <div className="inicio-tarjeta" key={titulo}>
+                  <dt>
+                    {titulo}
+                    <Icono size={16} aria-hidden="true" />
+                  </dt>
+                  <dd className={`inicio-valor${destacado ? ' inicio-valor-abierto' : ''}`}>
+                    {valor}
+                  </dd>
+                  <dd className="inicio-subtitulo">{detalle}</dd>
+                </div>
+              ))}
+            </dl>
+          )}
+        </section>
+        {lectura && (
+          <section aria-labelledby="inicio-actividad">
+            <h3 id="inicio-actividad">Actividad en gráficos</h3>
+            <div className="inicio-graficos">
+              <Graficos d={lectura} />
             </div>
           </section>
         )}
-
-        <nav className="inicio-seccion" aria-labelledby="inicio-accesos-titulo">
-          <h3 id="inicio-accesos-titulo">Accesos rápidos</h3>
-          {visibles.length > 0 ? (
-            <div className="inicio-accesos">
-              {visibles.map(({ destino, icono: Icono, titulo, descripcion }) => (
-                <button
-                  key={destino}
-                  type="button"
-                  className="inicio-acceso"
-                  aria-labelledby={`inicio-acceso-${destino}`}
-                  aria-describedby={`inicio-descripcion-${destino}`}
-                  onClick={() => setModuloActual(destino)}
-                >
-                  <span className="inicio-icono">
-                    <Icono size={20} aria-hidden="true" />
-                  </span>
-                  <span className="inicio-acceso-texto">
-                    <span id={`inicio-acceso-${destino}`} className="inicio-acceso-titulo">
-                      {titulo}
-                    </span>
-                    <span
-                      id={`inicio-descripcion-${destino}`}
-                      className="inicio-acceso-descripcion"
-                    >
-                      {destino === 'taller' && esOperativoTallerOnly
-                        ? 'Revisa tus servicios asignados y tu zanja.'
-                        : destino === 'backup' && estadoBackup?.ultima
-                          ? `Última copia válida: ${fechaBackup(estadoBackup.ultima)} (Lima)`
-                          : descripcion}
-                      {destino === 'backup' && (
-                        <span className="inicio-acceso-estados">
-                          <span className="inicio-acceso-estado" data-tono={tonoRespaldo}>{respaldo}</span>
-                          {!cargandoBackup && estadoBackup?.ultima && estadoBackup.vencida &&
-                            respaldo !== 'Copia de más de 24 h' && (
-                              <span className="inicio-acceso-estado" data-tono="aviso">Copia de más de 24 h</span>
-                            )}
-                        </span>
-                      )}
-                    </span>
-                  </span>
-                  <ArrowRight className="inicio-acceso-flecha" size={19} aria-hidden="true" />
-                </button>
-              ))}
-            </div>
-          ) : (
-            <p className="inicio-sin-accesos">No hay accesos rápidos disponibles para tu cuenta.</p>
-          )}
-        </nav>
       </div>
     </div>
   );
-};
+}
+
+export function DashboardPage() {
+  const { usuario, estadoSesion, ambienteActual } = useAuth();
+  if (!usuario?.session_id || estadoSesion !== 'NORMAL') return null;
+  const ambiente = usuario.ambiente_actual ?? ambienteActual;
+  const alcance = JSON.stringify([usuario.session_id, usuario.id_usuario, usuario.rol, ambiente]);
+  return (
+    <InicioSesion
+      key={alcance}
+      sessionId={usuario.session_id}
+      nombre={usuario.nombre_completo}
+      rol={usuario.rol}
+      ambiente={ambiente}
+    />
+  );
+}

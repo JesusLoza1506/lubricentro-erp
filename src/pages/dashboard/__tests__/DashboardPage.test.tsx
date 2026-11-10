@@ -1,5 +1,6 @@
 import '@testing-library/jest-dom/vitest';
-import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import { StrictMode } from 'react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { invoke } from '@tauri-apps/api/core';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useAuth } from '../../../context/AuthContext';
@@ -10,144 +11,133 @@ import { DashboardPage } from '../DashboardPage';
 vi.mock('@tauri-apps/api/core', () => ({ invoke: vi.fn() }));
 vi.mock('../../../context/AuthContext', () => ({ useAuth: vi.fn() }));
 
-const metricas: DashboardDTO = {
-  ventas_del_dia: 189.5,
-  comprobantes_emitidos: 1,
-  ots_activas: 2,
-  productos_stock_critico: 1,
-  estado_caja: 'Abierta',
+const base = { ambiente: 'PRUEBA', fecha: '2026-11-10', actualizado_en: '2026-11-10 14:42:18' };
+const admin: DashboardDTO = {
+  ...base, rol: 'ADMINISTRADOR', ventas_netas_hoy_cent: 7000, trabajos_terminados_hoy: 8, mediana_cobro_seg: 2040,
+  ventas_por_dia: [{ periodo: '2026-11-09', valor: -3000 }, { periodo: base.fecha, valor: 7000 }],
+  trabajos_por_hora: [{ periodo: '2026-11-10 14', valor: 8 }],
 };
-
-const respaldo = {
-  configurada: true,
-  ultima: '2026-11-06 23:00:00',
-  vencida: true,
-  recuperacion: { pendiente: false },
+const mecanico: DashboardDTO = {
+  ...base, rol: 'MECANICO', trabajos_terminados_hoy: 4, trabajos_abiertos: 3, mediana_trabajo_seg: 2880,
+  por_estado: { en_espera: 2, en_proceso: 1, finalizadas_hoy: 4 },
+  trabajos_por_dia: [{ periodo: base.fecha, valor: 4 }],
 };
-
-function permisos(...modulos: string[]) {
-  return (modulo: string, accion: string) => accion === 'ver' && modulos.includes(modulo);
-}
+const cajero: DashboardDTO = {
+  ...base, rol: 'CAJERO', turno: { estado: 'PROPIO', apertura: '2026-11-09 23:00:00' },
+  actividad_turno: { cobros: 2, cobros_por_hora: [
+    { periodo: '2026-11-09 23', valor: 1 }, { periodo: '2026-11-10 00', valor: 1 },
+  ] },
+  pendientes: { total: 6, mayor_espera_seg: 5640, menos_30: 3, entre_30_y_60: 1, mas_60: 2 },
+};
 
 beforeEach(() => {
-  vi.mocked(invoke).mockReset().mockImplementation(async (cmd) =>
-    cmd === 'backup_operacion_cmd' ? respaldo : metricas
-  );
+  vi.mocked(useAuth).mockReturnValue(authDePrueba());
+  vi.mocked(invoke).mockReset().mockResolvedValue(admin);
 });
+afterEach(cleanup);
 
-afterEach(() => {
-  cleanup();
-  vi.restoreAllMocks();
-});
-
-describe('Dashboard de inicio', () => {
-  it('distingue datos cargando de métricas reales y abre el módulo elegido', async () => {
-    vi.mocked(useAuth).mockReturnValue(
-      authDePrueba({
-        tienePermiso: permisos(
-          'BACKUP',
-          'COLA_SUNAT',
-          'OT',
-          'POS',
-          'FICHA_VEHICULAR',
-          'INVENTARIO'
-        ),
-      })
-    );
+describe('Inicio Dashboard v7.1', () => {
+  it('carga el corte una vez, muestra tres tarjetas y dos gráficos y explora un día negativo localmente', async () => {
     let resolver!: (dto: DashboardDTO) => void;
-    vi.mocked(invoke).mockImplementation((cmd) =>
-      cmd === 'backup_operacion_cmd' ? Promise.resolve(respaldo)
-        : new Promise<DashboardDTO>((resolve) => { resolver = resolve; })
-    );
-    const navegar = vi.fn();
-    render(<DashboardPage setModuloActual={navegar} />);
-
-    expect(screen.getByRole('heading', { name: 'Hola, Ana' })).toBeInTheDocument();
-    const resumen = within(screen.getByRole('region', { name: 'Resumen de hoy' }));
-    expect(resumen.getAllByText('Cargando…')).toHaveLength(4);
-    expect(resumen.queryByText('S/ 0.00')).not.toBeInTheDocument();
-    expect(invoke).toHaveBeenCalledWith('obtener_dashboard_cmd', { idUsuario: 7 });
-
-    await act(async () => resolver(metricas));
-    expect(resumen.queryByText('Cargando…')).not.toBeInTheDocument();
-    expect(resumen.getByText('S/ 189.50')).toBeInTheDocument();
-    expect(resumen.getByText('1 comprobante emitido')).toBeInTheDocument();
-    expect(resumen.getByText('Turno en curso')).toBeInTheDocument();
-    const accesos = within(screen.getByRole('navigation', { name: 'Accesos rápidos' }));
-    fireEvent.click(accesos.getByRole('button', { name: 'Punto de Venta' }));
-    expect(navegar).toHaveBeenCalledExactlyOnceWith('pos');
+    vi.mocked(invoke).mockImplementation(() => new Promise<DashboardDTO>((ok) => { resolver = ok; }));
+    render(<StrictMode><DashboardPage /></StrictMode>);
+    expect(screen.getByRole('status')).toHaveTextContent('Cargando resumen');
+    expect(screen.queryByText('Ventas netas hoy')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Actualizar' })).toBeDisabled();
+    await waitFor(() => expect(invoke).toHaveBeenCalledExactlyOnceWith('obtener_dashboard_cmd', { sessionId: 'sesion-prueba' }));
+    await act(async () => resolver(admin));
+    expect(within(screen.getByRole('region', { name: 'Resumen de hoy' })).getByText('34 min')).toBeInTheDocument();
+    const graficos = within(screen.getByRole('region', { name: 'Actividad en gráficos' }));
+    expect(graficos.getAllByRole('region')).toHaveLength(2);
+    expect(screen.getAllByRole('term')).toHaveLength(3);
+    fireEvent.click(graficos.getByRole('button', { name: /09\/11.*30/ }));
+    expect(graficos.getByRole('button', { name: /09\/11.*30/ })).toHaveAttribute('aria-pressed', 'true');
+    expect(graficos.getByText(/−S\/ 30/)).toBeInTheDocument();
+    expect(invoke).toHaveBeenCalledTimes(1);
+    expect(screen.queryByText(/Requiere atención|Accesos rápidos|Nueva OT/i)).not.toBeInTheDocument();
   });
 
-  it('un mecánico solo ve sus órdenes y los accesos permitidos', async () => {
-    vi.mocked(useAuth).mockReturnValue(
-      authDePrueba({
-        usuario: sesionDePrueba({ id_usuario: 3, rol: 'MECANICO' }),
-        tienePermiso: permisos('OT'),
-      })
-    );
-    const navegar = vi.fn();
-    render(<DashboardPage setModuloActual={navegar} />);
-    const ordenes = within(screen.getByRole('region', { name: 'Mis órdenes activas' }));
-    expect(await ordenes.findByText('2')).toBeInTheDocument();
-    expect(invoke).toHaveBeenCalledExactlyOnceWith('obtener_dashboard_cmd', { idUsuario: 3 });
-    expect(screen.queryByRole('region', { name: 'Resumen de hoy' })).not.toBeInTheDocument();
-    expect(screen.queryByText('S/ 189.50')).not.toBeInTheDocument();
-    const accesos = within(screen.getByRole('navigation', { name: 'Accesos rápidos' }));
-    expect(accesos.getAllByRole('button')).toHaveLength(1);
-    fireEvent.click(accesos.getByRole('button', { name: 'Órdenes de Trabajo' }));
-    expect(navegar).toHaveBeenCalledExactlyOnceWith('taller');
+  it('muestra al mecánico su jornada y sus finalizaciones sin exponer cifras de ventas', async () => {
+    vi.mocked(useAuth).mockReturnValue(authDePrueba({ usuario: sesionDePrueba({ rol: 'MECANICO' }) }));
+    vi.mocked(invoke).mockResolvedValue(mecanico);
+    render(<DashboardPage />);
+    expect(await screen.findByText('48 min')).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'Mi jornada por estado' })).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'Mis trabajos terminados por día' })).toBeInTheDocument();
+    expect(screen.queryByText('Ventas netas hoy')).not.toBeInTheDocument();
   });
 
-  it('si falla la consulta muestra datos no disponibles sin bloquear los accesos', async () => {
-    vi.spyOn(console, 'error').mockImplementation(() => {});
-    vi.mocked(invoke).mockImplementation(async (cmd) => {
-      if (cmd === 'obtener_dashboard_cmd') throw new Error('Sin respuesta');
-      return respaldo;
+  it('distingue fechas en los cobros de un turno que cruza medianoche', async () => {
+    vi.mocked(useAuth).mockReturnValue(authDePrueba({ usuario: sesionDePrueba({ rol: 'CAJERO' }) }));
+    vi.mocked(invoke).mockResolvedValue(cajero);
+    render(<DashboardPage />);
+    expect(await screen.findByText('1 h 34 min')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /09\/11 · 23:00/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /10\/11 · 00:00/ })).toBeInTheDocument();
+    expect(screen.getByText('Desde las 23:00 del 09/11 · Lima')).toBeInTheDocument();
+  });
+
+  it('distingue caja ajena, no aplica y ausencia real de pendientes', async () => {
+    vi.mocked(useAuth).mockReturnValue(authDePrueba({ usuario: sesionDePrueba({ rol: 'CAJERO' }) }));
+    vi.mocked(invoke).mockResolvedValue({ ...cajero, turno: { estado: 'AJENO' }, actividad_turno: null,
+      pendientes: { total: 0, mayor_espera_seg: null, menos_30: 0, entre_30_y_60: 0, mas_60: 0 } });
+    render(<DashboardPage />);
+    expect(await screen.findByText('Caja a cargo de otro usuario')).toBeInTheDocument();
+    expect(screen.getByText('No aplica sin un turno propio abierto.')).toBeInTheDocument();
+    expect(screen.getByText('Sin pendientes')).toBeInTheDocument();
+  });
+
+  it('reintenta un fallo inicial y conserva la hora previa si falla un refresco', async () => {
+    vi.mocked(invoke).mockRejectedValueOnce('DB_LOCK').mockResolvedValueOnce(admin).mockRejectedValueOnce('DB_LOCK');
+    render(<DashboardPage />);
+    expect(await screen.findByRole('alert')).toHaveTextContent('No se pudo cargar Inicio');
+    expect(screen.queryByText('Ventas netas hoy')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Reintentar' }));
+    expect(await screen.findByText('Ventas netas hoy')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Actualizar' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Sin actualizar');
+    expect(screen.getByText(/14:42:18/)).toBeInTheDocument();
+    expect(invoke).toHaveBeenCalledTimes(3);
+  });
+
+  it('descarta una respuesta tardía tras cambiar de usuario y no publica otra combinación de rol y ambiente', async () => {
+    let resolver!: (dato: DashboardDTO) => void;
+    vi.mocked(invoke).mockImplementationOnce(() => new Promise<DashboardDTO>((ok) => { resolver = ok; }))
+      .mockResolvedValueOnce({ ...mecanico, ambiente: 'PRODUCCION' }).mockResolvedValueOnce(mecanico);
+    const { rerender } = render(<DashboardPage />);
+    await waitFor(() => expect(invoke).toHaveBeenCalledTimes(1));
+    vi.mocked(useAuth).mockReturnValue(authDePrueba({ usuario: sesionDePrueba({ session_id: 'sesion-nueva', rol: 'MECANICO' }) }));
+    rerender(<DashboardPage />);
+    expect(await screen.findByRole('alert')).toBeInTheDocument();
+    await act(async () => resolver(admin));
+    expect(screen.queryByText('Ventas netas hoy')).not.toBeInTheDocument();
+    expect(screen.queryByText('48 min')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Reintentar' }));
+    expect(await screen.findByText('48 min')).toBeInTheDocument();
+    expect(invoke).toHaveBeenLastCalledWith('obtener_dashboard_cmd', { sessionId: 'sesion-nueva' });
+  });
+
+  it('vuelve a consultar al salir y regresar a Inicio', async () => {
+    vi.mocked(invoke).mockResolvedValueOnce(admin).mockResolvedValueOnce({
+      ...admin, actualizado_en: '2026-11-10 15:00:00',
     });
-    vi.mocked(useAuth).mockReturnValue(
-      authDePrueba({
-        tienePermiso: permisos('BACKUP', 'COLA_SUNAT', 'INVENTARIO'),
-      })
-    );
-    const navegar = vi.fn();
-    render(<DashboardPage setModuloActual={navegar} />);
-    const resumen = within(screen.getByRole('region', { name: 'Resumen de hoy' }));
-    expect((await resumen.findAllByText('Dato no disponible')).length).toBe(4);
-    expect(resumen.queryByText('S/ 0.00')).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Inventario y Stock' }));
-    expect(navegar).toHaveBeenCalledExactlyOnceWith('inventario');
+    const primeraVisita = render(<DashboardPage />);
+    expect(await screen.findByText(/14:42:18/)).toBeInTheDocument();
+    primeraVisita.unmount();
+    render(<DashboardPage />);
+    expect(await screen.findByText(/15:00:00/)).toBeInTheDocument();
+    expect(invoke).toHaveBeenCalledTimes(2);
   });
 
-  it('muestra la fecha y el estado del respaldo y abre Backup desde Inicio', async () => {
-    vi.mocked(useAuth).mockReturnValue(authDePrueba({ tienePermiso: permisos('BACKUP') }));
-    const navegar = vi.fn();
-    render(<DashboardPage setModuloActual={navegar} />);
-    const acceso = within(screen.getByRole('button', { name: 'Backup y Copias' }));
-    expect(await acceso.findByText('Copia de más de 24 h')).toBeInTheDocument();
-    expect(acceso.getByText('Última copia válida: 06/11/2026 · 23:00 (Lima)')).toBeInTheDocument();
-    expect(invoke).toHaveBeenCalledWith('backup_operacion_cmd', { req: { accion: 'estado' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Backup y Copias' }));
-    expect(navegar).toHaveBeenCalledExactlyOnceWith('backup');
+  it('oculta el corte al expirar la sesión y solicita verificar la sesión real', async () => {
+    const verificarSesion = vi.fn().mockResolvedValue(undefined);
+    vi.mocked(useAuth).mockReturnValue(authDePrueba({ verificarSesion }));
+    vi.mocked(invoke).mockResolvedValueOnce(admin).mockRejectedValueOnce('NO_AUTENTICADO: venció');
+    render(<DashboardPage />);
+    expect(await screen.findByText('Ventas netas hoy')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Actualizar' }));
+    expect(await screen.findByRole('alert')).toBeInTheDocument();
+    expect(verificarSesion).toHaveBeenCalledOnce();
+    expect(screen.queryByText('Ventas netas hoy')).not.toBeInTheDocument();
   });
-
-  it('abre Administración desde Inicio si la sesión es administrativa', async () => {
-    vi.mocked(useAuth).mockReturnValue(authDePrueba({ tienePermiso: permisos('ADMIN') }));
-    const navegar = vi.fn();
-    render(<DashboardPage setModuloActual={navegar} />);
-    const accesos = within(screen.getByRole('navigation', { name: 'Accesos rápidos' }));
-    fireEvent.click(accesos.getByRole('button', { name: 'Administración' }));
-    expect(navegar).toHaveBeenCalledExactlyOnceWith('administracion');
-    await act(async () => {});
-  });
-
-  it('no muestra Administración a un cajero aunque figure el permiso', async () => {
-    vi.mocked(useAuth).mockReturnValue(
-      authDePrueba({ usuario: sesionDePrueba({ rol: 'CAJERO' }), tienePermiso: permisos('ADMIN', 'CAJA') })
-    );
-    render(<DashboardPage setModuloActual={vi.fn()} />);
-    expect(screen.queryByRole('button', { name: 'Administración' })).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Caja Chica' })).toBeInTheDocument();
-    await act(async () => {});
-  });
-
 });

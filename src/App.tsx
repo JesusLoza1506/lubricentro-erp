@@ -159,7 +159,7 @@ const MainApp: React.FC = () => {
   const renderModulo = () => {
     switch (moduloActual) {
       case 'reportes':
-        return puedeReportes ? null : <DashboardPage setModuloActual={setModuloActual} />;
+        return puedeReportes ? null : <DashboardPage />;
       case 'ordenes':
       case 'taller':
       case 'ot':
@@ -173,7 +173,7 @@ const MainApp: React.FC = () => {
             }}
           />
         ) : (
-          <DashboardPage setModuloActual={setModuloActual} />
+          <DashboardPage />
         );
 
       case 'pos':
@@ -198,7 +198,7 @@ const MainApp: React.FC = () => {
             />
           </React.Suspense>
         ) : (
-          <DashboardPage setModuloActual={setModuloActual} />
+          <DashboardPage />
         );
       case 'administracion':
         return usuario.rol === 'ADMINISTRADOR' && !bkp?.pendiente ? (
@@ -213,7 +213,7 @@ const MainApp: React.FC = () => {
               onFiltrosUsuarios={(filtros) => setListadoAdmin({ alcance: alcanceAdmin, filtros })}
             />
           </React.Suspense>
-        ) : <DashboardPage setModuloActual={setModuloActual} />;
+        ) : <DashboardPage />;
       case 'backup':
         return tienePermiso('BACKUP', 'ver') ? (
           <BackupPage
@@ -226,7 +226,7 @@ const MainApp: React.FC = () => {
             onFinalizar={() => setBkp((prev) => ({ ...prev, pendiente: false }))}
           />
         ) : (
-          <DashboardPage setModuloActual={setModuloActual} />
+          <DashboardPage />
         );
       case 'caja':
         return tienePermiso('CAJA', 'ver') ? (
@@ -241,13 +241,13 @@ const MainApp: React.FC = () => {
             />
           </React.Suspense>
         ) : (
-          <DashboardPage setModuloActual={setModuloActual} />
+          <DashboardPage />
         );
       case 'inventario':
         return tienePermiso('INVENTARIO', 'ver') ? (
           <InventarioPage origenReporte={origenReporte?.destino === 'inventario' ? origenReporte.producto : undefined} />
         ) : (
-          <DashboardPage setModuloActual={setModuloActual} />
+          <DashboardPage />
         );
 
       case 'ficha_vehicular':
@@ -259,12 +259,12 @@ const MainApp: React.FC = () => {
           tienePermiso('CLIENTES', 'ver') ? (
           <FichaVehicularPage placaInicial={placaSeleccionada} />
         ) : (
-          <DashboardPage setModuloActual={setModuloActual} />
+          <DashboardPage />
         );
 
       case 'dashboard':
       default:
-        return <DashboardPage setModuloActual={setModuloActual} />;
+        return <DashboardPage />;
     }
   };
 

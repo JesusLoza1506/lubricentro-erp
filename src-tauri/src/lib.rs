@@ -164,9 +164,8 @@ pub fn run() {
             // Caja Chica & POS
             caja_operacion_cmd,
             emitir_comprobante_cmd,
-            // Dashboard, Fidelización & Backups
+            // Dashboard y Backups
             obtener_dashboard_cmd,
-            listar_alertas_fidelizacion_cmd,
             backup_arranque_cmd,
             backup_recuperar_arranque_cmd,
             backup_progreso_cmd,

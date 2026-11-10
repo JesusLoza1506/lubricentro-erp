@@ -12,9 +12,9 @@
 ![Rust](https://img.shields.io/badge/Rust-000000?style=for-the-badge&logo=rust&logoColor=white)
 ![SQLite](https://img.shields.io/badge/SQLite-003B57?style=for-the-badge&logo=sqlite&logoColor=white)
 
-![Estado](https://img.shields.io/badge/Estado-En_desarrollo-E9A23B?style=flat-square)
+![Estado](https://img.shields.io/badge/Estado-Ajustes_finales-15803D?style=flat-square)
 ![Plataforma](https://img.shields.io/badge/Plataforma-Windows_11-2563EB?style=flat-square)
-![Módulos](https://img.shields.io/badge/Alcance-10_m%C3%B3dulos-0F766E?style=flat-square)
+![Módulos](https://img.shields.io/badge/Implementaci%C3%B3n-10_de_10_m%C3%B3dulos-0F766E?style=flat-square)
 
 [Progreso](#estado) · [Login](#modulo-login-y-sesion) · [Ficha vehicular](#modulo-ficha-vehicular-e-historial) · [Taller](#modulo-ordenes-de-trabajo-taller) · [Inventario](#modulo-inventario-y-stock) · [POS](#modulo-punto-de-venta-pos) · [Caja Chica](#modulo-caja-chica) · [Backup y Copias](#modulo-backup-y-copias) · [Administración](#modulo-administracion) · [Reportes](#modulo-reportes) · [Inicio Dashboard](#modulo-inicio-dashboard) · [Instalación](#instalacion) · [Documentación](#documentacion)
 
@@ -43,9 +43,7 @@
 
 ## 2. Estado del proyecto
 
-Desarrollo secuencial, módulo por módulo, conforme al alcance funcional v7. **Login y Sesión (95/100)**, **Ficha Vehicular e Historial (93/100)**, **Órdenes de Trabajo Taller (93/100)**, **Inventario y Stock (95/100)**, **Punto de Venta POS (95/100)**, **Caja Chica (94/100)**, **Backup y Copias (94/100)**, **Administración (96/100)** y **Reportes (96/100)** se encuentran en **ajustes finales**. Sus funciones principales ya están implementadas; los pendientes de cierre y la validación en escritorio se detallan en cada módulo.
-
-**El próximo módulo es Inicio Dashboard.** Ya existe una pantalla base de Inicio. Queda pendiente completar la integración de indicadores y accesos por rol, y validar sus cifras con los módulos de origen.
+**Cierre parcial de la implementación · 10 de 10 módulos implementados.** Las funciones principales de los diez módulos ya están disponibles, incluido **Inicio Dashboard v7.1 (95/100)**. El proyecto queda en **🟢 Ajustes finales**: resta resolver los pendientes documentados, completar los recorridos en Tauri y validar las integraciones externas antes del cierre definitivo.
 
 | Orden | Módulo                                                             | Estado                            | Evaluación |
 | ----- | ------------------------------------------------------------------ | --------------------------------- | ---------- |
@@ -58,11 +56,11 @@ Desarrollo secuencial, módulo por módulo, conforme al alcance funcional v7. **
 | 07    | [Backup y Copias](#modulo-backup-y-copias)                         | 🟢 Ajustes finales                | 94/100     |
 | 08    | [Administración](#modulo-administracion)                           | 🟢 Ajustes finales                | 96/100     |
 | 09    | [Reportes](#modulo-reportes)                                       | 🟢 Ajustes finales                | 96/100     |
-| 10    | [Inicio Dashboard](#modulo-inicio-dashboard)                       | ⚪ Pendiente · próximo módulo     | —          |
+| 10    | [Inicio Dashboard](#modulo-inicio-dashboard)                       | 🟢 Ajustes finales                | 95/100     |
 
 **Leyenda:** ⚪ Pendiente · 🟡 En curso · 🟢 Ajustes finales · ✅ Completado.
 
-> **Evaluación:** los puntajes reflejan implementación y alineación con los PDF de los módulos; no son porcentajes de avance, cobertura de pruebas ni aprobación de todos los recorridos en escritorio. Las filas pendientes pueden tener código previo. Los roles, flujos y diagramas describen el alcance definido.
+> **Evaluación:** los puntajes reflejan implementación y alineación con los PDF de los módulos; no son porcentajes de avance, cobertura de pruebas ni aprobación de todos los recorridos en escritorio. Los pendientes de cierre se detallan en cada módulo.
 
 <a id="modulos"></a>
 
@@ -695,7 +693,61 @@ _Reporte exportado en Excel con importes numéricos_
 
 <a id="modulo-inicio-dashboard"></a>
 
-**10 · Inicio Dashboard — ⚪ Pendiente · Próximo módulo.** La pantalla base ya existe. Queda completar y validar los indicadores, resúmenes y accesos rápidos por rol, contrastando las cifras con los módulos de origen. Todavía no se asigna una evaluación al cierre del módulo.
+<details>
+<summary><b>10 · Inicio Dashboard</b> — 🟢 Ajustes finales · Evaluación: 95/100</summary>
+
+**Qué hace:** presenta un resumen de la jornada con **tres tarjetas y dos gráficos por rol**. Reúne datos de POS, Taller y Caja usando la misma hora de corte de Lima. Las acciones y los listados operativos se consultan en sus respectivos módulos.
+
+**Funciones principales:**
+
+| Rol | Tres tarjetas | Dos gráficos |
+| --- | --- | --- |
+| Administrador | Ventas netas de hoy, trabajos terminados hoy y tiempo habitual entre la finalización de una OT y su cobro. | Ventas netas de los últimos siete días y finalizaciones del taller por hora. |
+| Mecánico | Trabajos propios terminados hoy, órdenes propias abiertas y duración habitual de sus trabajos (mediana). | Órdenes propias en espera, en proceso y finalizadas hoy; finalizaciones propias de los últimos siete días. |
+| Cajero | Estado de caja (turno propio abierto, caja ajena o sin caja), cobros del turno propio y mayor espera de las OT pendientes de cobro. | Pendientes de cobro agrupados en menos de 30 minutos, de 30 a 60 minutos y más de una hora; cobros por hora del turno propio, con fechas diferenciadas si cruza medianoche. |
+
+- **Identificar la sesión:** muestra saludo, rol, ambiente, fecha y hora de la última lectura.
+- **Explorar los gráficos:** las columnas verticales se pueden seleccionar con clic o teclado para ver su valor, sin volver a consultar el backend. Las barras horizontales del cajero ya muestran sus cantidades; queda pendiente habilitar su selección.
+- **Actualizar el resumen:** consulta al entrar, al regresar desde otro módulo o al pulsar **Actualizar**. El botón permanece deshabilitado mientras se consulta.
+- **Distinguir estados:** informa carga inicial, ausencia de datos, «No disponible», «No aplica» y «Sin pendientes». Si falla una actualización, conserva la última lectura válida y su hora, y permite reintentar.
+
+**Fortalezas de implementación:**
+
+- Rust deriva el usuario y el rol de la sesión vigente. El mecánico no recibe cifras comerciales y el cajero no recibe identidad ni actividad del titular de una caja ajena.
+- SQLite entrega tarjetas y gráficos en una lectura coherente, con un único corte horario de Lima.
+- Ventas netas calculadas con la misma fuente económica que **R01 de Reportes**: pagos mixtos, notas y reemisiones no duplican ventas, y las devoluciones pueden producir un neto negativo. Los días sin actividad muestran cero tras una consulta válida.
+- Los cobros se cuentan por operación, aunque se combinen medios de pago. Las OT pendientes se determinan con los criterios de elegibilidad de POS.
+- Se descartan respuestas tardías al salir de Inicio o al cambiar la sesión, el usuario, el rol o el ambiente.
+- **6 pruebas de Rust y 8 de React aprobadas** en la revisión de Inicio, además de una comprobación integrada con POS.
+- **15 de 15 consultas de rendimiento aprobadas en Windows:** cinco por rol con **1.000 productos y 5.000 ventas ficticias** en SQLite en disco. Las lecturas del backend tardaron entre **0,20 y 10,71 ms**, por debajo del objetivo de **3 segundos**.
+
+**Capturas:**
+
+_Rutas previstas para las capturas de Inicio v7.1. Agregar los archivos con estos nombres al tomarlas en Tauri._
+
+_Administrador: ventas netas, finalizaciones y tiempo hasta el cobro_
+
+![Inicio Dashboard: tarjetas y gráficos del administrador](docs/images/10-inicio-dashboard-administrador.png)
+
+_Mecánico: trabajos propios, duración y actividad semanal_
+
+![Inicio Dashboard: tarjetas y gráficos del mecánico](docs/images/10-inicio-dashboard-mecanico.png)
+
+_Cajero: turno propio, pendientes y cobros por hora_
+
+![Inicio Dashboard: tarjetas y gráficos del cajero](docs/images/10-inicio-dashboard-cajero.png)
+
+**Pendiente para cerrar:**
+
+- Permitir seleccionar las barras horizontales del cajero con clic o teclado.
+- Ampliar las pruebas de ambas medianas (duración del trabajo y tiempo hasta el cobro): muestras pares e impares, fechas ausentes o invertidas y límites de la ventana de siete días.
+- Validar los tres roles en Tauri: teclado, foco, ventana estrecha, regreso desde el menú, vencimiento de sesión y cambio de ambiente.
+- Medir en escritorio el tiempo desde que se abre Inicio hasta que se muestran tarjetas y gráficos, dejando constancia del equipo, versión y resultados.
+- Actualizar el **Informe General** para que describa el alcance de Inicio v7.1.
+
+**Estado:** **95/100 en la última revisión**. La implementación principal está completa y sus cálculos e integraciones comprobadas aprobaron. El cierre queda sujeto a los ajustes de interacción, la cobertura adicional y la validación en escritorio.
+
+</details>
 
 <a id="roles"></a>
 
@@ -712,7 +764,7 @@ _Reporte exportado en Excel con importes numéricos_
 | Backup y Copias             | Configuración, copias y recuperación.                                               | Sin acceso.                                                                 | Sin acceso.                                                                 |
 | Administración              | Usuarios, empresa, facturación y taller.                                            | Sin acceso.                                                                 | Sin acceso.                                                                 |
 | Reportes                    | Consulta y exportación.                                                             | Sin acceso.                                                                 | Sin acceso.                                                                 |
-| Inicio Dashboard            | Resumen del negocio.                                                                | Resumen de trabajos propios y disponibles.                                  | Resumen de caja y OT por cobrar.                                            |
+| Inicio Dashboard | Ventas netas, finalizaciones y tiempo habitual hasta el cobro. | Trabajos y órdenes propios; duración habitual. | Estado de caja, cobros de su turno y espera de OT elegibles para cobro. |
 
 Las autorizaciones se validan en Rust. Los costos y las notas internas se restringen por rol; ocultar botones no sustituye el control del backend.
 
@@ -734,6 +786,8 @@ Las autorizaciones se validan en Rust. Los costos y las notas internas se restri
 **Comprobante electrónico:** el envío ocurre después del guardado local. Si el resultado es incierto, el administrador consulta el documento original antes de reenviarlo; si es rechazado, la reemisión usa otro número vinculado sin registrar otra venta ni otro cobro. Devolver exige que el original y las notas de crédito anteriores estén aceptados.
 
 **Cierre de turno:** Caja Chica guarda el arqueo y permite consultarlo desde el historial.
+
+**Resumen de jornada:** Inicio reúne tres indicadores y dos gráficos para el rol de la sesión, a partir de datos de POS, Taller y Caja con un mismo corte horario de Lima.
 
 **Consulta de gestión:** el administrador puede revisar los resultados en Reportes, abrir registros de origen y exportar el corte consultado.
 
@@ -827,7 +881,7 @@ La configuración actual de Tauri invoca `npm run dev` antes del desarrollo y `n
 
 ### 8.1. Qué se verifica
 
-En Login: acceso, sesiones, permisos, bloqueo, recuperación, revocación y consistencia ante fallos. En Ficha Vehicular: registro, edición, identidad histórica, permisos, correcciones, consultas y paginación. En Taller: recepción, estados, responsable, zanjas, servicios, consumos, devoluciones, aceite, auditoría y avisos de resultado. En Inventario: DTO públicos sin costos, catálogos, proveedores, compras, conteos, valoración de granel, kardex, filtros y reintentos sin duplicación de efectos. En POS: ventas directas, cobro de OT sin duplicar insumos, pagos, devoluciones, comprobantes, idempotencia y recuperación documental local. En Caja Chica: apertura idempotente, privacidad entre cajeros, arqueo con control de versión, reversión, aclaración, cierre recuperado e integración con cobros y reintegros del POS. En Backup: copia consistente con WAL, protección local de la frase, archivos ausentes, retención, restauración por generaciones, recuperación de arranque y conciliación de series. En Administración: permisos, cuentas y temporales, validación de ubigeo, control de versiones y dependencias, reversión ante fallos de auditoría, descarte de cambios y conservación de filtros por sesión. En Reportes: permisos, fechas de Lima, cifras históricas, filtros, corte multipágina, navegación al origen, conservación de Unicode en PDF y publicación segura de archivos.
+En Login: acceso, sesiones, permisos, bloqueo, recuperación, revocación y consistencia ante fallos. En Ficha Vehicular: registro, edición, identidad histórica, permisos, correcciones, consultas y paginación. En Taller: recepción, estados, responsable, zanjas, servicios, consumos, devoluciones, aceite, auditoría y avisos de resultado. En Inventario: DTO públicos sin costos, catálogos, proveedores, compras, conteos, valoración de granel, kardex, filtros y reintentos sin duplicación de efectos. En POS: ventas directas, cobro de OT sin duplicar insumos, pagos, devoluciones, comprobantes, idempotencia y recuperación documental local. En Caja Chica: apertura idempotente, privacidad entre cajeros, arqueo con control de versión, reversión, aclaración, cierre recuperado e integración con cobros y reintegros del POS. En Backup: copia consistente con WAL, protección local de la frase, archivos ausentes, retención, restauración por generaciones, recuperación de arranque y conciliación de series. En Administración: permisos, cuentas y temporales, validación de ubigeo, control de versiones y dependencias, reversión ante fallos de auditoría, descarte de cambios y conservación de filtros por sesión. En Reportes: permisos, fechas de Lima, cifras históricas, filtros, corte multipágina, navegación al origen, conservación de Unicode en PDF y publicación segura de archivos. En Inicio: alcance por rol, privacidad de caja ajena, ventas netas con devoluciones, corte de Lima, cobros por hora, tramos de espera, estados de consulta y descarte de respuestas tardías.
 
 ### 8.2. Cómo ejecutarlas
 
@@ -846,8 +900,15 @@ cargo test --manifest-path src-tauri/Cargo.toml
 Si en Windows aparecen errores de compilación relacionados con archivos `rlib`, la suite se verificó con una carpeta de compilación separada. Desde la raíz, reutiliza esa carpeta entre ejecuciones:
 
 ```powershell
-$targetPruebas = Join-Path $env:TEMP 'lubricentro-test'
+$targetPruebas = Join-Path $env:TEMP 'lubricentro-test-d3c505a2'
 cargo test --locked --manifest-path src-tauri/Cargo.toml --target-dir "$targetPruebas" -j 1
+```
+
+Para repetir la medición del backend de Inicio desde la raíz, con la misma carpeta temporal:
+
+```powershell
+$targetPruebas = Join-Path $env:TEMP 'lubricentro-test-d3c505a2'
+cargo test --locked --manifest-path src-tauri/Cargo.toml --target-dir "$targetPruebas" -j 1 --lib rendimiento_dashboard_con_1000_productos_y_5000_ventas -- --ignored --nocapture
 ```
 
 Para repetir las mediciones del backend de POS, Caja Chica, Administración y Reportes desde la raíz:
@@ -864,21 +925,27 @@ Las pruebas de integración externas deben usar datos y credenciales de Prueba. 
 
 ### 8.3. Estado de la validación
 
-La ejecución general en Windows del **10 de noviembre de 2026** reportó los siguientes resultados. La suite de Rust aprobó dos veces con una carpeta de compilación separada y `-j 1`. Las mediciones de rendimiento corresponden a ejecuciones por separado.
+Los resultados reúnen la última ejecución completa de Rust en Windows del **10 de noviembre de 2026** y comprobaciones reportadas en las revisiones de los módulos. La suite de Rust utilizó una carpeta de compilación separada y `-j 1`. Las mediciones de rendimiento se ejecutaron por separado.
 
 | Comprobación                                      | Resultado reportado                                                                                                                                                    |
 | ------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Formato Rust, `cargo check` y Clippy              | Aprobados.                                                                                                                                                             |
 | TypeScript y compilación del frontend             | Aprobadas.                                                                                                                                                             |
-| Pruebas de frontend y servicios                   | **144 aprobadas** en **21 archivos**, incluidas **3 de Reportes**, **11 de Administración**, **6 de Backup** y **3 de Caja Chica**.                                                       |
-| Suite general de Rust (`cargo test`)              | **162 aprobadas**, **0 fallidas** y **6 pruebas de rendimiento omitidas por defecto**.                                                                                             |
-| Suite Rust de POS                                 | **21 aprobadas**, incluida la integración con Caja Chica y Reportes.                                                                                                              |
+| Pruebas de frontend y servicios                   | **146 aprobadas** en la revisión de Inicio, incluidas **8 del Dashboard**. En la revisión anterior se reportaron **144** en **21 archivos**.                                                       |
+| Suite general de Rust (`cargo test`)              | **167 aprobadas**, **0 fallidas** y **7 pruebas de rendimiento omitidas por defecto**.                                                                                             |
+| Suite Rust de POS                                 | **21 aprobadas**, incluida la integración con Caja Chica, Reportes e Inicio.                                                                                                              |
 | Suite Rust de Caja Chica                          | **4 aprobadas**.                                                                                                                                                       |
 | Pruebas Rust de Backup y Copias                   | **10 aprobadas**, incluidas las de recuperación y de interrupción simulada.                                                                                            |
 | Suite funcional de Administración en Rust         | **11 aprobadas**. Incluye ubigeo, edición obsoleta, dependencias nuevas y reversión ante fallos de auditoría.                                                          |
+| Inicio Dashboard: pruebas de Rust y React | **6 de Rust** (incluidas en la suite general) y **8 de React** aprobadas en la revisión de Inicio. |
+| Rendimiento de Inicio Dashboard, por separado | **1 prueba aprobada en Windows**: 15 lecturas, cinco por rol, entre **0,20 y 10,71 ms**. |
 | Rendimiento de POS, ejecutado por separado        | **1 prueba aprobada** con cinco muestras y **5.000 ventas** en SQLite temporal en disco.                                                                               |
 | Rendimiento de Caja Chica, reportado por separado | **1 prueba aprobada** con **5.000 turnos y 100.000 movimientos** en SQLite temporal en disco. Las **20 muestras** por operación quedaron por debajo de **2 segundos**. |
 | Rendimiento de Administración, por separado       | **1 prueba aprobada** con **200 cuentas y 20 series** en SQLite en memoria; **20 de 20 muestras** por operación dentro de **2 segundos**.                              |
+
+**Rendimiento de Inicio:** las **15 consultas** con **1.000 productos y 5.000 ventas** en SQLite en disco cumplieron el objetivo de **3 segundos**. Los **10,20 s** de la prueba completa incluyen preparar los datos. Queda por medir la apertura desde Tauri hasta que aparezcan tarjetas y gráficos.
+
+**Integración externa:** el ejecutable de pruebas `integration_nubefact` registró **0 pruebas** en la suite general de Windows. Esa corrida no acredita la integración con NubeFact de Prueba.
 
 **Rendimiento del POS:** el listado promedió **44,76 ms** (36,27–50,18 ms) y la confirmación local **7,46 ms** (4,47–14,98 ms). La prueba mide el backend local; todavía falta validar el tiempo visible en WebView y el recorrido con NubeFact de Prueba.
 
@@ -906,13 +973,13 @@ La ejecución general en Windows del **10 de noviembre de 2026** reportó los si
 | [Wireframes y diseño](docs/ui/wireframes-y-diseno.md)                    | Referencia de interfaz existente.  |
 | [Esquema SQL v7](src-tauri/migrations/0001_initial_schema_v7.sql)        | Modelo inicial de datos.           |
 
-El informe general y las diez especificaciones funcionales v7 son documentos de referencia; sus enlaces se incorporarán cuando estén publicados en el repositorio. Los cambios de reglas deben reflejarse en código, documentación y esquema cuando corresponda.
+El Informe General y las diez especificaciones funcionales son documentos de referencia; sus enlaces se incorporarán cuando estén publicados en el repositorio. Para Inicio se aplica la especificación **v7.1**. Queda pendiente actualizar el Informe General para que describa las **tres tarjetas y dos gráficos por rol**. Los cambios de reglas deben reflejarse en código, documentación y esquema cuando corresponda.
 
 <a id="hoja-de-ruta"></a>
 
 ## 10. Hoja de ruta
 
-Los nueve primeros módulos están en ajustes finales; **el próximo módulo por cerrar es Inicio Dashboard**.
+**La implementación de los diez módulos llegó a su cierre parcial.** El trabajo que sigue es resolver los ajustes de cada módulo y reunir evidencia de validación para el cierre definitivo del ERP.
 
 1. **Login y Sesión — ajustes finales (95/100):** completar recuperación del error inicial y evidencias de teclado, foco, salida y tiempos de ingreso.
 2. **Ficha Vehicular e Historial — ajustes finales (93/100):** activar cambios pendientes al modificar datos, consolidar pruebas de interfaz y completar mediciones de escritorio.
@@ -923,9 +990,9 @@ Los nueve primeros módulos están en ajustes finales; **el próximo módulo por
 7. **Backup y Copias — ajustes finales (94/100):** estabilizar las pruebas de interfaz y completar las verificaciones de fallos, recuperación en Windows y guardado externo.
 8. **Administración — ajustes finales (96/100):** completar la validación en Tauri, el almacén de credenciales de Windows, los recorridos con POS y Backup y la medición con SQLite en disco.
 9. **Reportes — ajustes finales (96/100):** incorporar a Cargo los cuatro casos pendientes y completar la validación de navegación y exportación en Tauri.
-10. **Inicio Dashboard — pendiente · próximo módulo:** completar los indicadores, resúmenes y accesos por rol, conciliar sus cifras con los módulos de origen y validar el recorrido en Tauri.
+10. **Inicio Dashboard — ajustes finales (95/100):** habilitar la selección de barras horizontales del cajero, ampliar la cobertura de medianas, completar recorridos y tiempos de apertura en Tauri y alinear el Informe General con la especificación v7.1.
 
-Cada módulo tendrá su detalle plegable, capturas y evidencias conforme avance. Pasar a la siguiente etapa no elimina los pendientes de los módulos anteriores. Este orden de desarrollo no modifica el flujo operativo del taller descrito en la sección 5.
+El cierre definitivo se documentará con los recorridos en Windows, las pruebas de integración y la evidencia pendiente de cada módulo.
 
 <a id="autor"></a>
 

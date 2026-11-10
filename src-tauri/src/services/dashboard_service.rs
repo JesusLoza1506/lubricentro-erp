@@ -1,197 +1,273 @@
-use crate::dto::dashboard_dto::{AlertaFidelizacionDto, DashboardDto};
+use crate::dto::dashboard_dto::{
+    ActividadTurno, DashboardDto, DatosDashboard, EstadosTrabajo, PendientesDashboard,
+    PuntoDashboard, TurnoDashboard,
+};
 use crate::errors::AppError;
-use rusqlite::Connection;
+use crate::services::{reportes_service::ahora_lima, session_manager::SessionState};
+use chrono::{Days, NaiveDateTime, Timelike};
+use rusqlite::{params, Connection, OptionalExtension, Params};
+use std::collections::BTreeMap;
+
+type R<T> = Result<T, AppError>;
 
 pub struct DashboardService;
 
 impl DashboardService {
-    /// Obtiene las métricas del dashboard aplicando filtros de seguridad por rol directamente en BD
-    pub fn obtener_dashboard(conn: &Connection, id_usuario: i64) -> Result<DashboardDto, AppError> {
-        let rol: String = conn
+    pub fn obtener_para_sesion(
+        conn: &Connection,
+        sesion: &mut SessionState,
+        session_id: &str,
+    ) -> R<DashboardDto> {
+        if sesion.session_id.as_deref() != Some(session_id) {
+            return Err(AppError::NoAutenticado);
+        }
+        let usuario = sesion.validar_sesion_operativa(conn)?;
+        Self::obtener_dashboard(conn, usuario)
+    }
+
+    pub fn obtener_dashboard(conn: &Connection, usuario: i64) -> R<DashboardDto> {
+        Self::obtener_en(conn, usuario, ahora_lima())
+    }
+
+    fn obtener_en(conn: &Connection, usuario: i64, ahora: NaiveDateTime) -> R<DashboardDto> {
+        let tx = conn.unchecked_transaction()?;
+        let (ambiente, recuperacion): (String, bool) = tx.query_row(
+            "SELECT ambiente_actual, recuperacion_pendiente FROM configuracion WHERE id_config=1",
+            [],
+            |r| Ok((r.get(0)?, r.get(1)?)),
+        )?;
+        if recuperacion {
+            return Err(AppError::AccessDenied(
+                "Completa primero la recuperación en Backup.".into(),
+            ));
+        }
+        let rol: String = tx
             .query_row(
-                "SELECT rol FROM usuarios WHERE id_usuario = ?1 AND activo = 1",
-                [id_usuario],
-                |row| row.get(0),
-            )
-            .map_err(|_| AppError::NotFound("Usuario no encontrado o inactivo.".to_string()))?;
-
-        // 1. Órdenes activas (filtradas por mecánico si aplica)
-        let ots_activas: i64 = if rol == "MECANICO" {
-            conn.query_row(
-                "SELECT COUNT(*) FROM ordenes_trabajo WHERE estado IN ('EN_ESPERA', 'EN_PROCESO') AND id_mecanico = ?1",
-                [id_usuario],
-                |row| row.get(0),
-            )
-            .unwrap_or(0)
-        } else {
-            conn.query_row(
-                "SELECT COUNT(*) FROM ordenes_trabajo WHERE estado IN ('EN_ESPERA', 'EN_PROCESO')",
-                [],
-                |row| row.get(0),
-            )
-            .unwrap_or(0)
-        };
-
-        // 2. Productos con stock crítico
-        let productos_stock_critico: i64 = conn
-            .query_row(
-                "SELECT COUNT(*) FROM productos WHERE stock_actual <= stock_minimo AND activo = 1",
-                [],
-                |row| row.get(0),
-            )
-            .unwrap_or(0);
-
-        // La misma fuente económica de R01: ventas confirmadas y devoluciones por fecha propia.
-        let (ventas_del_dia, ventas_confirmadas, comprobantes_emitidos) = if rol == "MECANICO" {
-            (0.0, 0, 0)
-        } else {
-            let hoy = crate::services::reportes_service::ahora_lima().date();
-            let desde = format!("{hoy} 00:00:00");
-            let hasta = format!("{} 00:00:00", hoy.succ_opt().expect("fecha de hoy válida"));
-            let alcance = (rol == "CAJERO").then_some(id_usuario);
-            let (neto, cantidad): (i64, i64) = conn.query_row(
-                "SELECT coalesce(sum(total_cent),0),coalesce(sum(tipo='VENTA'),0)
-                 FROM v_operaciones_comerciales
-                 WHERE ambiente=(SELECT ambiente_actual FROM configuracion WHERE id_config=1)
-                 AND fecha_operacion>=?1 AND fecha_operacion<?2 AND (?3 IS NULL OR id_usuario=?3)",
-                (&desde, &hasta, alcance),
-                |r| Ok((r.get(0)?, r.get(1)?)),
-            )?;
-            let comprobantes: i64 = conn.query_row(
-                "SELECT count(*) FROM comprobantes c JOIN ventas v ON v.id_venta=c.id_venta
-                 WHERE c.ambiente=(SELECT ambiente_actual FROM configuracion WHERE id_config=1)
-                 AND fecha_emision>=?1 AND fecha_emision<?2 AND (?3 IS NULL OR v.id_emisor=?3)",
-                (&desde, &hasta, alcance),
+                "SELECT rol FROM usuarios WHERE id_usuario=?1 AND activo=1",
+                [usuario],
                 |r| r.get(0),
-            )?;
-            (neto as f64 / 100.0, cantidad, comprobantes)
-        };
-
-        // 4. Estado de caja (Filtrado por usuario para CAJERO, global para ADMIN, N/A para MECANICO)
-        let estado_caja = if rol == "MECANICO" {
-            "N/A".to_string()
-        } else if rol == "CAJERO" {
-            let caja_propia: i64 = conn
-                .query_row(
-                    "SELECT COUNT(*) FROM caja_chica WHERE estado = 'ABIERTA' AND id_usuario = ?1",
-                    [id_usuario],
-                    |row| row.get(0),
-                )
-                .unwrap_or(0);
-
-            if caja_propia > 0 {
-                "Abierta".to_string()
-            } else {
-                "Cerrada".to_string()
+            )
+            .optional()?
+            .ok_or(AppError::NoAutenticado)?;
+        let fecha = ahora.date();
+        let corte = ahora.format("%Y-%m-%d %H:%M:%S").to_string();
+        let dias: Vec<String> = (0..7)
+            .rev()
+            .map(|n| {
+                fecha
+                    .checked_sub_days(Days::new(n))
+                    .map(|d| d.to_string())
+                    .ok_or_else(|| AppError::Validation("Fecha de Inicio fuera de rango.".into()))
+            })
+            .collect::<R<_>>()?;
+        let desde = format!("{} 00:00:00", dias[0]);
+        let hoy = format!("{fecha} 00:00:00");
+        let datos = match rol.as_str() {
+            "ADMINISTRADOR" => {
+                administrador(&tx, &ambiente, &dias, &desde, &hoy, &corte, ahora.hour())?
             }
-        } else {
-            let caja_global: i64 = conn
-                .query_row(
-                    "SELECT COUNT(*) FROM caja_chica WHERE estado = 'ABIERTA'",
-                    [],
-                    |row| row.get(0),
-                )
-                .unwrap_or(0);
-
-            if caja_global > 0 {
-                "Abierta".to_string()
-            } else {
-                "Cerrada".to_string()
-            }
+            "MECANICO" => mecanico(&tx, usuario, &dias, &desde, &corte)?,
+            "CAJERO" => cajero(&tx, usuario, &ambiente, &corte)?,
+            _ => return Err(AppError::PermisoDenegado),
         };
-
+        tx.commit()?;
         Ok(DashboardDto {
-            rol,
-            ventas_del_dia,
-            ventas_confirmadas,
-            comprobantes_emitidos,
-            ots_activas,
-            productos_stock_critico,
-            estado_caja,
+            ambiente,
+            fecha: fecha.to_string(),
+            actualizado_en: corte,
+            datos,
         })
     }
+}
 
-    /// Lista los vehículos pendientes de mantenimiento por kilometraje
-    pub fn listar_alertas_fidelizacion(
-        conn: &Connection,
-    ) -> Result<Vec<AlertaFidelizacionDto>, AppError> {
-        let mut stmt = conn.prepare(
-            "SELECT v.placa, v.marca, v.modelo, v.kilometraje_actual, ot.proximo_kilometraje, c.nombre_razon_social, c.telefono
-             FROM vehiculos v
-             JOIN clientes c ON v.id_cliente = c.id_cliente
-             JOIN ordenes_trabajo ot ON v.placa = ot.placa
-             WHERE v.kilometraje_actual >= ot.proximo_kilometraje AND ot.estado = 'FINALIZADO'
-             GROUP BY v.placa"
-        ).or_else(|_| {
-            conn.prepare(
-                "SELECT v.placa, v.marca, v.modelo, v.kilometraje_actual, ot.proximo_kilometraje, c.nombre_razon_social, c.telefono
-                 FROM vehiculos v
-                 JOIN clientes c ON v.id_cliente = c.id_cliente
-                 JOIN ordenes_trabajo ot ON v.placa = ot.placa
-                 WHERE v.kilometraje_actual >= ot.proximo_kilometraje
-                 GROUP BY v.placa"
-            )
-        })?;
+fn serie(conn: &Connection, sql: &str, args: impl Params) -> R<BTreeMap<String, i64>> {
+    let mut s = conn.prepare(sql)?;
+    let filas = s.query_map(args, |r| Ok((r.get(0)?, r.get(1)?)))?;
+    Ok(filas.collect::<Result<_, _>>()?)
+}
 
-        let iter = stmt.query_map([], |row| {
-            Ok(AlertaFidelizacionDto {
-                placa: row.get(0)?,
-                marca: row.get(1)?,
-                modelo: row.get(2)?,
-                kilometraje_actual: row.get(3)?,
-                proximo_kilometraje: row.get(4)?,
-                nombre_cliente: row.get(5)?,
-                telefono: row.get(6)?,
-            })
-        })?;
+fn completar(
+    periodos: impl IntoIterator<Item = String>,
+    mut datos: BTreeMap<String, i64>,
+) -> Vec<PuntoDashboard> {
+    periodos
+        .into_iter()
+        .map(|periodo| PuntoDashboard {
+            valor: datos.remove(&periodo).unwrap_or(0),
+            periodo,
+        })
+        .collect()
+}
 
-        let mut alertas = Vec::new();
-        for item in iter {
-            alertas.push(item?);
+fn mediana(conn: &Connection, sql: &str, args: impl Params) -> R<Option<i64>> {
+    let mut s = conn.prepare(sql)?;
+    let filas = s.query_map(args, |r| r.get::<_, i64>(0))?;
+    let mut segundos = filas.collect::<Result<Vec<_>, _>>()?;
+    segundos.sort_unstable();
+    let mitad = segundos.len() / 2;
+    Ok(if segundos.is_empty() {
+        None
+    } else if segundos.len() % 2 == 0 {
+        let (a, b) = (segundos[mitad - 1], segundos[mitad]);
+        Some(a + (b - a) / 2)
+    } else {
+        Some(segundos[mitad])
+    })
+}
+
+fn administrador(
+    conn: &Connection,
+    ambiente: &str,
+    dias: &[String],
+    desde: &str,
+    hoy: &str,
+    corte: &str,
+    hora: u32,
+) -> R<DatosDashboard> {
+    // Misma vista económica que R01, sin usar comprobantes o filas de pago como ventas.
+    let ventas = serie(
+        conn,
+        "SELECT substr(fecha_operacion,1,10) AS dia, sum(total_cent)
+         FROM v_operaciones_comerciales WHERE ambiente=?1 AND fecha_operacion BETWEEN ?2 AND ?3
+         GROUP BY dia",
+        params![ambiente, desde, corte],
+    )?;
+    let terminadas = serie(
+        conn,
+        "SELECT substr(fecha_fin,1,13) AS hora, count(*)
+         FROM ordenes_trabajo WHERE estado='FINALIZADO' AND fecha_fin BETWEEN ?1 AND ?2
+         GROUP BY hora",
+        params![hoy, corte],
+    )?;
+    let trabajos_terminados_hoy = terminadas.values().sum();
+    let mediana_cobro_seg = mediana(
+        conn,
+        "SELECT unixepoch(v.fecha_venta)-unixepoch(o.fecha_fin)
+         FROM ventas v JOIN ordenes_trabajo o ON o.id_ot=v.id_ot
+         WHERE v.estado_registro='CONFIRMADA' AND v.ambiente=?1 AND o.estado='FINALIZADO'
+         AND v.fecha_venta BETWEEN ?2 AND ?3 AND unixepoch(v.fecha_venta)>=unixepoch(o.fecha_fin)",
+        params![ambiente, desde, corte],
+    )?;
+    Ok(DatosDashboard::Administrador {
+        ventas_netas_hoy_cent: ventas.get(&hoy[..10]).copied().unwrap_or(0),
+        trabajos_terminados_hoy,
+        mediana_cobro_seg,
+        ventas_por_dia: completar(dias.iter().cloned(), ventas),
+        trabajos_por_hora: completar(
+            (0..=hora).map(|h| format!("{} {h:02}", &hoy[..10])),
+            terminadas,
+        ),
+    })
+}
+
+fn mecanico(
+    conn: &Connection,
+    usuario: i64,
+    dias: &[String],
+    desde: &str,
+    corte: &str,
+) -> R<DatosDashboard> {
+    let (en_espera, en_proceso): (i64, i64) = conn.query_row(
+        "SELECT count(CASE WHEN estado='EN_ESPERA' THEN 1 END),
+                count(CASE WHEN estado='EN_PROCESO' THEN 1 END)
+         FROM ordenes_trabajo WHERE id_mecanico=?1 AND fecha_ingreso<=?2
+         AND estado IN ('EN_ESPERA','EN_PROCESO')",
+        params![usuario, corte],
+        |r| Ok((r.get(0)?, r.get(1)?)),
+    )?;
+    // Taller conserva el responsable de la finalización en id_mecanico_terminal.
+    let trabajos = serie(
+        conn,
+        "SELECT substr(fecha_fin,1,10) AS dia, count(*) FROM ordenes_trabajo
+         WHERE estado='FINALIZADO' AND coalesce(id_mecanico_terminal,id_mecanico)=?1
+         AND fecha_fin BETWEEN ?2 AND ?3 GROUP BY dia",
+        params![usuario, desde, corte],
+    )?;
+    let trabajos_terminados_hoy = trabajos.get(&corte[..10]).copied().unwrap_or(0);
+    let mediana_trabajo_seg = mediana(
+        conn,
+        "SELECT unixepoch(fecha_fin)-unixepoch(fecha_inicio) FROM ordenes_trabajo
+         WHERE estado='FINALIZADO' AND coalesce(id_mecanico_terminal,id_mecanico)=?1
+         AND fecha_fin BETWEEN ?2 AND ?3 AND unixepoch(fecha_fin)>=unixepoch(fecha_inicio)",
+        params![usuario, desde, corte],
+    )?;
+    Ok(DatosDashboard::Mecanico {
+        trabajos_terminados_hoy,
+        trabajos_abiertos: en_espera + en_proceso,
+        mediana_trabajo_seg,
+        por_estado: EstadosTrabajo {
+            en_espera,
+            en_proceso,
+            finalizadas_hoy: trabajos_terminados_hoy,
+        },
+        trabajos_por_dia: completar(dias.iter().cloned(), trabajos),
+    })
+}
+
+fn cajero(conn: &Connection, usuario: i64, ambiente: &str, corte: &str) -> R<DatosDashboard> {
+    let caja: Option<(i64, i64, String)> = conn
+        .query_row(
+            "SELECT id_caja,id_usuario,fecha_apertura FROM caja_chica
+             WHERE estado='ABIERTA' AND ambiente=?1 AND fecha_apertura<=?2",
+            params![ambiente, corte],
+            |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
+        )
+        .optional()?;
+    let (turno, actividad_turno) = match caja {
+        Some((id, titular, apertura)) if titular == usuario => {
+            // Una venta puede tener varios medios, pero sigue siendo un solo cobro.
+            let cobros = serie(
+                conn,
+                "SELECT substr(fecha,1,13) AS hora, count(*) FROM (
+                   SELECT min(m.fecha_operacion) AS fecha
+                   FROM movimientos_caja m JOIN ventas v ON v.id_venta=m.id_venta
+                   WHERE m.id_caja=?1 AND m.id_usuario=?2 AND m.tipo='COBRO'
+                   AND v.id_caja=?1 AND v.id_emisor=?2 AND v.estado_registro='CONFIRMADA'
+                   AND v.ambiente=?3 AND m.fecha_operacion BETWEEN ?4 AND ?5
+                   GROUP BY m.id_venta
+                 ) GROUP BY hora",
+                params![id, usuario, ambiente, apertura, corte],
+            )?;
+            let actividad = ActividadTurno {
+                cobros: cobros.values().sum(),
+                cobros_por_hora: cobros
+                    .into_iter()
+                    .map(|(periodo, valor)| PuntoDashboard { periodo, valor })
+                    .collect(),
+            };
+            (TurnoDashboard::Propio { apertura }, Some(actividad))
         }
-
-        Ok(alertas)
-    }
+        Some(_) => (TurnoDashboard::Ajeno, None),
+        None => (TurnoDashboard::SinCaja, None),
+    };
+    // La elegibilidad coincide con el selector de OT finalizadas del POS.
+    let pendientes = conn.query_row(
+        "WITH cola AS (
+            SELECT unixepoch(?1)-unixepoch(o.fecha_fin) AS espera
+            FROM ordenes_trabajo o WHERE o.estado='FINALIZADO'
+            AND (o.fecha_fin IS NULL OR o.fecha_fin<=?1)
+            AND NOT EXISTS(SELECT 1 FROM ventas v WHERE v.id_ot=o.id_ot)
+         )
+         SELECT count(*),max(espera),count(CASE WHEN espera>=0 AND espera<1800 THEN 1 END),
+                count(CASE WHEN espera BETWEEN 1800 AND 3600 THEN 1 END),
+                count(CASE WHEN espera>3600 THEN 1 END) FROM cola",
+        [corte],
+        |r| {
+            Ok(PendientesDashboard {
+                total: r.get(0)?,
+                mayor_espera_seg: r.get(1)?,
+                menos_30: r.get(2)?,
+                entre_30_y_60: r.get(3)?,
+                mas_60: r.get(4)?,
+            })
+        },
+    )?;
+    Ok(DatosDashboard::Cajero {
+        turno,
+        actividad_turno,
+        pendientes,
+    })
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::db::init_db;
-    use tempfile::tempdir;
-
-    const DUMMY_ARGON2_HASH: &str = "$argon2id$v=19$m=19456,t=2,p=1$Z3VpZGVsaW5lc3NhbHQ$5Vw5O7hK5W9u8P0s5vX+A1B2C3D4E5F6G7H8I9J0K1L";
-
-    #[test]
-    fn test_dashboard_filtrado_por_rol() {
-        let dir = tempdir().unwrap();
-        let conn = init_db(dir.path().to_path_buf()).unwrap();
-
-        // 1. Insertar usuario Mecánico
-        conn.execute(
-            "INSERT INTO usuarios (id_usuario, nombre_completo, username, password_hash, rol, activo)
-             VALUES (10, 'Mecanico Uno', 'meca1', ?1, 'MECANICO', 1)",
-            [DUMMY_ARGON2_HASH],
-        )
-        .unwrap();
-
-        // 2. Insertar usuario Cajero
-        conn.execute(
-            "INSERT INTO usuarios (id_usuario, nombre_completo, username, password_hash, rol, activo)
-             VALUES (20, 'Cajero Uno', 'caja1', ?1, 'CAJERO', 1)",
-            [DUMMY_ARGON2_HASH],
-        )
-        .unwrap();
-
-        // 3. Probar Dashboard de Mecánico (Ventas en 0.0 y Estado de caja en N/A)
-        let dash_meca = DashboardService::obtener_dashboard(&conn, 10).unwrap();
-        assert_eq!(dash_meca.rol, "MECANICO");
-        assert_eq!(dash_meca.ventas_del_dia, 0.0);
-        assert_eq!(dash_meca.estado_caja, "N/A");
-
-        // 4. Probar Dashboard de Cajero (Caja cerrada por defecto)
-        let dash_caja = DashboardService::obtener_dashboard(&conn, 20).unwrap();
-        assert_eq!(dash_caja.rol, "CAJERO");
-        assert_eq!(dash_caja.estado_caja, "Cerrada");
-    }
-}
+mod tests;

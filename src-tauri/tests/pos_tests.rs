@@ -366,6 +366,16 @@ fn cobrar_ot_con_adicional_no_repite_consumo_y_conserva_precios() {
     p.pagos[0].recibido_cent = Some(15000);
     let disponibles = consultas::ots(&c, 2, "ABC123", 1).unwrap();
     assert_eq!(disponibles["total"], 1);
+    let inicio = |db: &Connection, usuario| {
+        serde_json::to_value(
+            lubricentro_erp_lib::services::dashboard_service::DashboardService::obtener_dashboard(
+                db, usuario,
+            )
+            .unwrap(),
+        )
+        .unwrap()
+    };
+    assert_eq!(inicio(&c, 2)["pendientes"]["total"], 1);
     let contexto = &disponibles["filas"][0];
     assert_eq!(contexto["id"], ot.id_ot);
     assert!(contexto["codigo"].as_str().is_some_and(|s| !s.is_empty()));
@@ -379,6 +389,8 @@ fn cobrar_ot_con_adicional_no_repite_consumo_y_conserva_precios() {
     let r = ventas::confirmar(&mut c, 2, None, &p).unwrap();
     assert_eq!(r["total_cent"], 13000);
     assert_eq!(consultas::ots(&c, 2, "ABC123", 1).unwrap()["total"], 0);
+    assert_eq!(inicio(&c, 2)["pendientes"]["total"], 0);
+    assert!(inicio(&c, 1)["mediana_cobro_seg"].as_i64().is_some());
     let mov = n(
         &c,
         "SELECT id_movimiento FROM movimientos_inventario WHERE tipo_movimiento='VENTA_DIRECTA'",
@@ -824,9 +836,12 @@ fn reportes_usan_venta_cobro_y_recuperacion_fisica_del_pos() {
     assert_eq!(ventas(Reporte::R07)["total_filas"], 2);
     assert_eq!(n(&c,"SELECT count(*) FROM movimientos_caja m JOIN ventas v USING(id_venta) WHERE m.fecha_operacion=v.fecha_venta"),2);
     assert_eq!(n(&c,"SELECT count(*) FROM movimientos_caja m JOIN devoluciones d USING(id_devolucion) WHERE m.fecha_operacion=d.fecha_operacion"),1);
-    let dash = DashboardService::obtener_dashboard(&c, 1).unwrap();
-    assert_eq!(dash.ventas_del_dia, 63.0);
-    assert_eq!(dash.ventas_confirmadas, 1);
+    let dash = serde_json::to_value(DashboardService::obtener_dashboard(&c, 1).unwrap()).unwrap();
+    assert_eq!(dash["ventas_netas_hoy_cent"], 6300);
+    assert_eq!(dash["ventas_por_dia"][6]["valor"], 6300);
+    let caja = serde_json::to_value(DashboardService::obtener_dashboard(&c, 2).unwrap()).unwrap();
+    assert_eq!(caja["actividad_turno"]["cobros"], 1); // efectivo + Yape, sin contar el reintegro
+    assert!(caja.get("ventas_netas_hoy_cent").is_none());
 }
 
 #[test]
